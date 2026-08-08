@@ -160,7 +160,7 @@ function PixelSheet({
   return (
     <div className="prototype-overlay" onClick={onClose}>
       <div
-        className="prototype-sheet"
+        className={`prototype-sheet ${checkoutOpen ? "is-checkout" : "is-detail"}`}
         role="dialog"
         aria-modal="true"
         aria-label={`Detalhes do pixel ${pixel.id}`}
@@ -192,39 +192,43 @@ function PixelSheet({
               </div>
             </div>
 
-            <div className="prototype-qr-wrap">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(pixPayload)}`}
-                alt="QR Code Pix"
-                width="180"
-                height="180"
-                className="prototype-qr"
-              />
-            </div>
+            <div className="prototype-checkout-layout">
+              <div className="prototype-qr-wrap">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(pixPayload)}`}
+                  alt="QR Code Pix"
+                  width="180"
+                  height="180"
+                  className="prototype-qr"
+                />
+              </div>
 
-            <div className="prototype-pix-label">Pix copia e cola</div>
-            <div className="prototype-pix-row">
-              <span className="prototype-pix-key">{pixPayload}</span>
-              <button className="prototype-copy-button" onClick={copyPix}>
-                {copied ? <Check size={13} /> : <Copy size={13} />}
-                {copied ? "Copiado" : "Copiar"}
-              </button>
-            </div>
+              <div className="prototype-checkout-info">
+                <div className="prototype-pix-label">Pix copia e cola</div>
+                <div className="prototype-pix-row">
+                  <span className="prototype-pix-key">{pixPayload}</span>
+                  <button className="prototype-copy-button" onClick={copyPix}>
+                    {copied ? <Check size={13} /> : <Copy size={13} />}
+                    {copied ? "Copiado" : "Copiar"}
+                  </button>
+                </div>
 
-            <div className="prototype-waiting">
-              <Loader2 size={14} className="prototype-spinner" />
-              Aguardando pagamento…
-            </div>
+                <div className="prototype-waiting">
+                  <Loader2 size={14} className="prototype-spinner" />
+                  Aguardando pagamento…
+                </div>
 
-            <button
-              className="prototype-demo-button"
-              onClick={() => {
-                onReveal(pixel.id);
-                setCheckoutOpen(false);
-              }}
-            >
-              (demo) simular pagamento confirmado
-            </button>
+                <button
+                  className="prototype-demo-button"
+                  onClick={() => {
+                    onReveal(pixel.id);
+                    setCheckoutOpen(false);
+                  }}
+                >
+                  (demo) simular pagamento confirmado
+                </button>
+              </div>
+            </div>
           </>
         ) : (
           <>
@@ -240,37 +244,44 @@ function PixelSheet({
               </button>
             </div>
 
-            <div
-              className="prototype-pixel-hero"
-              style={{ background: pixel.color }}
-            >
-              {pixel.revealed ? (
-                <span className="prototype-hero-emoji">{pixel.emoji}</span>
-              ) : (
-                <Lock size={28} color="rgba(255,255,255,.55)" />
-              )}
-            </div>
-
-            {!pixel.revealed && (
-              <button
-                className="prototype-reveal-button"
-                onClick={() => setCheckoutOpen(true)}
+            <div className="prototype-detail-layout">
+              <div
+                className="prototype-pixel-hero"
+                style={{ background: pixel.color }}
               >
-                Revelar pixel
-              </button>
-            )}
-
-            {pixel.revealed && (
-              <div className="prototype-revealed-by">
-                <span>
-                  {pixel.revealedBy === CURRENT_USER_NICKNAME
-                    ? "Revelado por você"
-                    : `Revelado por ${pixel.revealedBy}`}
-                </span>
-                <span className="prototype-divider">·</span>
-                <span>{formatRevealedDate(pixel.revealedAt)}</span>
+                {pixel.revealed ? (
+                  <span className="prototype-hero-emoji">{pixel.emoji}</span>
+                ) : (
+                  <Lock size={28} color="rgba(255,255,255,.55)" />
+                )}
               </div>
-            )}
+
+              <div className="prototype-detail-actions">
+                {!pixel.revealed && (
+                  <button
+                    className="prototype-reveal-button"
+                    onClick={() => setCheckoutOpen(true)}
+                  >
+                    Revelar pixel
+                  </button>
+                )}
+
+                {pixel.revealed && (
+                  <div className="prototype-revealed-by">
+                    <span>
+                      {pixel.revealedBy === CURRENT_USER_NICKNAME
+                        ? "Revelado por você"
+                        : `Revelado por ${pixel.revealedBy}`}
+                    </span>
+                    <span className="prototype-divider">·</span>
+                    <span>{formatRevealedDate(pixel.revealedAt)}</span>
+                  </div>
+                )}
+                <p className="prototype-desktop-hint">
+                  Clique fora para continuar explorando.
+                </p>
+              </div>
+            </div>
           </>
         )}
       </div>

@@ -147,6 +147,8 @@ button:focus-visible {
 .prototype-sheet {
   width: 100%;
   max-width: 420px;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
   padding: 10px 20px 22px;
   border-top: 1px solid #1f2328;
   border-radius: 16px 16px 0 0;
@@ -229,6 +231,23 @@ button:focus-visible {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.prototype-detail-layout,
+.prototype-checkout-layout {
+  display: block;
+}
+
+.prototype-detail-actions {
+  min-width: 0;
+}
+
+.prototype-desktop-hint {
+  display: none;
+  margin: 14px 0 0;
+  color: #5b6470;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .prototype-revealed-by {
@@ -353,7 +372,84 @@ button:focus-visible {
   cursor: pointer;
 }
 
-@media (max-width: 520px) {
+@media (min-width: 700px) {
+  .prototype-overlay {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .prototype-sheet {
+    width: min(760px, calc(100vw - 48px));
+    max-width: none;
+    padding: 18px 24px 26px;
+    border: 1px solid #293039;
+    border-radius: 16px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+  }
+
+  .prototype-drag-handle {
+    display: none;
+  }
+
+  .prototype-sheet-header {
+    margin-bottom: 22px;
+  }
+
+  .prototype-detail-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1fr);
+    align-items: center;
+    gap: 28px;
+  }
+
+  .prototype-pixel-hero {
+    max-height: none;
+    margin: 0;
+    border-radius: 12px;
+  }
+
+  .prototype-detail-actions {
+    padding-right: 12px;
+  }
+
+  .prototype-detail-actions .prototype-reveal-button {
+    min-height: 48px;
+  }
+
+  .prototype-desktop-hint {
+    display: block;
+  }
+
+  .prototype-checkout-title {
+    margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .prototype-price {
+    font-size: 38px;
+  }
+
+  .prototype-checkout-layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    align-items: center;
+    gap: 28px;
+  }
+
+  .prototype-qr-wrap {
+    margin: 0;
+  }
+
+  .prototype-checkout-info {
+    min-width: 0;
+  }
+
+  .prototype-demo-button {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 699px) {
   .prototype-header {
     padding: 16px;
   }
@@ -365,5 +461,6 @@ button:focus-visible {
 
   .prototype-sheet {
     max-width: none;
+    border-radius: 16px 16px 0 0;
   }
 }
