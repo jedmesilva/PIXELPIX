@@ -242,14 +242,6 @@ button:focus-visible {
   min-width: 0;
 }
 
-.prototype-desktop-hint {
-  display: none;
-  margin: 14px 0 0;
-  color: #5b6470;
-  font-size: 11px;
-  line-height: 1.45;
-}
-
 .prototype-revealed-by {
   display: flex;
   align-items: center;
@@ -414,10 +406,6 @@ button:focus-visible {
 
   .prototype-detail-actions .prototype-reveal-button {
     min-height: 48px;
-  }
-
-  .prototype-desktop-hint {
-    display: block;
   }
 
   .prototype-checkout-title {

@@ -277,9 +277,6 @@ function PixelSheet({
                     <span>{formatRevealedDate(pixel.revealedAt)}</span>
                   </div>
                 )}
-                <p className="prototype-desktop-hint">
-                  Clique fora para continuar explorando.
-                </p>
               </div>
             </div>
           </>
