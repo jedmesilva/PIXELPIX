@@ -1,0 +1,623 @@
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { Lock, ChevronLeft, Copy, Check, Loader2 } from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// CONFIG
+// ---------------------------------------------------------------------------
+const TOTAL_PIXELS = 1_000_000;
+const MIN_CELL_PX = 34;      // tamanho mínimo alvo de célula (ajusta por viewport)
+const BUFFER_ROWS = 4;       // linhas extras acima/abaixo pra scroll suave
+const CHUNK_SIZE = 2500;     // simula blocos de 2500 (50x50) que "viriam" do backend
+const PIXEL_PRICE = 0.5;     // preço fixo por pixel, em BRL — só aparece na etapa de pagamento
+
+// ---------------------------------------------------------------------------
+// "BACKEND" SIMULADO
+// ---------------------------------------------------------------------------
+const chunkCache = new Map();
+
+const EMOJI_SET = [
+  "🌟", "🔥", "🌊", "🍀", "⚡", "🎯", "🪐", "🌙", "🦋", "🍁",
+  "🌵", "🐚", "🍄", "🎈", "🧿", "🪁", "🌈", "🍉", "🦖", "🎲",
+];
+
+// nicknames simulados pra pixels já revelados (viriam do backend em produção)
+const NICKNAME_SET = [
+  "ana.pixel", "joao_dev", "marcelasoares", "rafa_builder", "biancart",
+  "lucas.codes", "camila_", "pedrohenrique", "julia.designs", "thiago_ok",
+];
+
+const CURRENT_USER_NICKNAME = "você"; // usuário logado, quem está revelando agora
+
+function fakeRevealedAt(id) {
+  // data determinística no passado, só pra demonstração
+  const seed = (id * 2654435761) % 2 ** 32;
+  const daysAgo = 1 + (seed % 400);
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return date;
+}
+
+function fakeRevealedBy(id) {
+  const seed = (id * 2654435761) % 2 ** 32;
+  return NICKNAME_SET[seed % NICKNAME_SET.length];
+}
+
+function hashColor(id) {
+  const seed = (id * 2654435761) % 2 ** 32;
+  const t = (seed % 1000) / 1000;
+  const lightness = 14 + t * 10;
+  const hueShift = (id % 7 === 0) ? 210 : 220;
+  const sat = id % 13 === 0 ? 55 : 8;
+  return `hsl(${hueShift}, ${sat}%, ${lightness}%)`;
+}
+
+function pickEmoji(id) {
+  const seed = (id * 2654435761) % 2 ** 32;
+  return EMOJI_SET[seed % EMOJI_SET.length];
+}
+
+function getChunk(chunkId) {
+  if (chunkCache.has(chunkId)) return chunkCache.get(chunkId);
+  const start = chunkId * CHUNK_SIZE;
+  const end = Math.min(start + CHUNK_SIZE, TOTAL_PIXELS);
+  const data = new Map();
+  for (let id = start; id < end; id++) {
+    const revealed = id % 5 !== 0;
+    data.set(id, {
+      id,
+      color: hashColor(id),
+      revealed,
+      emoji: revealed ? pickEmoji(id) : null,
+      revealedBy: revealed ? fakeRevealedBy(id) : null,
+      revealedAt: revealed ? fakeRevealedAt(id) : null,
+    });
+  }
+  chunkCache.set(chunkId, data);
+  return data;
+}
+
+function getPixel(id) {
+  const chunkId = Math.floor(id / CHUNK_SIZE);
+  const chunk = getChunk(chunkId);
+  return chunk.get(id);
+}
+
+function revealPixelInCache(id) {
+  const pixel = getPixel(id);
+  pixel.revealed = true;
+  pixel.emoji = pickEmoji(id);
+  pixel.revealedBy = CURRENT_USER_NICKNAME;
+  pixel.revealedAt = new Date();
+  return pixel;
+}
+
+function formatBRL(value) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatRevealedDate(date) {
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// simula uma chave Pix "copia e cola" única por pixel — em produção viria do backend de pagamentos
+function fakePixPayload(id) {
+  return `00020126580014BR.GOV.BCB.PIX0136pixel-${id}-a1b2c3d4-e5f6-52040000530398654${(PIXEL_PRICE).toFixed(2)}5802BR5913Pixel Studio6009SAO PAULO62070503***6304ABCD`;
+}
+
+// ---------------------------------------------------------------------------
+// COMPONENTE PRINCIPAL
+// ---------------------------------------------------------------------------
+export default function PixelGrid() {
+  const containerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [scrollTop, setScrollTop] = useState(0);
+  const [selectedId, setSelectedId] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
+  const [revealVersion, setRevealVersion] = useState(0);
+  const [checkoutOpen, setCheckoutOpen] = useState(false); // etapa 2: pagamento Pix
+  const [copied, setCopied] = useState(false);
+
+  const closeSheet = useCallback(() => {
+    setSelectedId(null);
+    setCheckoutOpen(false);
+    setCopied(false);
+  }, []);
+
+  const handleCopyPixKey = useCallback((payload) => {
+    navigator.clipboard?.writeText(payload).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => {}
+    );
+  }, []);
+
+  const handleReveal = useCallback((id) => {
+    revealPixelInCache(id);
+    setRevealVersion((v) => v + 1);
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      setContainerSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const { columns, cellSize, totalRows, totalHeight } = useMemo(() => {
+    const width = containerSize.width || 1;
+    const cols = Math.max(1, Math.floor(width / MIN_CELL_PX));
+    const size = width / cols;
+    const rows = Math.ceil(TOTAL_PIXELS / cols);
+    return { columns: cols, cellSize: size, totalRows: rows, totalHeight: rows * size };
+  }, [containerSize.width]);
+
+  const { startRow, endRow } = useMemo(() => {
+    if (cellSize === 0) return { startRow: 0, endRow: 0 };
+    const visibleRows = Math.ceil(containerSize.height / cellSize) + 1;
+    const start = Math.max(0, Math.floor(scrollTop / cellSize) - BUFFER_ROWS);
+    const end = Math.min(totalRows, start + visibleRows + BUFFER_ROWS * 2);
+    return { startRow: start, endRow: end };
+  }, [scrollTop, cellSize, containerSize.height, totalRows]);
+
+  const visiblePixels = useMemo(() => {
+    const items = [];
+    for (let row = startRow; row < endRow; row++) {
+      for (let col = 0; col < columns; col++) {
+        const id = row * columns + col;
+        if (id >= TOTAL_PIXELS) break;
+        items.push({ id, row, col });
+      }
+    }
+    return items;
+  }, [startRow, endRow, columns]);
+
+  const handleScroll = useCallback((e) => {
+    setScrollTop(e.target.scrollTop);
+  }, []);
+
+  // dados derivados do pixel selecionado
+  const selected = useMemo(() => {
+    if (selectedId === null) return null;
+    return getPixel(selectedId);
+  }, [selectedId, revealVersion]);
+
+  return (
+    <>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div style={styles.page}>
+      <header style={styles.header}>
+        <div>
+          <h1 style={styles.title}>
+            PIXEL<span style={styles.titleAccent}>PIX</span>
+          </h1>
+          <p style={styles.subtitle}>1 milhão de pixels disponíveis pra revelar</p>
+        </div>
+        {hoveredId !== null && (
+          <div style={styles.hoverBadge}>#{hoveredId.toLocaleString("pt-BR")}</div>
+        )}
+      </header>
+
+      <div ref={containerRef} onScroll={handleScroll} style={styles.scrollArea}>
+        <div style={{ position: "relative", height: totalHeight, width: "100%" }}>
+          {visiblePixels.map(({ id, row, col }) => {
+            const pixel = getPixel(id);
+            const isSelected = id === selectedId;
+            const iconSize = Math.min(cellSize * 0.42, 16);
+            const emojiSize = Math.min(cellSize * 0.55, 20);
+            return (
+              <button
+                key={id}
+                onClick={() => setSelectedId(id)}
+                onMouseEnter={() => setHoveredId(id)}
+                onMouseLeave={() => setHoveredId((h) => (h === id ? null : h))}
+                style={{
+                  position: "absolute",
+                  top: row * cellSize,
+                  left: col * cellSize,
+                  width: cellSize,
+                  height: cellSize,
+                  boxSizing: "border-box",
+                  border: isSelected
+                    ? "2px solid #7DD3FC"
+                    : "1px solid rgba(255,255,255,0.05)",
+                  background: pixel.revealed
+                    ? pixel.color
+                    : `repeating-linear-gradient(45deg, ${pixel.color}, ${pixel.color} 4px, rgba(0,0,0,0.35) 4px, rgba(0,0,0,0.35) 8px)`,
+                  cursor: "pointer",
+                  padding: 0,
+                  outline: "none",
+                  transition: "border-color 120ms ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                aria-label={
+                  pixel.revealed
+                    ? `Pixel ${id}, revelado, ${pixel.emoji}`
+                    : `Pixel ${id}, não revelado`
+                }
+              >
+                {pixel.revealed ? (
+                  <span style={{ fontSize: emojiSize, lineHeight: 1, pointerEvents: "none" }}>
+                    {pixel.emoji}
+                  </span>
+                ) : (
+                  <Lock
+                    size={iconSize}
+                    strokeWidth={2}
+                    color="rgba(255,255,255,0.75)"
+                    style={{ pointerEvents: "none" }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {selected && (
+        <div style={styles.overlay} onClick={closeSheet}>
+          <div style={styles.sheet} onClick={(e) => e.stopPropagation()}>
+            {/* handle de arrastar — affordance nativa de bottom sheet mobile */}
+            <div style={styles.dragHandle} />
+
+            {checkoutOpen ? (
+              <>
+                {/* etapa 2: pagamento — header com voltar, não fechar direto */}
+                <div style={styles.sheetHeader}>
+                  <button
+                    style={styles.backBtn}
+                    onClick={() => setCheckoutOpen(false)}
+                    aria-label="Voltar"
+                  >
+                    <ChevronLeft size={16} strokeWidth={2} />
+                    Voltar
+                  </button>
+                  <button style={styles.closeBtn} onClick={closeSheet}>
+                    Fechar
+                  </button>
+                </div>
+
+                <div style={styles.checkoutTitleBlock}>
+                  <div style={styles.eyebrow}>PAGAMENTO VIA PIX</div>
+                  <div style={styles.priceValue}>{formatBRL(PIXEL_PRICE)}</div>
+                  <div style={styles.checkoutSubtitle}>
+                    Pixel #{selected.id.toLocaleString("pt-BR")}
+                  </div>
+                </div>
+
+                <div style={styles.qrWrap}>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(
+                      fakePixPayload(selected.id)
+                    )}`}
+                    alt="QR Code Pix"
+                    width={180}
+                    height={180}
+                    style={styles.qrImage}
+                  />
+                </div>
+
+                <div style={styles.pixKeyLabel}>Pix copia e cola</div>
+                <div style={styles.pixKeyRow}>
+                  <span style={styles.pixKeyText}>
+                    {fakePixPayload(selected.id)}
+                  </span>
+                  <button
+                    style={styles.copyBtn}
+                    onClick={() => handleCopyPixKey(fakePixPayload(selected.id))}
+                  >
+                    {copied ? (
+                      <>
+                        <Check size={13} strokeWidth={2.5} /> Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={13} strokeWidth={2} /> Copiar
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div style={styles.waitingRow}>
+                  <Loader2 size={14} strokeWidth={2} style={styles.spinner} />
+                  <span>Aguardando pagamento…</span>
+                </div>
+
+                {/* apenas para prototipagem — em produção o backend confirma via webhook */}
+                <button
+                  style={styles.devSimulateBtn}
+                  onClick={() => {
+                    handleReveal(selected.id);
+                    setCheckoutOpen(false); // volta pra etapa 1, com o mesmo pixel selecionado — já revelado
+                  }}
+                >
+                  (demo) simular pagamento confirmado
+                </button>
+              </>
+            ) : (
+              <>
+                {/* etapa 1: identidade do pixel + confirmação de revelar */}
+                <div style={styles.sheetHeader}>
+                  <div>
+                    <div style={styles.eyebrow}>PIXEL</div>
+                    <div style={styles.idNumber}>
+                      #{selected.id.toLocaleString("pt-BR")}
+                    </div>
+                  </div>
+                  <button style={styles.closeBtn} onClick={closeSheet}>
+                    Fechar
+                  </button>
+                </div>
+
+                <div style={{ ...styles.hero, background: selected.color }}>
+                  {selected.revealed ? (
+                    <span style={styles.heroEmoji}>{selected.emoji}</span>
+                  ) : (
+                    <Lock size={28} strokeWidth={2} color="rgba(255,255,255,0.55)" />
+                  )}
+                </div>
+
+                {!selected.revealed && (
+                  <button
+                    style={styles.revealBtn}
+                    onClick={() => setCheckoutOpen(true)}
+                  >
+                    Revelar pixel
+                  </button>
+                )}
+
+                {selected.revealed && (
+                  <div style={styles.revealedByRow}>
+                    <span style={styles.revealedByName}>
+                      {selected.revealedBy === CURRENT_USER_NICKNAME ? "Revelado por você" : `Revelado por ${selected.revealedBy}`}
+                    </span>
+                    <span style={styles.metaDivider}>·</span>
+                    <span>{formatRevealedDate(selected.revealedAt)}</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ESTILOS — monocromático, sóbrio
+// ---------------------------------------------------------------------------
+const styles = {
+  page: {
+    display: "flex",
+    flexDirection: "column",
+    height: "100vh",
+    width: "100%",
+    background: "#0B0D10",
+    color: "#E5E7EB",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px 20px",
+    borderBottom: "1px solid #1F2328",
+    flexShrink: 0,
+  },
+  title: { margin: 0, fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" },
+  titleAccent: { color: "#7DD3FC" },
+  subtitle: { margin: "4px 0 0", fontSize: 12, color: "#8B93A1" },
+  hoverBadge: {
+    fontSize: 12,
+    color: "#8B93A1",
+    border: "1px solid #1F2328",
+    borderRadius: 6,
+    padding: "4px 10px",
+    fontVariantNumeric: "tabular-nums",
+  },
+  scrollArea: { flex: 1, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" },
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.6)",
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  sheet: {
+    width: "100%",
+    maxWidth: 420,
+    background: "#14171B",
+    borderTop: "1px solid #1F2328",
+    borderRadius: "16px 16px 0 0",
+    padding: "10px 20px 22px",
+    boxSizing: "border-box",
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    background: "#2A2F36",
+    margin: "0 auto 16px",
+  },
+  sheetHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    color: "#8B93A1",
+    marginBottom: 2,
+  },
+  idNumber: {
+    fontSize: 22,
+    fontWeight: 600,
+    fontVariantNumeric: "tabular-nums",
+    fontFeatureSettings: '"tnum"',
+    letterSpacing: "-0.01em",
+  },
+  closeBtn: {
+    background: "transparent",
+    border: "none",
+    color: "#7DD3FC",
+    fontSize: 13,
+    cursor: "pointer",
+    padding: "4px 0",
+  },
+  hero: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    maxHeight: 180,
+    borderRadius: 14,
+    marginBottom: 14,
+    border: "1px solid #1F2328",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroEmoji: { fontSize: 56, lineHeight: 1 },
+  revealBtn: {
+    width: "100%",
+    padding: "14px 0",
+    borderRadius: 10,
+    border: "none",
+    background: "#7DD3FC",
+    color: "#0B0D10",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  revealedByRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    fontSize: 12,
+    color: "#8B93A1",
+  },
+  revealedByName: {
+    color: "#C3C9D1",
+    fontWeight: 500,
+  },
+  metaDivider: { color: "#3A4046" },
+  backBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 2,
+    background: "transparent",
+    border: "none",
+    color: "#8B93A1",
+    fontSize: 13,
+    cursor: "pointer",
+    padding: "4px 0",
+  },
+  checkoutTitleBlock: {
+    textAlign: "center",
+    marginBottom: 18,
+  },
+  priceValue: {
+    fontSize: 32,
+    fontWeight: 700,
+    letterSpacing: "-0.02em",
+    marginTop: 4,
+  },
+  checkoutSubtitle: {
+    fontSize: 12,
+    color: "#8B93A1",
+    marginTop: 4,
+  },
+  qrWrap: {
+    display: "flex",
+    justifyContent: "center",
+    padding: 12,
+    background: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  qrImage: { display: "block", borderRadius: 4 },
+  pixKeyLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.06em",
+    color: "#8B93A1",
+    marginBottom: 6,
+  },
+  pixKeyRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    background: "#0B0D10",
+    border: "1px solid #1F2328",
+    borderRadius: 10,
+    padding: "10px 12px",
+    marginBottom: 16,
+  },
+  pixKeyText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "'SF Mono', 'Roboto Mono', monospace",
+    color: "#8B93A1",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  copyBtn: {
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: 5,
+    background: "#1F2328",
+    border: "none",
+    borderRadius: 6,
+    color: "#E5E7EB",
+    fontSize: 12,
+    fontWeight: 600,
+    padding: "6px 10px",
+    cursor: "pointer",
+  },
+  waitingRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    fontSize: 12,
+    color: "#8B93A1",
+    marginBottom: 4,
+  },
+  spinner: {
+    animation: "spin 1s linear infinite",
+  },
+  devSimulateBtn: {
+    width: "100%",
+    marginTop: 14,
+    padding: "8px 0",
+    background: "transparent",
+    border: "1px dashed #3A4046",
+    borderRadius: 8,
+    color: "#5B6470",
+    fontSize: 11,
+    cursor: "pointer",
+  },
+};

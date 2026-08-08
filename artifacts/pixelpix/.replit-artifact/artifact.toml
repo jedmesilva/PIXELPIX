@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "PIXELPIX"
+description = "Um site interativo para explorar e revelar 1.000.000 de pixels. O grid é responsivo e virtualizado para manter a navegação rápida, carrega dados em chunks e abre detalhes e fluxo de revelação sob demanda."
+version = "1.0.0"
+id = "artifacts/pixelpix"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24056
+
+[services.development]
+run = "pnpm --filter @workspace/pixelpix run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pixelpix", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pixelpix/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24056"
+BASE_PATH = "/"
