@@ -1,285 +1,427 @@
-import { type CSSProperties, type ReactNode, type UIEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ErrorBoundary } from '@/components/error-boundary';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import NotFound from '@/pages/not-found';
-import { ArrowLeft, Check, Copy, X } from 'lucide-react';
-import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { ArrowLeft, Check, Copy, Loader2, Lock, X } from "lucide-react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ErrorBoundary } from "@/components/error-boundary";
+import NotFound from "@/pages/not-found";
+import { Route, Router as WouterRouter, Switch, useLocation } from "wouter";
 
 const queryClient = new QueryClient();
+
 const TOTAL_PIXELS = 1_000_000;
-const MIN_CELL = 16;
-const ROW_BUFFER = 7;
-const CHUNK_ROWS = 9;
-const PALETTE = ['#f2b857', '#e36c8b', '#82d69b', '#80b7e8', '#b697df', '#e8e0ad'];
+const MIN_CELL_PX = 34;
+const BUFFER_ROWS = 4;
+const CHUNK_SIZE = 2_500;
+const PIXEL_PRICE = 0.5;
 
-type Pixel = { id: number; row: number; col: number; opened: boolean; color: string; mark: number };
-type Viewport = { width: number; height: number; scrollTop: number };
+type Pixel = {
+  id: number;
+  color: string;
+  revealed: boolean;
+  emoji: string | null;
+  revealedBy: string | null;
+  revealedAt: Date | null;
+};
 
-function hashPixel(id: number) {
-  let x = (id + 1) * 2654435761;
-  x = (x ^ (x >>> 16)) * 2246822519;
-  x = (x ^ (x >>> 13)) * 3266489917;
-  return Math.abs(x ^ (x >>> 16));
+const chunkCache = new Map<number, Map<number, Pixel>>();
+
+const EMOJI_SET = [
+  "🌟", "🔥", "🌊", "🍀", "⚡", "🎯", "🪐", "🌙", "🦋", "🍁",
+  "🌵", "🐚", "🍄", "🎈", "🧿", "🪁", "🌈", "🍉", "🦖", "🎲",
+];
+
+const NICKNAME_SET = [
+  "ana.pixel", "joao_dev", "marcelasoares", "rafa_builder", "biancart",
+  "lucas.codes", "camila_", "pedrohenrique", "julia.designs", "thiago_ok",
+];
+
+const CURRENT_USER_NICKNAME = "você";
+
+function seedFor(id: number) {
+  return (id * 2_654_435_761) >>> 0;
 }
 
-function pixelFor(id: number, cols: number, opened: Set<number>): Pixel {
-  const hash = hashPixel(id);
-  return {
-    id,
-    row: Math.floor(id / cols),
-    col: id % cols,
-    opened: opened.has(id) || hash % 23 === 0,
-    color: PALETTE[hash % PALETTE.length],
-    mark: hash % 3,
-  };
+function fakeRevealedAt(id: number) {
+  const daysAgo = 1 + (seedFor(id) % 400);
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return date;
 }
 
-function PixelGlyph({ mark, opened }: { mark: number; opened: boolean }) {
-  if (!opened) return <span className="pixel-lock-mark" aria-hidden="true" />;
-  return <span className={`pixel-mark mark-${mark}`} aria-hidden="true" />;
+function fakeRevealedBy(id: number) {
+  return NICKNAME_SET[seedFor(id) % NICKNAME_SET.length];
 }
 
-function Brand() {
-  return (
-    <a className="brand-lockup" href="/" data-testid="link-brand" aria-label="Pixelpix início">
-      <span className="brand-mark" aria-hidden="true">
-        {Array.from({ length: 9 }, (_, index) => <i key={index} />)}
-      </span>
-      <span className="brand-word">PIXELPIX</span>
-    </a>
-  );
+function hashColor(id: number) {
+  const seed = seedFor(id);
+  const lightness = 14 + ((seed % 1_000) / 1_000) * 10;
+  const hueShift = id % 7 === 0 ? 210 : 220;
+  const saturation = id % 13 === 0 ? 55 : 8;
+  return `hsl(${hueShift}, ${saturation}%, ${lightness}%)`;
 }
 
-function PixelDetail({
+function pickEmoji(id: number) {
+  return EMOJI_SET[seedFor(id) % EMOJI_SET.length];
+}
+
+function getChunk(chunkId: number) {
+  const cached = chunkCache.get(chunkId);
+  if (cached) return cached;
+
+  const start = chunkId * CHUNK_SIZE;
+  const end = Math.min(start + CHUNK_SIZE, TOTAL_PIXELS);
+  const chunk = new Map<number, Pixel>();
+
+  for (let id = start; id < end; id += 1) {
+    const revealed = id % 5 !== 0;
+    chunk.set(id, {
+      id,
+      color: hashColor(id),
+      revealed,
+      emoji: revealed ? pickEmoji(id) : null,
+      revealedBy: revealed ? fakeRevealedBy(id) : null,
+      revealedAt: revealed ? fakeRevealedAt(id) : null,
+    });
+  }
+
+  chunkCache.set(chunkId, chunk);
+  return chunk;
+}
+
+function getPixel(id: number) {
+  return getChunk(Math.floor(id / CHUNK_SIZE)).get(id)!;
+}
+
+function revealPixelInCache(id: number) {
+  const pixel = getPixel(id);
+  pixel.revealed = true;
+  pixel.emoji = pickEmoji(id);
+  pixel.revealedBy = CURRENT_USER_NICKNAME;
+  pixel.revealedAt = new Date();
+  return pixel;
+}
+
+function formatBRL(value: number) {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+function formatRevealedDate(date: Date | null) {
+  if (!date) return "";
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function fakePixPayload(id: number) {
+  return `00020126580014BR.GOV.BCB.PIX0136pixel-${id}-a1b2c3d4-e5f6-52040000530398654${PIXEL_PRICE.toFixed(2)}5802BR5913Pixel Studio6009SAO PAULO62070503***6304ABCD`;
+}
+
+function PixelSheet({
   pixel,
   onClose,
   onReveal,
-  onConfirm,
 }: {
   pixel: Pixel;
   onClose: () => void;
-  onReveal: () => void;
-  onConfirm: () => void;
+  onReveal: (id: number) => void;
 }) {
-  const [step, setStep] = useState<'detail' | 'checkout' | 'confirmed'>('detail');
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const pixKey = 'pixelpix.demo@pix';
+  const pixPayload = fakePixPayload(pixel.id);
+
+  const copyPix = useCallback(async () => {
+    try {
+      await navigator.clipboard?.writeText(pixPayload);
+    } finally {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2_000);
+    }
+  }, [pixPayload]);
 
   useEffect(() => {
-    setStep(pixel.opened ? 'confirmed' : 'detail');
+    setCheckoutOpen(false);
     setCopied(false);
-  }, [pixel.id, pixel.opened]);
-
-  const copyPix = async () => {
-    try {
-      await navigator.clipboard?.writeText(pixKey);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(true);
-    }
-  };
+  }, [pixel.id]);
 
   return (
-    <aside className="detail-panel" role="dialog" aria-label={`Detalhes do pixel ${pixel.id}`}>
-      <button className="detail-close" onClick={onClose} data-testid="button-close-detail" aria-label="Fechar detalhes">
-        <X size={16} />
-      </button>
-      {step === 'detail' && (
-        <>
-          <p className="detail-kicker">Uma janela ainda fechada</p>
-          <h2 className="detail-title">Você encontrou um pixel.</h2>
-          <p className="detail-copy">Abra este pequeno espaço na obra coletiva e deixe uma marca que passa a existir para todo mundo.</p>
-          <span className="detail-id">pixel / {pixel.id.toLocaleString('pt-BR')}</span>
-          <button className="primary-action" onClick={() => { onReveal(); setStep('checkout'); }} data-testid="button-reveal-pixel">
-            Revelar por R$ 1,00
-            <ArrowLeft size={15} style={{ transform: 'rotate(180deg)' }} />
-          </button>
-        </>
-      )}
-      {step === 'checkout' && (
-        <>
-          <button className="detail-back" onClick={() => setStep('detail')} data-testid="button-back-detail">
-            <ArrowLeft size={14} /> Voltar
-          </button>
-          <p className="detail-kicker">Demonstração de pagamento</p>
-          <h2 className="detail-title">Abra a janela.</h2>
-          <p className="detail-copy">Copie a chave abaixo para imaginar o gesto. Nada é cobrado nesta experiência.</p>
-          <div className="checkout-box">
-            <span className="checkout-label">Chave Pix de demonstração</span>
-            <div className="copy-row">
-              <span className="pix-key">{pixKey}</span>
-              <button className="copy-button" onClick={copyPix} data-testid="button-copy-pix" aria-label="Copiar chave Pix">
-                {copied ? <Check size={13} /> : <Copy size={13} />}
-                {copied ? 'Copiada' : 'Copiar'}
+    <div className="prototype-overlay" onClick={onClose}>
+      <div
+        className="prototype-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Detalhes do pixel ${pixel.id}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="prototype-drag-handle" />
+
+        {checkoutOpen ? (
+          <>
+            <div className="prototype-sheet-header">
+              <button
+                className="prototype-back-button"
+                onClick={() => setCheckoutOpen(false)}
+                aria-label="Voltar"
+              >
+                <ArrowLeft size={16} />
+                Voltar
+              </button>
+              <button className="prototype-close-button" onClick={onClose}>
+                Fechar
               </button>
             </div>
-            <p className="pay-note">Depois, confirme abaixo para ver o pixel nascer no mapa.</p>
-          </div>
-          <button className="primary-action" onClick={() => { onConfirm(); setStep('confirmed'); }} data-testid="button-confirm-payment">
-            Simular pagamento confirmado
-            <Check size={15} />
-          </button>
-        </>
-      )}
-      {step === 'confirmed' && (
-        <>
-          <p className="detail-kicker">Agora ele é parte da obra</p>
-          <h2 className="detail-title">Pixel revelado.</h2>
-          <p className="detail-copy">Você abriu a janela {pixel.id.toLocaleString('pt-BR')}. Volte ao mapa e encontre sua marca quando quiser.</p>
-          <span className="detail-id" style={{ color: pixel.color }}>● &nbsp; pixel / {pixel.id.toLocaleString('pt-BR')}</span>
-          <button className="secondary-action" onClick={onClose} data-testid="button-return-map">Continuar explorando</button>
-        </>
-      )}
-    </aside>
+
+            <div className="prototype-checkout-title">
+              <div className="prototype-eyebrow">PAGAMENTO VIA PIX</div>
+              <div className="prototype-price">{formatBRL(PIXEL_PRICE)}</div>
+              <div className="prototype-subtle">
+                Pixel #{pixel.id.toLocaleString("pt-BR")}
+              </div>
+            </div>
+
+            <div className="prototype-qr-wrap">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(pixPayload)}`}
+                alt="QR Code Pix"
+                width="180"
+                height="180"
+                className="prototype-qr"
+              />
+            </div>
+
+            <div className="prototype-pix-label">Pix copia e cola</div>
+            <div className="prototype-pix-row">
+              <span className="prototype-pix-key">{pixPayload}</span>
+              <button className="prototype-copy-button" onClick={copyPix}>
+                {copied ? <Check size={13} /> : <Copy size={13} />}
+                {copied ? "Copiado" : "Copiar"}
+              </button>
+            </div>
+
+            <div className="prototype-waiting">
+              <Loader2 size={14} className="prototype-spinner" />
+              Aguardando pagamento…
+            </div>
+
+            <button
+              className="prototype-demo-button"
+              onClick={() => {
+                onReveal(pixel.id);
+                setCheckoutOpen(false);
+              }}
+            >
+              (demo) simular pagamento confirmado
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="prototype-sheet-header">
+              <div>
+                <div className="prototype-eyebrow">PIXEL</div>
+                <div className="prototype-id">
+                  #{pixel.id.toLocaleString("pt-BR")}
+                </div>
+              </div>
+              <button className="prototype-close-button" onClick={onClose}>
+                Fechar
+              </button>
+            </div>
+
+            <div
+              className="prototype-pixel-hero"
+              style={{ background: pixel.color }}
+            >
+              {pixel.revealed ? (
+                <span className="prototype-hero-emoji">{pixel.emoji}</span>
+              ) : (
+                <Lock size={28} color="rgba(255,255,255,.55)" />
+              )}
+            </div>
+
+            {!pixel.revealed && (
+              <button
+                className="prototype-reveal-button"
+                onClick={() => setCheckoutOpen(true)}
+              >
+                Revelar pixel
+              </button>
+            )}
+
+            {pixel.revealed && (
+              <div className="prototype-revealed-by">
+                <span>
+                  {pixel.revealedBy === CURRENT_USER_NICKNAME
+                    ? "Revelado por você"
+                    : `Revelado por ${pixel.revealedBy}`}
+                </span>
+                <span className="prototype-divider">·</span>
+                <span>{formatRevealedDate(pixel.revealedAt)}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
-function PixelBoard({ onRevealCount }: { onRevealCount: () => void }) {
-  const frameRef = useRef<HTMLDivElement>(null);
-  const [viewport, setViewport] = useState<Viewport>({ width: 800, height: 500, scrollTop: 0 });
+function PixelGrid() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [scrollTop, setScrollTop] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [revealed, setRevealed] = useState<Set<number>>(() => new Set());
-  const [loadedChunks, setLoadedChunks] = useState<Set<number>>(() => new Set([0, 1, 2]));
-  const [loadingChunks, setLoadingChunks] = useState<Set<number>>(() => new Set());
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [, setRevealVersion] = useState(0);
 
   useEffect(() => {
-    const element = frameRef.current;
+    const element = containerRef.current;
     if (!element) return;
-    const resize = () => setViewport((previous) => ({ ...previous, width: element.clientWidth, height: element.clientHeight }));
-    const observer = new ResizeObserver(resize);
+
+    const observer = new ResizeObserver(([entry]) => {
+      setContainerSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
     observer.observe(element);
-    resize();
     return () => observer.disconnect();
   }, []);
 
-  const cols = Math.max(8, Math.floor(viewport.width / MIN_CELL));
-  const cellSize = viewport.width / cols;
-  const totalRows = Math.ceil(TOTAL_PIXELS / cols);
-  const visibleRows = Math.ceil(viewport.height / cellSize);
-  const firstRow = Math.max(0, Math.floor(viewport.scrollTop / cellSize) - ROW_BUFFER);
-  const lastRow = Math.min(totalRows, firstRow + visibleRows + ROW_BUFFER * 2);
-  const selected = selectedId === null ? null : pixelFor(selectedId, cols, revealed);
+  const { columns, cellSize, totalRows, totalHeight } = useMemo(() => {
+    const width = containerSize.width || 1;
+    const columns = Math.max(1, Math.floor(width / MIN_CELL_PX));
+    const cellSize = width / columns;
+    const totalRows = Math.ceil(TOTAL_PIXELS / columns);
+    return { columns, cellSize, totalRows, totalHeight: totalRows * cellSize };
+  }, [containerSize.width]);
+
+  const { startRow, endRow } = useMemo(() => {
+    if (!cellSize) return { startRow: 0, endRow: 0 };
+    const visibleRows = Math.ceil(containerSize.height / cellSize) + 1;
+    const startRow = Math.max(
+      0,
+      Math.floor(scrollTop / cellSize) - BUFFER_ROWS,
+    );
+    const endRow = Math.min(
+      totalRows,
+      startRow + visibleRows + BUFFER_ROWS * 2,
+    );
+    return { startRow, endRow };
+  }, [cellSize, containerSize.height, scrollTop, totalRows]);
 
   const visiblePixels = useMemo(() => {
-    const pixels: Pixel[] = [];
-    for (let row = firstRow; row < lastRow; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        const id = row * cols + col;
-        if (id < TOTAL_PIXELS) pixels.push(pixelFor(id, cols, revealed));
+    const pixels: Array<{ id: number; row: number; col: number }> = [];
+    for (let row = startRow; row < endRow; row += 1) {
+      for (let col = 0; col < columns; col += 1) {
+        const id = row * columns + col;
+        if (id >= TOTAL_PIXELS) break;
+        pixels.push({ id, row, col });
       }
     }
     return pixels;
-  }, [cols, firstRow, lastRow, revealed]);
+  }, [columns, endRow, startRow]);
 
-  useEffect(() => {
-    const needed = new Set<number>();
-    for (let row = firstRow; row < lastRow; row += CHUNK_ROWS) needed.add(Math.floor(row / CHUNK_ROWS));
-    const missing = [...needed].filter((chunk) => !loadedChunks.has(chunk) && !loadingChunks.has(chunk));
-    if (!missing.length) return;
-    setLoadingChunks((current) => new Set([...current, ...missing]));
-    const timeout = window.setTimeout(() => {
-      setLoadedChunks((current) => new Set([...current, ...missing]));
-      setLoadingChunks((current) => {
-        const next = new Set(current);
-        missing.forEach((chunk) => next.delete(chunk));
-        return next;
-      });
-    }, 340);
-    return () => window.clearTimeout(timeout);
-  }, [firstRow, lastRow, loadedChunks]);
+  const selected = selectedId === null ? null : getPixel(selectedId);
 
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedId(null);
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
+  const handleReveal = useCallback((id: number) => {
+    revealPixelInCache(id);
+    setRevealVersion((version) => version + 1);
   }, []);
-
-  const onScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
-    setViewport((previous) => ({ ...previous, scrollTop: event.currentTarget.scrollTop }));
-  }, []);
-
-  const commitReveal = () => {
-    if (selectedId === null) return;
-    setRevealed((current) => new Set([...current, selectedId]));
-  };
 
   return (
-    <section className="board-frame" aria-label="Mapa de um milhão de pixels">
-      <div className="grid-scroller" ref={frameRef} onScroll={onScroll} data-testid="pixel-grid-scroller">
-        <div className="grid-inner" style={{ height: totalRows * cellSize }}>
-          {visiblePixels.map((pixel) => {
-            const loaded = loadedChunks.has(Math.floor(pixel.row / CHUNK_ROWS));
-            return (
-              <button
-                key={pixel.id}
-                className={`pixel-cell${pixel.opened ? ' is-opened' : ''}${selectedId === pixel.id ? ' is-selected' : ''}${!loaded ? ' is-loading' : ''}`}
-                style={{ width: cellSize, height: cellSize, left: pixel.col * cellSize, top: pixel.row * cellSize, ...(pixel.opened ? { '--pixel-color': pixel.color } : {}) } as CSSProperties}
-                onClick={() => loaded && setSelectedId(pixel.id)}
-                disabled={!loaded}
-                data-testid={`button-pixel-${pixel.id}`}
-                aria-label={`Pixel ${pixel.id}${pixel.opened ? ', revelado' : ', bloqueado'}`}
-              >
-                <span className="pixel-glyph"><PixelGlyph mark={pixel.mark} opened={pixel.opened} /></span>
-              </button>
-            );
-          })}
-        </div>
+    <div
+      ref={containerRef}
+      className="prototype-scroll-area"
+      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+    >
+      <div
+        className="prototype-grid-canvas"
+        style={{ height: totalHeight }}
+      >
+        {visiblePixels.map(({ id, row, col }) => {
+          const pixel = getPixel(id);
+          const selected = id === selectedId;
+          const iconSize = Math.min(cellSize * 0.42, 16);
+          const emojiSize = Math.min(cellSize * 0.55, 20);
+
+          return (
+            <button
+              key={id}
+              className={`prototype-cell${selected ? " is-selected" : ""}`}
+              style={{
+                top: row * cellSize,
+                left: col * cellSize,
+                width: cellSize,
+                height: cellSize,
+                background: pixel.revealed
+                  ? pixel.color
+                  : `repeating-linear-gradient(45deg, ${pixel.color}, ${pixel.color} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`,
+              }}
+              onClick={() => setSelectedId(id)}
+              onMouseEnter={() => setHoveredId(id)}
+              onMouseLeave={() =>
+                setHoveredId((current) => (current === id ? null : current))
+              }
+              aria-label={
+                pixel.revealed
+                  ? `Pixel ${id}, revelado, ${pixel.emoji}`
+                  : `Pixel ${id}, não revelado`
+              }
+            >
+              {pixel.revealed ? (
+                <span style={{ fontSize: emojiSize }}>{pixel.emoji}</span>
+              ) : (
+                <Lock size={iconSize} color="rgba(255,255,255,.75)" />
+              )}
+            </button>
+          );
+        })}
       </div>
-      <div className="grid-caption">
-        <span>Arraste para atravessar a obra</span>
-        <span>{cols.toLocaleString('pt-BR')} colunas · mapa infinito à vista</span>
-      </div>
+
       {selected && (
-        <PixelDetail
+        <PixelSheet
           pixel={selected}
           onClose={() => setSelectedId(null)}
-          onReveal={() => undefined}
-          onConfirm={() => { commitReveal(); onRevealCount(); }}
+          onReveal={handleReveal}
         />
       )}
-    </section>
+
+      {hoveredId !== null && (
+        <div className="prototype-hover-badge">
+          #{hoveredId.toLocaleString("pt-BR")}
+        </div>
+      )}
+    </div>
   );
 }
 
 function Home() {
-  const [openedCount, setOpenedCount] = useState(43_478);
-  const progress = (openedCount / TOTAL_PIXELS) * 100;
   return (
-    <main className="pixelpix-app">
-      <div className="pixelpix-shell">
-        <header className="pixelpix-header">
-          <Brand />
-          <div className="header-note"><span className="live-dot" aria-hidden="true" /> obra coletiva, ao vivo</div>
-        </header>
-        <section className="intro">
-          <div>
-            <p className="eyebrow">um milhão de pequenas janelas</p>
-            <h1>Abra um espaço.<br /><em>Deixe uma marca.</em></h1>
-          </div>
-          <div className="intro-side">
-            <p className="intro-copy">Pixelpix é um arquivo vivo feito de encontros. Explore o mapa, escolha uma coordenada e abra uma janela na obra coletiva.</p>
-            <span className="intro-signal">clique em um ponto para começar</span>
-          </div>
-        </section>
-        <div className="board-meta">
-          <div className="board-meta-left">
-            <div className="stats"><span className="stat-number" data-testid="text-opened-count">{openedCount.toLocaleString('pt-BR')}</span><span className="stat-label">de 1.000.000 abertas</span></div>
-            <span className="progress-percent">{progress.toFixed(1).replace('.', ',')}%</span>
-          </div>
-          <div className="legend" aria-label="Legenda"><span className="legend-item"><i className="legend-swatch opened" /> revelado</span><span className="legend-item"><i className="legend-swatch waiting" /> esperando</span></div>
+    <main className="prototype-page">
+      <header className="prototype-header">
+        <div>
+          <h1 className="prototype-title">
+            PIXEL<span>PIX</span>
+          </h1>
+          <p className="prototype-subtitle">
+            1 milhão de pixels disponíveis pra revelar
+          </p>
         </div>
-        <PixelBoard onRevealCount={() => setOpenedCount((count) => count + 1)} />
-        <div className="discovery-strip">
-          <div className="discovery-card accent-card"><strong>Cada pixel é único.</strong><p>Uma pequena coordenada, uma nova possibilidade de descoberta.</p></div>
-          <div className="discovery-card"><strong>{(1_000_000 - openedCount).toLocaleString('pt-BR')}</strong><p>janelas ainda esperando para serem encontradas.</p></div>
-          <div className="discovery-card"><strong>R$ 1,00</strong><p>para abrir um espaço e entrar para a obra.</p></div>
-        </div>
-      </div>
+      </header>
+      <PixelGrid />
     </main>
   );
 }
@@ -300,11 +442,11 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
         </WouterRouter>
         <Toaster />
@@ -312,5 +454,3 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-export default App;

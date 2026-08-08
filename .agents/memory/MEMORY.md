@@ -1,0 +1,1 @@
+- [PIXELPIX source of truth](pixelpix-source-of-truth.md) — Treat the uploaded prototype as the visual and interaction baseline; do not reinterpret its design without explicit approval.
