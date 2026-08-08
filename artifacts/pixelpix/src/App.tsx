@@ -119,11 +119,16 @@ function formatBRL(value: number) {
 
 function formatRevealedDate(date: Date | null) {
   if (!date) return "";
-  return date.toLocaleDateString("pt-BR", {
+  const datePart = date.toLocaleDateString("pt-BR", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
     year: "numeric",
   });
+  const timePart = date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${datePart} às ${timePart}`;
 }
 
 function fakePixPayload(id: number) {
