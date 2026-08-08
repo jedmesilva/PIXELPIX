@@ -4,7 +4,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { ArrowLeft, Check, CircleDot, Copy, LockKeyhole, Sparkles, Star, X } from 'lucide-react';
+import { ArrowLeft, Check, Copy, X } from 'lucide-react';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 
 const queryClient = new QueryClient();
@@ -37,10 +37,8 @@ function pixelFor(id: number, cols: number, opened: Set<number>): Pixel {
 }
 
 function PixelGlyph({ mark, opened }: { mark: number; opened: boolean }) {
-  if (!opened) return <LockKeyhole className="pixel-lock" aria-hidden="true" />;
-  if (mark === 0) return <Sparkles aria-hidden="true" />;
-  if (mark === 1) return <CircleDot aria-hidden="true" />;
-  return <Star aria-hidden="true" />;
+  if (!opened) return <span className="pixel-lock-mark" aria-hidden="true" />;
+  return <span className={`pixel-mark mark-${mark}`} aria-hidden="true" />;
 }
 
 function Brand() {
@@ -250,6 +248,7 @@ function PixelBoard({ onRevealCount }: { onRevealCount: () => void }) {
 
 function Home() {
   const [openedCount, setOpenedCount] = useState(43_478);
+  const progress = (openedCount / TOTAL_PIXELS) * 100;
   return (
     <main className="pixelpix-app">
       <div className="pixelpix-shell">
@@ -262,10 +261,16 @@ function Home() {
             <p className="eyebrow">um milhão de pequenas janelas</p>
             <h1>Abra um espaço.<br /><em>Deixe uma marca.</em></h1>
           </div>
-          <p className="intro-copy">Pixelpix é uma obra feita de encontros. Explore o mapa, encontre um pixel esperando por você e descubra o que aparece quando ele se abre.</p>
+          <div className="intro-side">
+            <p className="intro-copy">Pixelpix é um arquivo vivo feito de encontros. Explore o mapa, escolha uma coordenada e abra uma janela na obra coletiva.</p>
+            <span className="intro-signal">clique em um ponto para começar</span>
+          </div>
         </section>
         <div className="board-meta">
-          <div className="stats"><span className="stat-number" data-testid="text-opened-count">{openedCount.toLocaleString('pt-BR')}</span><span className="stat-label">janelas abertas de 1.000.000</span></div>
+          <div className="board-meta-left">
+            <div className="stats"><span className="stat-number" data-testid="text-opened-count">{openedCount.toLocaleString('pt-BR')}</span><span className="stat-label">de 1.000.000 abertas</span></div>
+            <span className="progress-percent">{progress.toFixed(1).replace('.', ',')}%</span>
+          </div>
           <div className="legend" aria-label="Legenda"><span className="legend-item"><i className="legend-swatch opened" /> revelado</span><span className="legend-item"><i className="legend-swatch waiting" /> esperando</span></div>
         </div>
         <PixelBoard onRevealCount={() => setOpenedCount((count) => count + 1)} />
