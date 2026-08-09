@@ -251,6 +251,13 @@ button:focus-visible {
   font-size: 12px;
 }
 
+.prototype-revealed-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
 .prototype-revealed-by span:first-child {
   color: #c3c9d1;
   font-weight: 500;
@@ -258,6 +265,214 @@ button:focus-visible {
 
 .prototype-divider {
   color: #3a4046;
+}
+
+.prototype-social-section {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #252b32;
+  border-radius: 10px;
+  background: #101317;
+}
+
+.prototype-social-title {
+  margin-bottom: 8px;
+  color: #8b93a1;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.prototype-social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.prototype-social-links a {
+  color: #7dd3fc;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.prototype-social-links a:hover {
+  text-decoration: underline;
+}
+
+.prototype-edit-social-button {
+  padding: 0;
+  border: 0;
+  color: #697481;
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.prototype-edit-social-button:hover {
+  color: #a8b2bf;
+}
+
+.prototype-social-prompt {
+  position: absolute;
+  z-index: 2;
+  inset: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 18px;
+  border: 1px solid #293039;
+  border-radius: 12px;
+  background: #171b20;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.38);
+}
+
+.prototype-social-prompt-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.prototype-social-prompt h2 {
+  margin: 5px 0 0;
+  color: #e5e7eb;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.prototype-social-prompt > p,
+.prototype-profile-description {
+  margin: 8px 0 18px;
+  color: #8b93a1;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.prototype-icon-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #293039;
+  border-radius: 7px;
+  color: #8b93a1;
+  background: transparent;
+  cursor: pointer;
+}
+
+.prototype-icon-close:hover {
+  color: #e5e7eb;
+  background: #20262d;
+}
+
+.prototype-social-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prototype-social-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #c3c9d1;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.prototype-handle-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid #2b333c;
+  border-radius: 8px;
+  color: #697481;
+  background: #0b0d10;
+}
+
+.prototype-handle-input:focus-within {
+  border-color: #7dd3fc;
+}
+
+.prototype-handle-input > span {
+  padding-left: 10px;
+  color: #7dd3fc;
+}
+
+.prototype-handle-input input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 10px 10px 4px;
+  border: 0;
+  outline: 0;
+  color: #e5e7eb;
+  background: transparent;
+  font-size: 13px;
+}
+
+.prototype-handle-input input::placeholder {
+  color: #4f5965;
+}
+
+.prototype-social-form small {
+  color: #fca5a5;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.prototype-social-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.prototype-social-primary,
+.prototype-social-secondary {
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prototype-social-primary {
+  border: 0;
+  color: #0b0d10;
+  background: #7dd3fc;
+}
+
+.prototype-social-secondary {
+  border: 1px solid #2b333c;
+  color: #a8b2bf;
+  background: transparent;
+}
+
+.prototype-social-secondary:hover {
+  background: #20262d;
+}
+
+.prototype-profile-trigger {
+  position: fixed;
+  top: 15px;
+  right: 76px;
+  z-index: 4;
+  padding: 5px 10px;
+  border: 1px solid #1f2328;
+  border-radius: 6px;
+  color: #8b93a1;
+  background: #14171b;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.prototype-profile-trigger:hover {
+  color: #e5e7eb;
+  border-color: #36404a;
+}
+
+.prototype-profile-sheet {
+  max-width: 420px;
 }
 
 .prototype-checkout-title {
@@ -444,6 +659,11 @@ button:focus-visible {
 
   .prototype-hover-badge {
     top: 16px;
+    right: 16px;
+  }
+
+  .prototype-profile-trigger {
+    top: 56px;
     right: 16px;
   }
 

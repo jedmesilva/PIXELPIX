@@ -30,7 +30,15 @@ type Pixel = {
   emoji: string | null;
   revealedBy: string | null;
   revealedAt: Date | null;
+  socialProfile: SocialProfile;
 };
+
+type SocialProfile = {
+  instagram: string;
+  x: string;
+};
+
+const EMPTY_SOCIAL_PROFILE: SocialProfile = { instagram: "", x: "" };
 
 const chunkCache = new Map<number, Map<number, Pixel>>();
 
@@ -59,6 +67,19 @@ function fakeRevealedAt(id: number) {
 
 function fakeRevealedBy(id: number) {
   return NICKNAME_SET[seedFor(id) % NICKNAME_SET.length];
+}
+
+function fakeSocialProfile(id: number): SocialProfile {
+  if (id % 13 === 0) {
+    return { instagram: "pixel.studio", x: "pixelstudio" };
+  }
+  if (id % 11 === 0) {
+    return { ...EMPTY_SOCIAL_PROFILE, x: "criadorespixel" };
+  }
+  if (id % 7 === 0) {
+    return { ...EMPTY_SOCIAL_PROFILE, instagram: "ana.pixel" };
+  }
+  return EMPTY_SOCIAL_PROFILE;
 }
 
 function hashColor(id: number) {
@@ -90,6 +111,7 @@ function getChunk(chunkId: number) {
       emoji: revealed ? pickEmoji(id) : null,
       revealedBy: revealed ? fakeRevealedBy(id) : null,
       revealedAt: revealed ? fakeRevealedAt(id) : null,
+      socialProfile: revealed ? fakeSocialProfile(id) : EMPTY_SOCIAL_PROFILE,
     });
   }
 
@@ -101,13 +123,42 @@ function getPixel(id: number) {
   return getChunk(Math.floor(id / CHUNK_SIZE)).get(id)!;
 }
 
-function revealPixelInCache(id: number) {
+function revealPixelInCache(id: number, socialProfile: SocialProfile) {
   const pixel = getPixel(id);
   pixel.revealed = true;
   pixel.emoji = pickEmoji(id);
   pixel.revealedBy = CURRENT_USER_NICKNAME;
   pixel.revealedAt = new Date();
+  pixel.socialProfile = socialProfile;
   return pixel;
+}
+
+function updateCurrentUserSocialProfile(socialProfile: SocialProfile) {
+  chunkCache.forEach((chunk) => {
+    chunk.forEach((pixel) => {
+      if (pixel.revealedBy === CURRENT_USER_NICKNAME) {
+        pixel.socialProfile = socialProfile;
+      }
+    });
+  });
+}
+
+function normalizeHandle(value: string) {
+  return value.trim().replace(/^@+/, "");
+}
+
+function validateSocialProfile(profile: SocialProfile) {
+  const errors: SocialProfile = { ...EMPTY_SOCIAL_PROFILE };
+  const instagram = normalizeHandle(profile.instagram);
+  const x = normalizeHandle(profile.x);
+
+  if (instagram && !/^[a-zA-Z0-9._]{1,30}$/.test(instagram)) {
+    errors.instagram = "Use apenas letras, números, pontos e sublinhados.";
+  }
+  if (x && !/^[a-zA-Z0-9_]{1,15}$/.test(x)) {
+    errors.x = "Use até 15 caracteres: letras, números e sublinhados.";
+  }
+  return errors;
 }
 
 function formatBRL(value: number) {
@@ -139,12 +190,20 @@ function PixelSheet({
   pixel,
   onClose,
   onReveal,
+  socialProfile,
+  onSaveSocialProfile,
 }: {
   pixel: Pixel;
   onClose: () => void;
-  onReveal: (id: number) => void;
+  onReveal: (id: number, socialProfile: SocialProfile) => void;
+  socialProfile: SocialProfile;
+  onSaveSocialProfile: (profile: SocialProfile) => void;
 }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [socialPromptOpen, setSocialPromptOpen] = useState(false);
+  const [editingSocials, setEditingSocials] = useState(false);
+  const [socialForm, setSocialForm] = useState<SocialProfile>(EMPTY_SOCIAL_PROFILE);
+  const [socialErrors, setSocialErrors] = useState<SocialProfile>(EMPTY_SOCIAL_PROFILE);
   const [copied, setCopied] = useState(false);
   const pixPayload = fakePixPayload(pixel.id);
 
@@ -159,8 +218,34 @@ function PixelSheet({
 
   useEffect(() => {
     setCheckoutOpen(false);
+    setSocialPromptOpen(false);
+    setEditingSocials(false);
     setCopied(false);
   }, [pixel.id]);
+
+  useEffect(() => {
+    if (pixel.revealed) {
+      setSocialForm(pixel.revealedBy === CURRENT_USER_NICKNAME ? socialProfile : pixel.socialProfile);
+    }
+  }, [pixel.revealed, pixel.revealedBy, pixel.socialProfile, socialProfile]);
+
+  const saveSocials = () => {
+    const normalized = {
+      instagram: normalizeHandle(socialForm.instagram),
+      x: normalizeHandle(socialForm.x),
+    };
+    const errors = validateSocialProfile(normalized);
+    setSocialErrors(errors);
+    if (errors.instagram || errors.x) return;
+    onSaveSocialProfile(normalized);
+    setSocialForm(normalized);
+    setSocialPromptOpen(false);
+    setEditingSocials(false);
+  };
+
+  const displayedSocials =
+    pixel.revealedBy === CURRENT_USER_NICKNAME ? socialProfile : pixel.socialProfile;
+  const hasSocials = Boolean(displayedSocials.instagram || displayedSocials.x);
 
   return (
     <div className="prototype-overlay" onClick={onClose}>
@@ -226,8 +311,9 @@ function PixelSheet({
                 <button
                   className="prototype-demo-button"
                   onClick={() => {
-                    onReveal(pixel.id);
+                    onReveal(pixel.id, EMPTY_SOCIAL_PROFILE);
                     setCheckoutOpen(false);
+                    setSocialPromptOpen(true);
                   }}
                 >
                   (demo) simular pagamento confirmado
@@ -272,20 +358,183 @@ function PixelSheet({
                 )}
 
                 {pixel.revealed && (
-                  <div className="prototype-revealed-by">
-                    <span>
-                      {pixel.revealedBy === CURRENT_USER_NICKNAME
-                        ? "Revelado por você"
-                        : `Revelado por ${pixel.revealedBy}`}
-                    </span>
-                    <span className="prototype-divider">·</span>
-                    <span>{formatRevealedDate(pixel.revealedAt)}</span>
+                  <div className="prototype-revealed-content">
+                    <div className="prototype-revealed-by">
+                      <span>
+                        {pixel.revealedBy === CURRENT_USER_NICKNAME
+                          ? "Revelado por você"
+                          : `Revelado por ${pixel.revealedBy}`}
+                      </span>
+                      <span className="prototype-divider">·</span>
+                      <span>{formatRevealedDate(pixel.revealedAt)}</span>
+                    </div>
+
+                    {hasSocials && (
+                      <div className="prototype-social-section">
+                        <div className="prototype-social-title">
+                          Encontre quem deixou esta marca
+                        </div>
+                        <div className="prototype-social-links">
+                          {displayedSocials.instagram && (
+                            <a
+                              href={`https://instagram.com/${displayedSocials.instagram}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Instagram: @{displayedSocials.instagram}
+                            </a>
+                          )}
+                          {displayedSocials.x && (
+                            <a
+                              href={`https://x.com/${displayedSocials.x}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              X: @{displayedSocials.x}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {pixel.revealedBy === CURRENT_USER_NICKNAME && (
+                      <button
+                        className="prototype-edit-social-button"
+                        onClick={() => {
+                          setSocialForm(displayedSocials);
+                          setSocialErrors(EMPTY_SOCIAL_PROFILE);
+                          setEditingSocials(true);
+                        }}
+                      >
+                        {hasSocials ? "Editar perfis" : "Adicionar perfis"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           </>
         )}
+
+        {socialPromptOpen && (
+          <div className="prototype-social-prompt" role="dialog" aria-label="Assine sua marca">
+            <div className="prototype-social-prompt-header">
+              <div>
+                <div className="prototype-eyebrow">ASSINATURA OPCIONAL</div>
+                <h2>Quer assinar sua marca?</h2>
+              </div>
+              <button
+                className="prototype-icon-close"
+                onClick={() => setSocialPromptOpen(false)}
+                aria-label="Fechar"
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <p>
+              Adicione seus perfis para que outras pessoas encontrem quem deixou este pixel.
+            </p>
+            <SocialProfileForm
+              profile={socialForm}
+              errors={socialErrors}
+              onChange={setSocialForm}
+              onSave={saveSocials}
+              onSkip={() => setSocialPromptOpen(false)}
+              saveLabel="Salvar e ver meu pixel"
+            />
+          </div>
+        )}
+
+        {editingSocials && (
+          <div className="prototype-social-prompt" role="dialog" aria-label="Editar perfis">
+            <div className="prototype-social-prompt-header">
+              <div>
+                <div className="prototype-eyebrow">SEU PERFIL</div>
+                <h2>Editar sua assinatura</h2>
+              </div>
+              <button
+                className="prototype-icon-close"
+                onClick={() => setEditingSocials(false)}
+                aria-label="Fechar"
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <p>Você pode atualizar ou remover seus perfis quando quiser.</p>
+            <SocialProfileForm
+              profile={socialForm}
+              errors={socialErrors}
+              onChange={setSocialForm}
+              onSave={saveSocials}
+              onSkip={() => {
+                onSaveSocialProfile(EMPTY_SOCIAL_PROFILE);
+                setSocialForm(EMPTY_SOCIAL_PROFILE);
+                setEditingSocials(false);
+              }}
+              saveLabel="Salvar alterações"
+              skipLabel="Remover perfis"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SocialProfileForm({
+  profile,
+  errors,
+  onChange,
+  onSave,
+  onSkip,
+  saveLabel,
+  skipLabel = "Agora não",
+}: {
+  profile: SocialProfile;
+  errors: SocialProfile;
+  onChange: (profile: SocialProfile) => void;
+  onSave: () => void;
+  onSkip: () => void;
+  saveLabel: string;
+  skipLabel?: string;
+}) {
+  return (
+    <div className="prototype-social-form">
+      <label>
+        <span>Instagram</span>
+        <div className="prototype-handle-input">
+          <span>@</span>
+          <input
+            value={profile.instagram}
+            onChange={(event) => onChange({ ...profile, instagram: event.target.value })}
+            placeholder="seuusuario"
+            autoComplete="off"
+            aria-invalid={Boolean(errors.instagram)}
+          />
+        </div>
+        {errors.instagram && <small>{errors.instagram}</small>}
+      </label>
+      <label>
+        <span>X</span>
+        <div className="prototype-handle-input">
+          <span>@</span>
+          <input
+            value={profile.x}
+            onChange={(event) => onChange({ ...profile, x: event.target.value })}
+            placeholder="seuusuario"
+            autoComplete="off"
+            aria-invalid={Boolean(errors.x)}
+          />
+        </div>
+        {errors.x && <small>{errors.x}</small>}
+      </label>
+      <div className="prototype-social-form-actions">
+        <button className="prototype-social-secondary" onClick={onSkip}>
+          {skipLabel}
+        </button>
+        <button className="prototype-social-primary" onClick={onSave}>
+          {saveLabel}
+        </button>
       </div>
     </div>
   );
@@ -297,7 +546,20 @@ function PixelGrid() {
   const [scrollTop, setScrollTop] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [, setRevealVersion] = useState(0);
+  const [socialProfile, setSocialProfile] = useState<SocialProfile>(() => {
+    try {
+      const saved = window.localStorage.getItem("pixelpix-social-profile");
+      return saved ? { ...EMPTY_SOCIAL_PROFILE, ...JSON.parse(saved) } : EMPTY_SOCIAL_PROFILE;
+    } catch {
+      return EMPTY_SOCIAL_PROFILE;
+    }
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem("pixelpix-social-profile", JSON.stringify(socialProfile));
+  }, [socialProfile]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -349,8 +611,14 @@ function PixelGrid() {
 
   const selected = selectedId === null ? null : getPixel(selectedId);
 
-  const handleReveal = useCallback((id: number) => {
-    revealPixelInCache(id);
+  const handleReveal = useCallback((id: number, profile: SocialProfile) => {
+    revealPixelInCache(id, profile);
+    setRevealVersion((version) => version + 1);
+  }, []);
+
+  const handleSaveSocialProfile = useCallback((profile: SocialProfile) => {
+    setSocialProfile(profile);
+    updateCurrentUserSocialProfile(profile);
     setRevealVersion((version) => version + 1);
   }, []);
 
@@ -409,14 +677,95 @@ function PixelGrid() {
           pixel={selected}
           onClose={() => setSelectedId(null)}
           onReveal={handleReveal}
+          socialProfile={socialProfile}
+          onSaveSocialProfile={handleSaveSocialProfile}
         />
       )}
+
+      {profileOpen && (
+        <ProfileSheet
+          profile={socialProfile}
+          onClose={() => setProfileOpen(false)}
+          onSave={(profile) => {
+            handleSaveSocialProfile(profile);
+            setProfileOpen(false);
+          }}
+        />
+      )}
+
+      <button
+        className="prototype-profile-trigger"
+        onClick={() => setProfileOpen(true)}
+        aria-label="Editar sua assinatura"
+      >
+        Sua assinatura
+      </button>
 
       {hoveredId !== null && (
         <div className="prototype-hover-badge">
           #{hoveredId.toLocaleString("pt-BR")}
         </div>
       )}
+    </div>
+  );
+}
+
+function ProfileSheet({
+  profile,
+  onClose,
+  onSave,
+}: {
+  profile: SocialProfile;
+  onClose: () => void;
+  onSave: (profile: SocialProfile) => void;
+}) {
+  const [form, setForm] = useState(profile);
+  const [errors, setErrors] = useState(EMPTY_SOCIAL_PROFILE);
+
+  const save = () => {
+    const normalized = {
+      instagram: normalizeHandle(form.instagram),
+      x: normalizeHandle(form.x),
+    };
+    const nextErrors = validateSocialProfile(normalized);
+    setErrors(nextErrors);
+    if (nextErrors.instagram || nextErrors.x) return;
+    onSave(normalized);
+  };
+
+  return (
+    <div className="prototype-overlay" onClick={onClose}>
+      <div
+        className="prototype-sheet prototype-profile-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sua assinatura"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="prototype-drag-handle" />
+        <div className="prototype-sheet-header">
+          <div>
+            <div className="prototype-eyebrow">SEU PERFIL</div>
+            <div className="prototype-id">Sua assinatura</div>
+          </div>
+          <button className="prototype-icon-close" onClick={onClose} aria-label="Fechar">
+            <X size={17} />
+          </button>
+        </div>
+        <p className="prototype-profile-description">
+          Esses perfis aparecem nos pixels que você revelar. Eles são opcionais e podem ser
+          alterados a qualquer momento.
+        </p>
+        <SocialProfileForm
+          profile={form}
+          errors={errors}
+          onChange={setForm}
+          onSave={save}
+          onSkip={() => onSave(EMPTY_SOCIAL_PROFILE)}
+          saveLabel="Salvar assinatura"
+          skipLabel="Remover perfis"
+        />
+      </div>
     </div>
   );
 }
