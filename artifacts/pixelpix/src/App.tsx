@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Check, ChevronDown, Copy, Loader2, Lock, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, Loader2, Lock, X } from "lucide-react";
 import { FiInstagram } from "react-icons/fi";
 import { RiTwitterXFill } from "react-icons/ri";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -499,9 +499,6 @@ function SignatureFormView({
         </button>
       </div>
       <div className="prototype-signature-title">
-        <div className="prototype-eyebrow">
-          {isEditing ? "SUA ASSINATURA" : "ASSINATURA DO PIXEL"}
-        </div>
         <h2>{isEditing ? "Editar sua assinatura" : "Assinar este pixel"}</h2>
         <p>
           {isEditing
@@ -543,25 +540,19 @@ function SocialProfileForm({
     <div className="prototype-social-form">
       <label className="prototype-network-field">
         <span>Rede social</span>
-        <div className="prototype-network-select">
-          <SignatureIcon network={profile.network} size={16} />
-          <span className="prototype-network-select-name">
-            {profile.network === "instagram" ? "Instagram" : "X"}
-          </span>
-          <ChevronDown size={15} className="prototype-network-chevron" aria-hidden="true" />
-          <select
-            value={profile.network}
-            onChange={(event) =>
-              onChange({
-                ...profile,
-                network: event.target.value as SignatureNetwork,
-              })
-            }
-            aria-label="Escolha a rede da assinatura"
-          >
-            <option value="instagram">Instagram</option>
-            <option value="x">X</option>
-          </select>
+        <div className="prototype-network-options" role="group" aria-label="Escolha a rede da assinatura">
+          {(["instagram", "x"] as const).map((network) => (
+            <button
+              key={network}
+              type="button"
+              className={`prototype-network-option ${profile.network === network ? "is-selected" : ""}`}
+              aria-pressed={profile.network === network}
+              onClick={() => onChange({ ...profile, network })}
+            >
+              <SignatureIcon network={network} size={16} />
+              <span>{network === "instagram" ? "Instagram" : "X"}</span>
+            </button>
+          ))}
         </div>
       </label>
       <label className="prototype-handle-field">
@@ -795,8 +786,7 @@ function ProfileSheet({
         <div className="prototype-drag-handle" />
         <div className="prototype-sheet-header">
           <div>
-                <div className="prototype-eyebrow">SUA ASSINATURA</div>
-            <div className="prototype-id">Sua assinatura</div>
+            <h2 className="prototype-profile-title">Sua assinatura</h2>
           </div>
           <button className="prototype-icon-close" onClick={onClose} aria-label="Fechar">
             <X size={17} />
