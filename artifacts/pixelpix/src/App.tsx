@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Check, Copy, Loader2, Lock, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Loader2, Lock, X } from "lucide-react";
 import { FiInstagram } from "react-icons/fi";
 import { RiTwitterXFill } from "react-icons/ri";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -363,6 +363,27 @@ function PixelSheet({
               </div>
             </div>
           </>
+        ) : socialPromptOpen || editingSocials ? (
+          <SignatureFormView
+            profile={socialForm}
+            error={socialError}
+            isEditing={editingSocials}
+            onChange={setSocialForm}
+            onClose={() => {
+              setSocialPromptOpen(false);
+              setEditingSocials(false);
+            }}
+            onSave={saveSocials}
+            onRemove={
+              editingSocials
+                ? () => {
+                    onSaveSocialProfile(EMPTY_SOCIAL_PROFILE);
+                    setSocialForm(EMPTY_SOCIAL_PROFILE);
+                    setEditingSocials(false);
+                  }
+                : undefined
+            }
+          />
         ) : (
           <>
             <div className="prototype-sheet-header">
@@ -444,68 +465,60 @@ function PixelSheet({
           </>
         )}
 
-        {socialPromptOpen && (
-          <div className="prototype-social-prompt" role="dialog" aria-label="Assine sua marca">
-            <div className="prototype-social-prompt-header">
-              <div>
-                <div className="prototype-eyebrow">ASSINATURA OPCIONAL</div>
-                <h2>Quer assinar sua marca?</h2>
-              </div>
-              <button
-                className="prototype-icon-close"
-                onClick={() => setSocialPromptOpen(false)}
-                aria-label="Fechar"
-              >
-                <X size={17} />
-              </button>
-            </div>
-            <p>
-              Escolha uma rede e adicione seu @ para deixar uma assinatura pública neste pixel.
-            </p>
-            <SocialProfileForm
-              profile={socialForm}
-              error={socialError}
-              onChange={setSocialForm}
-              onSave={saveSocials}
-              onSkip={() => setSocialPromptOpen(false)}
-              saveLabel="Assinar pixel"
-            />
-          </div>
-        )}
-
-        {editingSocials && (
-          <div className="prototype-social-prompt" role="dialog" aria-label="Editar assinatura">
-            <div className="prototype-social-prompt-header">
-              <div>
-                <div className="prototype-eyebrow">SUA ASSINATURA</div>
-                <h2>Editar sua assinatura</h2>
-              </div>
-              <button
-                className="prototype-icon-close"
-                onClick={() => setEditingSocials(false)}
-                aria-label="Fechar"
-              >
-                <X size={17} />
-              </button>
-            </div>
-            <p>Você pode atualizar ou remover sua assinatura quando quiser.</p>
-            <SocialProfileForm
-              profile={socialForm}
-              error={socialError}
-              onChange={setSocialForm}
-              onSave={saveSocials}
-              onSkip={() => {
-                onSaveSocialProfile(EMPTY_SOCIAL_PROFILE);
-                setSocialForm(EMPTY_SOCIAL_PROFILE);
-                setEditingSocials(false);
-              }}
-              saveLabel="Salvar alterações"
-              skipLabel="Remover assinatura"
-            />
-          </div>
-        )}
       </div>
     </div>
+  );
+}
+
+function SignatureFormView({
+  profile,
+  error,
+  isEditing,
+  onChange,
+  onClose,
+  onSave,
+  onRemove,
+}: {
+  profile: SocialProfile;
+  error: string;
+  isEditing: boolean;
+  onChange: (profile: SocialProfile) => void;
+  onClose: () => void;
+  onSave: () => void;
+  onRemove?: () => void;
+}) {
+  return (
+    <>
+      <div className="prototype-sheet-header">
+        <button className="prototype-back-button" onClick={onClose} aria-label="Voltar">
+          <ArrowLeft size={16} />
+          Voltar
+        </button>
+        <button className="prototype-close-button" onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+      <div className="prototype-signature-title">
+        <div className="prototype-eyebrow">
+          {isEditing ? "SUA ASSINATURA" : "ASSINATURA DO PIXEL"}
+        </div>
+        <h2>{isEditing ? "Editar sua assinatura" : "Assinar este pixel"}</h2>
+        <p>
+          {isEditing
+            ? "Atualize a rede ou o @ que aparece nos pixels assinados por você."
+            : "Escolha uma rede e adicione seu @ para deixar uma assinatura pública neste pixel."}
+        </p>
+      </div>
+      <SocialProfileForm
+        profile={profile}
+        error={error}
+        onChange={onChange}
+        onSave={onSave}
+        onSkip={onRemove ?? onClose}
+        saveLabel={isEditing ? "Salvar assinatura" : "Assinar pixel"}
+        skipLabel={isEditing ? "Remover assinatura" : "Agora não"}
+      />
+    </>
   );
 }
 
@@ -528,27 +541,30 @@ function SocialProfileForm({
 }) {
   return (
     <div className="prototype-social-form">
-      <div className="prototype-network-picker" role="group" aria-label="Escolha a rede da assinatura">
-        <button
-          type="button"
-          className={`prototype-network-option${profile.network === "instagram" ? " is-selected" : ""}`}
-          onClick={() => onChange({ ...profile, network: "instagram" })}
-          aria-pressed={profile.network === "instagram"}
-        >
-          <FiInstagram size={16} aria-hidden="true" />
-          Instagram
-        </button>
-        <button
-          type="button"
-          className={`prototype-network-option${profile.network === "x" ? " is-selected" : ""}`}
-          onClick={() => onChange({ ...profile, network: "x" })}
-          aria-pressed={profile.network === "x"}
-        >
-          <RiTwitterXFill size={16} aria-hidden="true" />
-          X
-        </button>
-      </div>
-      <label>
+      <label className="prototype-network-field">
+        <span>Rede social</span>
+        <div className="prototype-network-select">
+          <SignatureIcon network={profile.network} size={16} />
+          <span className="prototype-network-select-name">
+            {profile.network === "instagram" ? "Instagram" : "X"}
+          </span>
+          <ChevronDown size={15} className="prototype-network-chevron" aria-hidden="true" />
+          <select
+            value={profile.network}
+            onChange={(event) =>
+              onChange({
+                ...profile,
+                network: event.target.value as SignatureNetwork,
+              })
+            }
+            aria-label="Escolha a rede da assinatura"
+          >
+            <option value="instagram">Instagram</option>
+            <option value="x">X</option>
+          </select>
+        </div>
+      </label>
+      <label className="prototype-handle-field">
         <span>Seu @usuário</span>
         <div className="prototype-handle-input">
           <span>@</span>
