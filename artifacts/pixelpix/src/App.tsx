@@ -8,6 +8,8 @@ import {
   useState,
 } from "react";
 import { ArrowLeft, Check, Copy, Loader2, Lock, X } from "lucide-react";
+import { FiInstagram } from "react-icons/fi";
+import { RiTwitterXFill } from "react-icons/ri";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,12 +35,14 @@ type Pixel = {
   socialProfile: SocialProfile;
 };
 
+type SignatureNetwork = "instagram" | "x";
+
 type SocialProfile = {
-  instagram: string;
-  x: string;
+  network: SignatureNetwork;
+  handle: string;
 };
 
-const EMPTY_SOCIAL_PROFILE: SocialProfile = { instagram: "", x: "" };
+const EMPTY_SOCIAL_PROFILE: SocialProfile = { network: "instagram", handle: "" };
 
 const chunkCache = new Map<number, Map<number, Pixel>>();
 
@@ -71,13 +75,13 @@ function fakeRevealedBy(id: number) {
 
 function fakeSocialProfile(id: number): SocialProfile {
   if (id % 13 === 0) {
-    return { instagram: "pixel.studio", x: "pixelstudio" };
+    return { network: "instagram", handle: "pixel.studio" };
   }
   if (id % 11 === 0) {
-    return { ...EMPTY_SOCIAL_PROFILE, x: "criadorespixel" };
+    return { network: "x", handle: "criadorespixel" };
   }
   if (id % 7 === 0) {
-    return { ...EMPTY_SOCIAL_PROFILE, instagram: "ana.pixel" };
+    return { network: "instagram", handle: "ana.pixel" };
   }
   return EMPTY_SOCIAL_PROFILE;
 }
@@ -147,18 +151,56 @@ function normalizeHandle(value: string) {
   return value.trim().replace(/^@+/, "");
 }
 
-function validateSocialProfile(profile: SocialProfile) {
-  const errors: SocialProfile = { ...EMPTY_SOCIAL_PROFILE };
-  const instagram = normalizeHandle(profile.instagram);
-  const x = normalizeHandle(profile.x);
+function normalizeSocialProfile(value: unknown): SocialProfile {
+  if (!value || typeof value !== "object") return EMPTY_SOCIAL_PROFILE;
+  const profile = value as Partial<SocialProfile> & {
+    instagram?: string;
+    x?: string;
+  };
+  if (profile.network && (profile.network === "instagram" || profile.network === "x")) {
+    return { network: profile.network, handle: normalizeHandle(profile.handle ?? "") };
+  }
+  if (profile.instagram) {
+    return { network: "instagram", handle: normalizeHandle(profile.instagram) };
+  }
+  if (profile.x) {
+    return { network: "x", handle: normalizeHandle(profile.x) };
+  }
+  return EMPTY_SOCIAL_PROFILE;
+}
 
-  if (instagram && !/^[a-zA-Z0-9._]{1,30}$/.test(instagram)) {
-    errors.instagram = "Use apenas letras, números, pontos e sublinhados.";
+function validateSocialProfile(profile: SocialProfile) {
+  const handle = normalizeHandle(profile.handle);
+  if (!handle) return "";
+  if (
+    profile.network === "instagram" &&
+    !/^[a-zA-Z0-9._]{1,30}$/.test(handle)
+  ) {
+    return "Use apenas letras, números, pontos e sublinhados.";
   }
-  if (x && !/^[a-zA-Z0-9_]{1,15}$/.test(x)) {
-    errors.x = "Use até 15 caracteres: letras, números e sublinhados.";
+  if (profile.network === "x" && !/^[a-zA-Z0-9_]{1,15}$/.test(handle)) {
+    return "Use até 15 caracteres: letras, números e sublinhados.";
   }
-  return errors;
+  return "";
+}
+
+function SignatureIcon({
+  network,
+  size = 16,
+}: {
+  network: SignatureNetwork;
+  size?: number;
+}) {
+  return network === "instagram" ? (
+    <FiInstagram size={size} aria-hidden="true" />
+  ) : (
+    <RiTwitterXFill size={size} aria-hidden="true" />
+  );
+}
+
+function signatureUrl(profile: SocialProfile) {
+  const base = profile.network === "instagram" ? "https://instagram.com/" : "https://x.com/";
+  return `${base}${profile.handle}`;
 }
 
 function formatBRL(value: number) {
@@ -203,7 +245,7 @@ function PixelSheet({
   const [socialPromptOpen, setSocialPromptOpen] = useState(false);
   const [editingSocials, setEditingSocials] = useState(false);
   const [socialForm, setSocialForm] = useState<SocialProfile>(EMPTY_SOCIAL_PROFILE);
-  const [socialErrors, setSocialErrors] = useState<SocialProfile>(EMPTY_SOCIAL_PROFILE);
+  const [socialError, setSocialError] = useState("");
   const [copied, setCopied] = useState(false);
   const pixPayload = fakePixPayload(pixel.id);
 
@@ -231,21 +273,21 @@ function PixelSheet({
 
   const saveSocials = () => {
     const normalized = {
-      instagram: normalizeHandle(socialForm.instagram),
-      x: normalizeHandle(socialForm.x),
+      network: socialForm.network,
+      handle: normalizeHandle(socialForm.handle),
     };
-    const errors = validateSocialProfile(normalized);
-    setSocialErrors(errors);
-    if (errors.instagram || errors.x) return;
+    const error = validateSocialProfile(normalized);
+    setSocialError(error);
+    if (error) return;
     onSaveSocialProfile(normalized);
     setSocialForm(normalized);
     setSocialPromptOpen(false);
     setEditingSocials(false);
   };
 
-  const displayedSocials =
+  const displayedSignature =
     pixel.revealedBy === CURRENT_USER_NICKNAME ? socialProfile : pixel.socialProfile;
-  const hasSocials = Boolean(displayedSocials.instagram || displayedSocials.x);
+  const hasSignature = Boolean(displayedSignature.handle);
 
   return (
     <div className="prototype-overlay" onClick={onClose}>
@@ -360,39 +402,25 @@ function PixelSheet({
                 {pixel.revealed && (
                   <div className="prototype-revealed-content">
                     <div className="prototype-revealed-by">
-                      <span>
-                        {pixel.revealedBy === CURRENT_USER_NICKNAME
-                          ? "Revelado por você"
-                          : `Revelado por ${pixel.revealedBy}`}
-                      </span>
-                      <span className="prototype-divider">·</span>
+                      <span>Revelado em</span>
                       <span>{formatRevealedDate(pixel.revealedAt)}</span>
                     </div>
 
-                    {hasSocials && (
+                    {hasSignature && (
                       <div className="prototype-social-section">
                         <div className="prototype-social-title">
-                          Encontre quem deixou esta marca
+                          Assinado por
                         </div>
                         <div className="prototype-social-links">
-                          {displayedSocials.instagram && (
-                            <a
-                              href={`https://instagram.com/${displayedSocials.instagram}`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Instagram: @{displayedSocials.instagram}
-                            </a>
-                          )}
-                          {displayedSocials.x && (
-                            <a
-                              href={`https://x.com/${displayedSocials.x}`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              X: @{displayedSocials.x}
-                            </a>
-                          )}
+                          <a
+                            href={signatureUrl(displayedSignature)}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`Abrir @${displayedSignature.handle} no ${displayedSignature.network}`}
+                          >
+                            <SignatureIcon network={displayedSignature.network} size={17} />
+                            <span>@{displayedSignature.handle}</span>
+                          </a>
                         </div>
                       </div>
                     )}
@@ -401,12 +429,12 @@ function PixelSheet({
                       <button
                         className="prototype-edit-social-button"
                         onClick={() => {
-                          setSocialForm(displayedSocials);
-                          setSocialErrors(EMPTY_SOCIAL_PROFILE);
+                          setSocialForm(displayedSignature);
+                          setSocialError("");
                           setEditingSocials(true);
                         }}
                       >
-                        {hasSocials ? "Editar perfis" : "Adicionar perfis"}
+                        {hasSignature ? "Editar assinatura" : "Assinar pixel"}
                       </button>
                     )}
                   </div>
@@ -432,24 +460,24 @@ function PixelSheet({
               </button>
             </div>
             <p>
-              Adicione seus perfis para que outras pessoas encontrem quem deixou este pixel.
+              Escolha uma rede e adicione seu @ para deixar uma assinatura pública neste pixel.
             </p>
             <SocialProfileForm
               profile={socialForm}
-              errors={socialErrors}
+              error={socialError}
               onChange={setSocialForm}
               onSave={saveSocials}
               onSkip={() => setSocialPromptOpen(false)}
-              saveLabel="Salvar e ver meu pixel"
+              saveLabel="Assinar pixel"
             />
           </div>
         )}
 
         {editingSocials && (
-          <div className="prototype-social-prompt" role="dialog" aria-label="Editar perfis">
+          <div className="prototype-social-prompt" role="dialog" aria-label="Editar assinatura">
             <div className="prototype-social-prompt-header">
               <div>
-                <div className="prototype-eyebrow">SEU PERFIL</div>
+                <div className="prototype-eyebrow">SUA ASSINATURA</div>
                 <h2>Editar sua assinatura</h2>
               </div>
               <button
@@ -460,10 +488,10 @@ function PixelSheet({
                 <X size={17} />
               </button>
             </div>
-            <p>Você pode atualizar ou remover seus perfis quando quiser.</p>
+            <p>Você pode atualizar ou remover sua assinatura quando quiser.</p>
             <SocialProfileForm
               profile={socialForm}
-              errors={socialErrors}
+              error={socialError}
               onChange={setSocialForm}
               onSave={saveSocials}
               onSkip={() => {
@@ -472,7 +500,7 @@ function PixelSheet({
                 setEditingSocials(false);
               }}
               saveLabel="Salvar alterações"
-              skipLabel="Remover perfis"
+              skipLabel="Remover assinatura"
             />
           </div>
         )}
@@ -483,7 +511,7 @@ function PixelSheet({
 
 function SocialProfileForm({
   profile,
-  errors,
+  error,
   onChange,
   onSave,
   onSkip,
@@ -491,7 +519,7 @@ function SocialProfileForm({
   skipLabel = "Agora não",
 }: {
   profile: SocialProfile;
-  errors: SocialProfile;
+  error: string;
   onChange: (profile: SocialProfile) => void;
   onSave: () => void;
   onSkip: () => void;
@@ -500,33 +528,39 @@ function SocialProfileForm({
 }) {
   return (
     <div className="prototype-social-form">
+      <div className="prototype-network-picker" role="group" aria-label="Escolha a rede da assinatura">
+        <button
+          type="button"
+          className={`prototype-network-option${profile.network === "instagram" ? " is-selected" : ""}`}
+          onClick={() => onChange({ ...profile, network: "instagram" })}
+          aria-pressed={profile.network === "instagram"}
+        >
+          <FiInstagram size={16} aria-hidden="true" />
+          Instagram
+        </button>
+        <button
+          type="button"
+          className={`prototype-network-option${profile.network === "x" ? " is-selected" : ""}`}
+          onClick={() => onChange({ ...profile, network: "x" })}
+          aria-pressed={profile.network === "x"}
+        >
+          <RiTwitterXFill size={16} aria-hidden="true" />
+          X
+        </button>
+      </div>
       <label>
-        <span>Instagram</span>
+        <span>Seu @usuário</span>
         <div className="prototype-handle-input">
           <span>@</span>
           <input
-            value={profile.instagram}
-            onChange={(event) => onChange({ ...profile, instagram: event.target.value })}
+            value={profile.handle}
+            onChange={(event) => onChange({ ...profile, handle: event.target.value })}
             placeholder="seuusuario"
             autoComplete="off"
-            aria-invalid={Boolean(errors.instagram)}
+            aria-invalid={Boolean(error)}
           />
         </div>
-        {errors.instagram && <small>{errors.instagram}</small>}
-      </label>
-      <label>
-        <span>X</span>
-        <div className="prototype-handle-input">
-          <span>@</span>
-          <input
-            value={profile.x}
-            onChange={(event) => onChange({ ...profile, x: event.target.value })}
-            placeholder="seuusuario"
-            autoComplete="off"
-            aria-invalid={Boolean(errors.x)}
-          />
-        </div>
-        {errors.x && <small>{errors.x}</small>}
+        {error && <small>{error}</small>}
       </label>
       <div className="prototype-social-form-actions">
         <button className="prototype-social-secondary" onClick={onSkip}>
@@ -551,7 +585,7 @@ function PixelGrid() {
   const [socialProfile, setSocialProfile] = useState<SocialProfile>(() => {
     try {
       const saved = window.localStorage.getItem("pixelpix-social-profile");
-      return saved ? { ...EMPTY_SOCIAL_PROFILE, ...JSON.parse(saved) } : EMPTY_SOCIAL_PROFILE;
+      return saved ? normalizeSocialProfile(JSON.parse(saved)) : EMPTY_SOCIAL_PROFILE;
     } catch {
       return EMPTY_SOCIAL_PROFILE;
     }
@@ -720,16 +754,16 @@ function ProfileSheet({
   onSave: (profile: SocialProfile) => void;
 }) {
   const [form, setForm] = useState(profile);
-  const [errors, setErrors] = useState(EMPTY_SOCIAL_PROFILE);
+  const [error, setError] = useState("");
 
   const save = () => {
     const normalized = {
-      instagram: normalizeHandle(form.instagram),
-      x: normalizeHandle(form.x),
+      network: form.network,
+      handle: normalizeHandle(form.handle),
     };
-    const nextErrors = validateSocialProfile(normalized);
-    setErrors(nextErrors);
-    if (nextErrors.instagram || nextErrors.x) return;
+    const nextError = validateSocialProfile(normalized);
+    setError(nextError);
+    if (nextError) return;
     onSave(normalized);
   };
 
@@ -745,7 +779,7 @@ function ProfileSheet({
         <div className="prototype-drag-handle" />
         <div className="prototype-sheet-header">
           <div>
-            <div className="prototype-eyebrow">SEU PERFIL</div>
+                <div className="prototype-eyebrow">SUA ASSINATURA</div>
             <div className="prototype-id">Sua assinatura</div>
           </div>
           <button className="prototype-icon-close" onClick={onClose} aria-label="Fechar">
@@ -753,17 +787,17 @@ function ProfileSheet({
           </button>
         </div>
         <p className="prototype-profile-description">
-          Esses perfis aparecem nos pixels que você revelar. Eles são opcionais e podem ser
-          alterados a qualquer momento.
+          Essa assinatura aparece nos pixels que você revelar. Ela é opcional e pode ser
+          alterada a qualquer momento.
         </p>
         <SocialProfileForm
           profile={form}
-          errors={errors}
+          error={error}
           onChange={setForm}
           onSave={save}
           onSkip={() => onSave(EMPTY_SOCIAL_PROFILE)}
-          saveLabel="Salvar assinatura"
-          skipLabel="Remover perfis"
+          saveLabel="Assinar pixel"
+          skipLabel="Remover assinatura"
         />
       </div>
     </div>

@@ -284,14 +284,21 @@ button:focus-visible {
 
 .prototype-social-links {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
+  align-items: center;
 }
 
 .prototype-social-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   color: #7dd3fc;
   font-size: 12px;
+  font-weight: 600;
   text-decoration: none;
+}
+
+.prototype-social-links a svg {
+  color: #c3c9d1;
 }
 
 .prototype-social-links a:hover {
@@ -370,6 +377,43 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.prototype-network-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.prototype-network-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #2b333c;
+  border-radius: 8px;
+  color: #8b93a1;
+  background: #0b0d10;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prototype-network-option:hover {
+  border-color: #53616e;
+  color: #e5e7eb;
+}
+
+.prototype-network-option.is-selected {
+  border-color: #7dd3fc;
+  color: #7dd3fc;
+  background: rgba(125, 211, 252, 0.08);
+}
+
+.prototype-network-option svg {
+  color: currentColor;
 }
 
 .prototype-social-form label {
