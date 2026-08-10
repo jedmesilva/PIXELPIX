@@ -618,16 +618,11 @@ function ReceiptEmailView({
       </div>
 
       <div className="prototype-signature-title">
-        <div className="prototype-eyebrow">ANTES DO PAGAMENTO</div>
-        <h2>Onde enviar seu comprovante?</h2>
-        <p>
-          Informe seu e-mail antes de pagar. Assim, o pagamento, o pixel revelado
-          e o comprovante ficam vinculados ao mesmo endereço.
-        </p>
+        <h2>Seu e-mail</h2>
       </div>
 
       <label className="prototype-email-field">
-        <span>Seu e-mail</span>
+        <span>E-mail</span>
         <input
           type="email"
           value={email}
@@ -640,9 +635,6 @@ function ReceiptEmailView({
             if (event.key === "Enter") onContinue();
           }}
         />
-        <small>
-          Vamos lembrar este e-mail neste navegador para os próximos pixels.
-        </small>
         {error && <strong>{error}</strong>}
       </label>
 
