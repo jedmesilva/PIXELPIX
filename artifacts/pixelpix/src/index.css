@@ -399,7 +399,7 @@ button:focus-visible {
   background: #0b0d10;
 }
 
-.prototype-network-select:focus-within {
+.prototype-network-select.is-open {
   border-color: #7dd3fc;
 }
 
@@ -408,7 +408,11 @@ button:focus-visible {
   color: #7dd3fc;
 }
 
-.prototype-network-select select {
+.prototype-network-select-trigger {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
   min-width: 0;
   height: 40px;
@@ -419,19 +423,57 @@ button:focus-visible {
   background: transparent;
   font: inherit;
   cursor: pointer;
-  appearance: none;
 }
 
-.prototype-network-select select option {
-  color: #e5e7eb;
-  background: #14171b;
+.prototype-network-select-trigger:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 2px;
 }
 
 .prototype-network-chevron {
   position: absolute;
-  right: 11px;
+  right: 10px;
   pointer-events: none;
   color: #697481 !important;
+}
+
+.prototype-network-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  padding: 4px;
+  border: 1px solid #2b333c;
+  border-radius: 8px;
+  background: #14171b;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.38);
+}
+
+.prototype-network-menu-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  color: #a8b2bf;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.prototype-network-menu-option svg:last-child {
+  margin-left: auto;
+  color: #7dd3fc;
+}
+
+.prototype-network-menu-option:hover,
+.prototype-network-menu-option.is-selected {
+  color: #e5e7eb;
+  background: #20262d;
 }
 
 .prototype-social-form label {

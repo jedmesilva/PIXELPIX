@@ -536,26 +536,48 @@ function SocialProfileForm({
   saveLabel: string;
   skipLabel?: string;
 }) {
+  const [networkMenuOpen, setNetworkMenuOpen] = useState(false);
+
   return (
     <div className="prototype-social-form">
       <label className="prototype-network-field">
         <span>Rede social</span>
-        <div className="prototype-network-select">
+        <div className={`prototype-network-select ${networkMenuOpen ? "is-open" : ""}`}>
           <SignatureIcon network={profile.network} size={16} />
-          <select
-            value={profile.network}
-            onChange={(event) =>
-              onChange({
-                ...profile,
-                network: event.target.value as SignatureNetwork,
-              })
-            }
+          <button
+            type="button"
+            className="prototype-network-select-trigger"
+            aria-haspopup="listbox"
+            aria-expanded={networkMenuOpen}
             aria-label="Escolha a rede da assinatura"
+            onClick={() => setNetworkMenuOpen((open) => !open)}
           >
-            <option value="instagram">Instagram</option>
-            <option value="x">X</option>
-          </select>
-          <ChevronDown size={15} className="prototype-network-chevron" aria-hidden="true" />
+            <span>{profile.network === "instagram" ? "Instagram" : "X"}</span>
+            <ChevronDown size={15} className="prototype-network-chevron" aria-hidden="true" />
+          </button>
+          {networkMenuOpen && (
+            <div className="prototype-network-menu" role="listbox" aria-label="Redes sociais">
+              {(["instagram", "x"] as const).map((network) => (
+                <button
+                  key={network}
+                  type="button"
+                  role="option"
+                  aria-selected={profile.network === network}
+                  className={`prototype-network-menu-option ${
+                    profile.network === network ? "is-selected" : ""
+                  }`}
+                  onClick={() => {
+                    onChange({ ...profile, network });
+                    setNetworkMenuOpen(false);
+                  }}
+                >
+                  <SignatureIcon network={network} size={15} />
+                  <span>{network === "instagram" ? "Instagram" : "X"}</span>
+                  {profile.network === network && <Check size={14} aria-hidden="true" />}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </label>
       <label className="prototype-handle-field">
