@@ -24,6 +24,7 @@ const MIN_CELL_PX = 34;
 const BUFFER_ROWS = 4;
 const CHUNK_SIZE = 2_500;
 const PIXEL_PRICE = 0.5;
+const RECEIPT_EMAIL_STORAGE_KEY = "pixelpix-receipt-email";
 
 type Pixel = {
   id: number;
@@ -127,12 +128,12 @@ function getPixel(id: number) {
   return getChunk(Math.floor(id / CHUNK_SIZE)).get(id)!;
 }
 
-function revealPixelInCache(id: number, socialProfile: SocialProfile) {
+function revealPixelInCache(id: number, socialProfile: SocialProfile, revealedAt = new Date()) {
   const pixel = getPixel(id);
   pixel.revealed = true;
   pixel.emoji = pickEmoji(id);
   pixel.revealedBy = CURRENT_USER_NICKNAME;
-  pixel.revealedAt = new Date();
+  pixel.revealedAt = revealedAt;
   pixel.socialProfile = socialProfile;
   return pixel;
 }
@@ -183,6 +184,45 @@ function validateSocialProfile(profile: SocialProfile) {
   }
   return "";
 }
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function validateEmail(value: string) {
+  const email = normalizeEmail(value);
+  if (!email) return "Informe seu e-mail para receber o comprovante.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return "Digite um e-mail válido.";
+  }
+  return "";
+}
+
+function getStoredReceiptEmail() {
+  try {
+    return window.localStorage.getItem(RECEIPT_EMAIL_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeReceiptEmail(email: string) {
+  try {
+    window.localStorage.setItem(RECEIPT_EMAIL_STORAGE_KEY, email);
+  } catch {
+    // Some privacy modes block localStorage; the current checkout can continue.
+  }
+}
+
+type ReceiptPayload = {
+  pixelId: number;
+  email: string;
+  paymentId: string;
+  revealedAt: string;
+  value: number;
+  emoji: string;
+  socialProfile: SocialProfile;
+};
 
 function SignatureIcon({
   network,
@@ -237,15 +277,21 @@ function PixelSheet({
 }: {
   pixel: Pixel;
   onClose: () => void;
-  onReveal: (id: number, socialProfile: SocialProfile) => void;
+  onReveal: (
+    receipt: ReceiptPayload,
+  ) => Promise<void>;
   socialProfile: SocialProfile;
   onSaveSocialProfile: (profile: SocialProfile) => void;
 }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [emailPromptOpen, setEmailPromptOpen] = useState(false);
   const [socialPromptOpen, setSocialPromptOpen] = useState(false);
   const [editingSocials, setEditingSocials] = useState(false);
   const [socialForm, setSocialForm] = useState<SocialProfile>(EMPTY_SOCIAL_PROFILE);
   const [socialError, setSocialError] = useState("");
+  const [receiptEmail, setReceiptEmail] = useState(getStoredReceiptEmail);
+  const [receiptEmailError, setReceiptEmailError] = useState("");
+  const [isSubmittingReveal, setIsSubmittingReveal] = useState(false);
   const [copied, setCopied] = useState(false);
   const pixPayload = fakePixPayload(pixel.id);
 
@@ -260,9 +306,13 @@ function PixelSheet({
 
   useEffect(() => {
     setCheckoutOpen(false);
+    setEmailPromptOpen(false);
     setSocialPromptOpen(false);
     setEditingSocials(false);
     setCopied(false);
+    setReceiptEmail(getStoredReceiptEmail());
+    setReceiptEmailError("");
+    setIsSubmittingReveal(false);
   }, [pixel.id]);
 
   useEffect(() => {
@@ -288,6 +338,50 @@ function PixelSheet({
   const displayedSignature =
     pixel.revealedBy === CURRENT_USER_NICKNAME ? socialProfile : pixel.socialProfile;
   const hasSignature = Boolean(displayedSignature.handle);
+
+  const confirmDemoPayment = async () => {
+    const normalizedEmail = normalizeEmail(receiptEmail);
+    const error = validateEmail(normalizedEmail);
+    setReceiptEmailError(error);
+    if (error) return;
+
+    const receipt: ReceiptPayload = {
+      pixelId: pixel.id,
+      email: normalizedEmail,
+      paymentId: `demo-payment-${pixel.id}-${Date.now()}`,
+      revealedAt: new Date().toISOString(),
+      value: PIXEL_PRICE,
+      emoji: pickEmoji(pixel.id),
+      socialProfile: EMPTY_SOCIAL_PROFILE,
+    };
+    storeReceiptEmail(normalizedEmail);
+    setIsSubmittingReveal(true);
+    try {
+      await onReveal(receipt);
+      setCheckoutOpen(false);
+      setSocialPromptOpen(true);
+    } catch (error) {
+      setReceiptEmailError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível enviar o comprovante. Tente novamente.",
+      );
+    } finally {
+      setIsSubmittingReveal(false);
+    }
+  };
+
+  const continueToCheckout = () => {
+    const normalizedEmail = normalizeEmail(receiptEmail);
+    const error = validateEmail(normalizedEmail);
+    setReceiptEmailError(error);
+    if (error) return;
+
+    storeReceiptEmail(normalizedEmail);
+    setReceiptEmail(normalizedEmail);
+    setEmailPromptOpen(false);
+    setCheckoutOpen(true);
+  };
 
   return (
     <div className="prototype-overlay" onClick={onClose}>
@@ -324,6 +418,20 @@ function PixelSheet({
               </div>
             </div>
 
+             <div className="prototype-receipt-destination">
+               <span>Comprovante deste pixel</span>
+               <strong>{receiptEmail}</strong>
+               <button
+                 type="button"
+                 onClick={() => {
+                   setCheckoutOpen(false);
+                   setEmailPromptOpen(true);
+                 }}
+               >
+                 Alterar e-mail
+               </button>
+             </div>
+
             <div className="prototype-checkout-layout">
               <div className="prototype-qr-wrap">
                 <img
@@ -352,17 +460,27 @@ function PixelSheet({
 
                 <button
                   className="prototype-demo-button"
-                  onClick={() => {
-                    onReveal(pixel.id, EMPTY_SOCIAL_PROFILE);
-                    setCheckoutOpen(false);
-                    setSocialPromptOpen(true);
-                  }}
+                  onClick={confirmDemoPayment}
+                  disabled={isSubmittingReveal}
                 >
-                  (demo) simular pagamento confirmado
+                  {isSubmittingReveal
+                    ? "Enviando comprovante…"
+                    : "(demo) simular pagamento confirmado"}
                 </button>
               </div>
             </div>
           </>
+        ) : emailPromptOpen ? (
+          <ReceiptEmailView
+            email={receiptEmail}
+            error={receiptEmailError}
+            onChange={(email) => {
+              setReceiptEmail(email);
+              setReceiptEmailError("");
+            }}
+            onBack={() => setEmailPromptOpen(false)}
+            onContinue={continueToCheckout}
+          />
         ) : socialPromptOpen || editingSocials ? (
           <SignatureFormView
             profile={socialForm}
@@ -414,7 +532,11 @@ function PixelSheet({
                 {!pixel.revealed && (
                   <button
                     className="prototype-reveal-button"
-                    onClick={() => setCheckoutOpen(true)}
+                    onClick={() => {
+                      setReceiptEmail(getStoredReceiptEmail());
+                      setReceiptEmailError("");
+                      setEmailPromptOpen(true);
+                    }}
                   >
                     Revelar pixel
                   </button>
@@ -467,6 +589,69 @@ function PixelSheet({
 
       </div>
     </div>
+  );
+}
+
+function ReceiptEmailView({
+  email,
+  error,
+  onChange,
+  onBack,
+  onContinue,
+}: {
+  email: string;
+  error: string;
+  onChange: (email: string) => void;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <>
+      <div className="prototype-sheet-header">
+        <button className="prototype-back-button" onClick={onBack} aria-label="Voltar">
+          <ArrowLeft size={16} />
+          Voltar
+        </button>
+        <button className="prototype-close-button" onClick={onBack}>
+          Fechar
+        </button>
+      </div>
+
+      <div className="prototype-signature-title">
+        <div className="prototype-eyebrow">ANTES DO PAGAMENTO</div>
+        <h2>Onde enviar seu comprovante?</h2>
+        <p>
+          Informe seu e-mail antes de pagar. Assim, o pagamento, o pixel revelado
+          e o comprovante ficam vinculados ao mesmo endereço.
+        </p>
+      </div>
+
+      <label className="prototype-email-field">
+        <span>Seu e-mail</span>
+        <input
+          type="email"
+          value={email}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="voce@exemplo.com"
+          autoComplete="email"
+          autoFocus
+          aria-invalid={Boolean(error)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") onContinue();
+          }}
+        />
+        <small>
+          Vamos lembrar este e-mail neste navegador para os próximos pixels.
+        </small>
+        {error && <strong>{error}</strong>}
+      </label>
+
+      <div className="prototype-email-actions">
+        <button className="prototype-social-primary" onClick={onContinue}>
+          Continuar para o pagamento
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -672,10 +857,14 @@ function PixelGrid() {
 
   const selected = selectedId === null ? null : getPixel(selectedId);
 
-  const handleReveal = useCallback((id: number, profile: SocialProfile) => {
-    revealPixelInCache(id, profile);
-    setRevealVersion((version) => version + 1);
-  }, []);
+  const handleReveal = useCallback(async (receipt: ReceiptPayload) => {
+      revealPixelInCache(
+        receipt.pixelId,
+        receipt.socialProfile,
+        new Date(receipt.revealedAt),
+      );
+      setRevealVersion((version) => version + 1);
+    }, []);
 
   const handleSaveSocialProfile = useCallback((profile: SocialProfile) => {
     setSocialProfile(profile);

@@ -510,6 +510,96 @@ button:focus-visible {
   font-weight: 400;
 }
 
+.prototype-email-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #c3c9d1;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.prototype-email-field input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid #2b333c;
+  border-radius: 8px;
+  outline: 0;
+  color: #e5e7eb;
+  background: #0b0d10;
+  font: inherit;
+  font-size: 13px;
+}
+
+.prototype-email-field input:focus {
+  border-color: #7dd3fc;
+}
+
+.prototype-email-field input[aria-invalid="true"] {
+  border-color: #fca5a5;
+}
+
+.prototype-email-field small {
+  color: #8b93a1;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.prototype-email-field strong {
+  color: #fca5a5;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.prototype-email-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.prototype-email-actions .prototype-social-primary {
+  width: 100%;
+  min-height: 42px;
+}
+
+.prototype-receipt-destination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border: 1px solid #252b32;
+  border-radius: 9px;
+  color: #8b93a1;
+  background: #101317;
+  font-size: 11px;
+}
+
+.prototype-receipt-destination strong {
+  flex: 1 1 100%;
+  min-width: 0;
+  overflow: hidden;
+  color: #e5e7eb;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prototype-receipt-destination button {
+  padding: 0;
+  border: 0;
+  color: #7dd3fc;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .prototype-social-form-actions {
   display: flex;
   justify-content: flex-end;
