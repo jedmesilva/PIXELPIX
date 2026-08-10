@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Check, ChevronDown, Copy, Loader2, Lock, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, Loader2, Lock, X } from "lucide-react";
 import { FiInstagram } from "react-icons/fi";
 import { RiTwitterXFill } from "react-icons/ri";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -540,20 +540,20 @@ function SocialProfileForm({
 
   return (
     <div className="prototype-social-form">
-      <label className="prototype-network-field">
-        <span>Rede social</span>
-        <div className={`prototype-network-select ${networkMenuOpen ? "is-open" : ""}`}>
-          <SignatureIcon network={profile.network} size={16} />
+      <label className="prototype-handle-field">
+        <span>Seu @usuário</span>
+        <div className={`prototype-identity-input ${networkMenuOpen ? "is-open" : ""}`}>
           <button
             type="button"
-            className="prototype-network-select-trigger"
+            className="prototype-network-icon-button"
             aria-haspopup="listbox"
             aria-expanded={networkMenuOpen}
-            aria-label="Escolha a rede da assinatura"
+            aria-label={`Trocar rede social. Atual: ${
+              profile.network === "instagram" ? "Instagram" : "X"
+            }`}
             onClick={() => setNetworkMenuOpen((open) => !open)}
           >
-            <span>{profile.network === "instagram" ? "Instagram" : "X"}</span>
-            <ChevronDown size={15} className="prototype-network-chevron" aria-hidden="true" />
+            <SignatureIcon network={profile.network} size={17} />
           </button>
           {networkMenuOpen && (
             <div className="prototype-network-menu" role="listbox" aria-label="Redes sociais">
@@ -578,12 +578,7 @@ function SocialProfileForm({
               ))}
             </div>
           )}
-        </div>
-      </label>
-      <label className="prototype-handle-field">
-        <span>Seu @usuário</span>
-        <div className="prototype-handle-input">
-          <span>@</span>
+          <span className="prototype-handle-prefix">@</span>
           <input
             value={profile.handle}
             onChange={(event) => onChange({ ...profile, handle: event.target.value })}

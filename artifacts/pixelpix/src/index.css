@@ -376,7 +376,6 @@ button:focus-visible {
   gap: 12px;
 }
 
-.prototype-network-field,
 .prototype-handle-field {
   display: flex;
   flex-direction: column;
@@ -386,63 +385,56 @@ button:focus-visible {
   font-weight: 500;
 }
 
-.prototype-network-select {
+.prototype-identity-input {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 7px;
   min-height: 42px;
-  padding: 0 11px;
   border: 1px solid #2b333c;
   border-radius: 8px;
   color: #c3c9d1;
   background: #0b0d10;
 }
 
-.prototype-network-select.is-open {
+.prototype-identity-input.is-open {
   border-color: #7dd3fc;
 }
 
-.prototype-network-select > svg:first-child {
-  flex: 0 0 auto;
-  color: #7dd3fc;
-}
-
-.prototype-network-select-trigger {
+.prototype-network-icon-button {
   display: flex;
-  flex: 1;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-width: 0;
-  height: 40px;
-  padding: 0 24px 0 0;
+  justify-content: center;
+  flex: 0 0 42px;
+  align-self: stretch;
+  padding: 0;
   border: 0;
-  outline: 0;
-  color: #c3c9d1;
+  border-right: 1px solid #2b333c;
+  color: #7dd3fc;
   background: transparent;
-  font: inherit;
   cursor: pointer;
 }
 
-.prototype-network-select-trigger:focus-visible {
+.prototype-network-icon-button:hover {
+  color: #e5e7eb;
+  background: #20262d;
+}
+
+.prototype-network-icon-button:focus-visible {
   outline: 2px solid #7dd3fc;
   outline-offset: 2px;
 }
 
-.prototype-network-chevron {
-  position: absolute;
-  right: 10px;
-  pointer-events: none;
-  color: #697481 !important;
+.prototype-handle-prefix {
+  padding-left: 10px;
+  color: #7dd3fc;
 }
 
 .prototype-network-menu {
   position: absolute;
   z-index: 20;
   top: calc(100% + 6px);
-  right: 0;
   left: 0;
+  width: 170px;
   padding: 4px;
   border: 1px solid #2b333c;
   border-radius: 8px;
@@ -492,25 +484,11 @@ button:focus-visible {
   font-weight: 700;
 }
 
-.prototype-handle-input {
-  display: flex;
-  align-items: center;
-  border: 1px solid #2b333c;
-  border-radius: 8px;
-  color: #697481;
-  background: #0b0d10;
-}
-
-.prototype-handle-input:focus-within {
+.prototype-identity-input:focus-within {
   border-color: #7dd3fc;
 }
 
-.prototype-handle-input > span {
-  padding-left: 10px;
-  color: #7dd3fc;
-}
-
-.prototype-handle-input input {
+.prototype-identity-input input {
   width: 100%;
   min-width: 0;
   padding: 10px 10px 10px 4px;
