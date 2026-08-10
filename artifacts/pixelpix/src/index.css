@@ -408,6 +408,7 @@ button:focus-visible {
   align-self: stretch;
   padding: 0;
   border: 0;
+  border-radius: 7px 0 0 7px;
   border-right: 1px solid #2b333c;
   color: #7dd3fc;
   background: transparent;
