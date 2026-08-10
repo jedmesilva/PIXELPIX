@@ -386,45 +386,52 @@ button:focus-visible {
   font-weight: 500;
 }
 
-.prototype-network-options {
+.prototype-network-select {
+  position: relative;
   display: flex;
-  gap: 8px;
-}
-
-.prototype-network-option {
-  display: inline-flex;
-  flex: 1;
   align-items: center;
-  justify-content: center;
   gap: 7px;
   min-height: 42px;
   padding: 0 11px;
   border: 1px solid #2b333c;
   border-radius: 8px;
-  color: #a8b2bf;
+  color: #c3c9d1;
   background: #0b0d10;
-  cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
 }
 
-.prototype-network-option:hover {
-  border-color: #4a5967;
-  color: #e5e7eb;
-}
-
-.prototype-network-option.is-selected {
+.prototype-network-select:focus-within {
   border-color: #7dd3fc;
-  color: #e5e7eb;
-  background: #17232c;
 }
 
-.prototype-network-option svg {
+.prototype-network-select > svg:first-child {
+  flex: 0 0 auto;
   color: #7dd3fc;
 }
 
-.prototype-network-option:focus-visible {
-  outline: 2px solid #7dd3fc;
-  outline-offset: 2px;
+.prototype-network-select select {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 24px 0 0;
+  border: 0;
+  outline: 0;
+  color: #c3c9d1;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+
+.prototype-network-select select option {
+  color: #e5e7eb;
+  background: #14171b;
+}
+
+.prototype-network-chevron {
+  position: absolute;
+  right: 11px;
+  pointer-events: none;
+  color: #697481 !important;
 }
 
 .prototype-social-form label {
