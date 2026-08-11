@@ -1,5 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { expireReservations } from "./routes/cells";
+import { pool } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -15,11 +17,29 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+async function start() {
+  await pool.query(`
+    INSERT INTO prizes (label, weight, stock, value_cents, active)
+    SELECT 'Sem prêmio', 90, NULL, 0, true
+    WHERE NOT EXISTS (SELECT 1 FROM prizes)
+  `);
+  await expireReservations();
+  setInterval(() => {
+    void expireReservations().catch((error) =>
+      logger.error({ error }, "Reservation expiration failed"),
+    );
+  }, 30_000);
+  app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
 
   logger.info({ port }, "Server listening");
+  });
+}
+
+void start().catch((error) => {
+  logger.error({ error }, "Server startup failed");
+  process.exit(1);
 });

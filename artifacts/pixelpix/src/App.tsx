@@ -20,6 +20,7 @@ import { Route, Router as WouterRouter, Switch, useLocation } from "wouter";
 const queryClient = new QueryClient();
 
 const TOTAL_PIXELS = 1_000_000;
+const LOGICAL_COLUMNS = 1_000;
 const MIN_CELL_PX = 34;
 const BUFFER_ROWS = 4;
 const CHUNK_SIZE = 2_500;
@@ -35,6 +36,7 @@ type Pixel = {
   revealedBy: string | null;
   revealedAt: Date | null;
   socialProfile: SocialProfile;
+  status: "available" | "reserved" | "paid";
 };
 
 type SignatureNetwork = "instagram" | "x";
@@ -53,39 +55,10 @@ const EMOJI_SET = [
   "🌵", "🐚", "🍄", "🎈", "🧿", "🪁", "🌈", "🍉", "🦖", "🎲",
 ];
 
-const NICKNAME_SET = [
-  "ana.pixel", "joao_dev", "marcelasoares", "rafa_builder", "biancart",
-  "lucas.codes", "camila_", "pedrohenrique", "julia.designs", "thiago_ok",
-];
-
 const CURRENT_USER_NICKNAME = "você";
 
 function seedFor(id: number) {
   return (id * 2_654_435_761) >>> 0;
-}
-
-function fakeRevealedAt(id: number) {
-  const daysAgo = 1 + (seedFor(id) % 400);
-  const date = new Date();
-  date.setDate(date.getDate() - daysAgo);
-  return date;
-}
-
-function fakeRevealedBy(id: number) {
-  return NICKNAME_SET[seedFor(id) % NICKNAME_SET.length];
-}
-
-function fakeSocialProfile(id: number): SocialProfile {
-  if (id % 13 === 0) {
-    return { network: "instagram", handle: "pixel.studio" };
-  }
-  if (id % 11 === 0) {
-    return { network: "x", handle: "criadorespixel" };
-  }
-  if (id % 7 === 0) {
-    return { network: "instagram", handle: "ana.pixel" };
-  }
-  return EMPTY_SOCIAL_PROFILE;
 }
 
 function hashColor(id: number) {
@@ -100,6 +73,19 @@ function pickEmoji(id: number) {
   return EMOJI_SET[seedFor(id) % EMOJI_SET.length];
 }
 
+function emptyPixel(id: number): Pixel {
+  return {
+    id,
+    color: hashColor(id),
+    revealed: false,
+    emoji: null,
+    revealedBy: null,
+    revealedAt: null,
+    socialProfile: EMPTY_SOCIAL_PROFILE,
+    status: "available",
+  };
+}
+
 function getChunk(chunkId: number) {
   const cached = chunkCache.get(chunkId);
   if (cached) return cached;
@@ -109,16 +95,7 @@ function getChunk(chunkId: number) {
   const chunk = new Map<number, Pixel>();
 
   for (let id = start; id < end; id += 1) {
-    const revealed = id % 5 !== 0;
-    chunk.set(id, {
-      id,
-      color: hashColor(id),
-      revealed,
-      emoji: revealed ? pickEmoji(id) : null,
-      revealedBy: revealed ? fakeRevealedBy(id) : null,
-      revealedAt: revealed ? fakeRevealedAt(id) : null,
-      socialProfile: revealed ? fakeSocialProfile(id) : EMPTY_SOCIAL_PROFILE,
-    });
+    chunk.set(id, emptyPixel(id));
   }
 
   chunkCache.set(chunkId, chunk);
@@ -136,7 +113,52 @@ function revealPixelInCache(id: number, socialProfile: SocialProfile, revealedAt
   pixel.revealedBy = CURRENT_USER_NICKNAME;
   pixel.revealedAt = revealedAt;
   pixel.socialProfile = socialProfile;
+  pixel.status = "paid";
   return pixel;
+}
+
+function applyCellStatus(
+  id: number,
+  status: "available" | "reserved" | "paid",
+) {
+  const pixel = getPixel(id);
+  pixel.status = status;
+  pixel.revealed = status === "paid";
+  if (!pixel.revealed) {
+    pixel.emoji = null;
+    pixel.revealedBy = null;
+    pixel.revealedAt = null;
+    pixel.socialProfile = EMPTY_SOCIAL_PROFILE;
+  }
+}
+
+async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  });
+  const body = (await response.json().catch(() => ({}))) as T & {
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new Error(body.error ?? "Não foi possível concluir a operação.");
+  }
+  return body;
+}
+
+function getDeviceId() {
+  const key = "pixelpix-device-id";
+  try {
+    const existing = window.localStorage.getItem(key);
+    if (existing) return existing;
+    const created =
+      globalThis.crypto?.randomUUID?.() ??
+      `device_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(key, created);
+    return created;
+  } catch {
+    return `device_${globalThis.crypto?.randomUUID?.() ?? "ephemeral"}`;
+  }
 }
 
 function updatePixelSocialProfile(pixelId: number, socialProfile: SocialProfile) {
@@ -262,14 +284,11 @@ function formatRevealedDate(date: Date | null) {
   return `${datePart} às ${timePart}`;
 }
 
-function fakePixPayload(id: number) {
-  return `00020126580014BR.GOV.BCB.PIX0136pixel-${id}-a1b2c3d4-e5f6-52040000530398654${PIXEL_PRICE.toFixed(2)}5802BR5913Pixel Studio6009SAO PAULO62070503***6304ABCD`;
-}
-
 function PixelSheet({
   pixel,
   onClose,
   onReveal,
+  onReserve,
   socialProfile,
   onSaveSocialProfile,
 }: {
@@ -278,6 +297,7 @@ function PixelSheet({
   onReveal: (
     receipt: ReceiptPayload,
   ) => Promise<void>;
+  onReserve: (id: number) => Promise<string>;
   socialProfile: SocialProfile;
   onSaveSocialProfile: (profile: SocialProfile) => void;
 }) {
@@ -291,16 +311,18 @@ function PixelSheet({
   const [receiptEmailError, setReceiptEmailError] = useState("");
   const [isSubmittingReveal, setIsSubmittingReveal] = useState(false);
   const [copied, setCopied] = useState(false);
-  const pixPayload = fakePixPayload(pixel.id);
+  const [reservationToken, setReservationToken] = useState("");
+  const [checkoutUrl, setCheckoutUrl] = useState("");
+  const checkoutReference = checkoutUrl || "checkout ainda não criado";
 
   const copyPix = useCallback(async () => {
     try {
-      await navigator.clipboard?.writeText(pixPayload);
+      await navigator.clipboard?.writeText(checkoutReference);
     } finally {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2_000);
     }
-  }, [pixPayload]);
+  }, [checkoutReference]);
 
   useEffect(() => {
     setCheckoutOpen(false);
@@ -311,6 +333,8 @@ function PixelSheet({
     setReceiptEmail(getStoredReceiptEmail());
     setReceiptEmailError("");
     setIsSubmittingReveal(false);
+    setReservationToken("");
+    setCheckoutUrl("");
   }, [pixel.id]);
 
   useEffect(() => {
@@ -345,18 +369,27 @@ function PixelSheet({
     setReceiptEmailError(error);
     if (error) return;
 
-    const receipt: ReceiptPayload = {
-      pixelId: pixel.id,
-      email: normalizedEmail,
-      paymentId: `demo-payment-${pixel.id}-${Date.now()}`,
-      revealedAt: new Date().toISOString(),
-      value: PIXEL_PRICE,
-      emoji: pickEmoji(pixel.id),
-      socialProfile: EMPTY_SOCIAL_PROFILE,
-    };
     storeReceiptEmail(normalizedEmail);
     setIsSubmittingReveal(true);
     try {
+      const confirmation = await fetchJson<{ cellId: number }>(
+        `${checkoutUrl}/confirm`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      const detail = await fetchJson<{
+        id: number;
+        emoji: string | null;
+        status: string;
+      }>(`/api/cells/${confirmation.cellId}`);
+      const receipt: ReceiptPayload = {
+        pixelId: confirmation.cellId,
+        email: normalizedEmail,
+        paymentId: "server-confirmed",
+        revealedAt: new Date().toISOString(),
+        value: PIXEL_PRICE,
+        emoji: detail.emoji ?? pickEmoji(confirmation.cellId),
+        socialProfile: EMPTY_SOCIAL_PROFILE,
+      };
       await onReveal(receipt);
       setCheckoutOpen(false);
       setSocialForm(socialProfile);
@@ -379,10 +412,33 @@ function PixelSheet({
     setReceiptEmailError(error);
     if (error) return;
 
-    storeReceiptEmail(normalizedEmail);
-    setReceiptEmail(normalizedEmail);
-    setEmailPromptOpen(false);
-    setCheckoutOpen(true);
+    void (async () => {
+      setIsSubmittingReveal(true);
+      try {
+        const result = await fetchJson<{ checkoutUrl: string }>("/api/cells/email", {
+          method: "POST",
+          body: JSON.stringify({
+            cellId: pixel.id,
+            token: reservationToken,
+            email: normalizedEmail,
+            deviceId: getDeviceId(),
+          }),
+        });
+        storeReceiptEmail(normalizedEmail);
+        setReceiptEmail(normalizedEmail);
+        setCheckoutUrl(result.checkoutUrl);
+        setEmailPromptOpen(false);
+        setCheckoutOpen(true);
+      } catch (error) {
+        setReceiptEmailError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível criar o checkout.",
+        );
+      } finally {
+        setIsSubmittingReveal(false);
+      }
+    })();
   };
 
   return (
@@ -436,19 +492,15 @@ function PixelSheet({
 
             <div className="prototype-checkout-layout">
               <div className="prototype-qr-wrap">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(pixPayload)}`}
-                  alt="QR Code Pix"
-                  width="180"
-                  height="180"
-                  className="prototype-qr"
-                />
+                 <div className="prototype-qr prototype-qr-placeholder">
+                   PIX
+                 </div>
               </div>
 
               <div className="prototype-checkout-info">
-                <div className="prototype-pix-label">Pix copia e cola</div>
+                 <div className="prototype-pix-label">Checkout Pix seguro</div>
                 <div className="prototype-pix-row">
-                  <span className="prototype-pix-key">{pixPayload}</span>
+                   <span className="prototype-pix-key">{checkoutReference}</span>
                   <button className="prototype-copy-button" onClick={copyPix}>
                     {copied ? <Check size={13} /> : <Copy size={13} />}
                     {copied ? "Copiado" : "Copiar"}
@@ -467,7 +519,7 @@ function PixelSheet({
                 >
                   {isSubmittingReveal
           ? "Preparando seu certificado…"
-                    : "(demo) simular pagamento confirmado"}
+                     : "(desenvolvimento) simular webhook confirmado"}
                 </button>
               </div>
             </div>
@@ -534,13 +586,27 @@ function PixelSheet({
                 {!pixel.revealed && (
                   <button
                     className="prototype-reveal-button"
-                    onClick={() => {
+                    disabled={isSubmittingReveal}
+                    onClick={async () => {
                       setReceiptEmail(getStoredReceiptEmail());
                       setReceiptEmailError("");
-                      setEmailPromptOpen(true);
+                      setIsSubmittingReveal(true);
+                      try {
+                        const token = await onReserve(pixel.id);
+                        setReservationToken(token);
+                        setEmailPromptOpen(true);
+                      } catch (error) {
+                        setReceiptEmailError(
+                          error instanceof Error
+                            ? error.message
+                            : "Esta célula não está disponível.",
+                        );
+                      } finally {
+                        setIsSubmittingReveal(false);
+                      }
                     }}
                   >
-                    Revelar pixel
+                    {isSubmittingReveal ? "Reservando…" : "Revelar pixel"}
                   </button>
                 )}
 
@@ -853,7 +919,10 @@ function PixelGrid() {
     const pixels: Array<{ id: number; row: number; col: number }> = [];
     for (let row = startRow; row < endRow; row += 1) {
       for (let col = 0; col < columns; col += 1) {
-        const id = row * columns + col;
+        const visualIndex = row * columns + col;
+        const logicalRow = Math.floor(visualIndex / LOGICAL_COLUMNS);
+        const logicalCol = visualIndex % LOGICAL_COLUMNS;
+        const id = logicalRow * LOGICAL_COLUMNS + logicalCol;
         if (id >= TOTAL_PIXELS) break;
         pixels.push({ id, row, col });
       }
@@ -862,6 +931,58 @@ function PixelGrid() {
   }, [columns, endRow, startRow]);
 
   const selected = selectedId === null ? null : getPixel(selectedId);
+
+  useEffect(() => {
+    if (!containerSize.width || !cellSize || startRow >= endRow) return;
+    const from = startRow * columns;
+    const to = Math.min(TOTAL_PIXELS - 1, endRow * columns - 1);
+    void fetchJson<Array<{ id: number; status: "available" | "reserved" | "paid" }>>(
+      `/api/cells?from=${from}&to=${to}`,
+    )
+      .then((cells) => {
+        cells.forEach((cell) => applyCellStatus(cell.id, cell.status));
+        setRevealVersion((version) => version + 1);
+      })
+      .catch(() => {
+        // The visual grid remains usable while the API is temporarily unavailable.
+      });
+  }, [cellSize, columns, containerSize.width, endRow, startRow]);
+
+  useEffect(() => {
+    if (selectedId === null) return;
+    void fetchJson<{
+      id: number;
+      status: "available" | "reserved" | "paid";
+      emoji?: string | null;
+      revealedBy?: string | null;
+      socialProfile?: SocialProfile;
+    }>(`/api/cells/${selectedId}`)
+      .then((detail) => {
+        const pixel = getPixel(selectedId);
+        applyCellStatus(selectedId, detail.status);
+        if (detail.status === "paid") {
+          pixel.emoji = detail.emoji ?? null;
+          pixel.revealedBy = detail.revealedBy ?? null;
+          pixel.revealedAt = pixel.revealedAt ?? new Date();
+          pixel.socialProfile = detail.socialProfile ?? EMPTY_SOCIAL_PROFILE;
+        }
+        setRevealVersion((version) => version + 1);
+      })
+      .catch(() => undefined);
+  }, [selectedId]);
+
+  const handleReserve = useCallback(async (id: number) => {
+    const result = await fetchJson<{ cellId: number; token: string }>(
+      "/api/cells/reserve",
+      {
+        method: "POST",
+        body: JSON.stringify({ id, deviceId: getDeviceId() }),
+      },
+    );
+    applyCellStatus(id, "reserved");
+    setRevealVersion((version) => version + 1);
+    return result.token;
+  }, []);
 
   const handleReveal = useCallback(async (receipt: ReceiptPayload) => {
       revealPixelInCache(
@@ -932,6 +1053,7 @@ function PixelGrid() {
           pixel={selected}
           onClose={() => setSelectedId(null)}
           onReveal={handleReveal}
+           onReserve={handleReserve}
           socialProfile={socialProfile}
           onSaveSocialProfile={handleSaveSocialProfile}
         />

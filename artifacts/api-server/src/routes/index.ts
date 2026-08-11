@@ -1,8 +1,12 @@
 import { Router, type IRouter } from "express";
+import cellsRouter from "./cells";
 import healthRouter from "./health";
+import webhookRouter from "./webhook";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(cellsRouter);
+router.use(webhookRouter);
 
 export default router;
