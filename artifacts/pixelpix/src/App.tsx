@@ -189,7 +189,7 @@ function normalizeEmail(value: string) {
 
 function validateEmail(value: string) {
   const email = normalizeEmail(value);
-  if (!email) return "Informe seu e-mail para receber o comprovante.";
+  if (!email) return "Informe seu e-mail para receber o certificado do pixel.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return "Digite um e-mail válido.";
   }
@@ -366,7 +366,7 @@ function PixelSheet({
       setReceiptEmailError(
         error instanceof Error
           ? error.message
-          : "Não foi possível enviar o comprovante. Tente novamente.",
+          : "Não foi possível preparar o certificado do pixel. Tente novamente.",
       );
     } finally {
       setIsSubmittingReveal(false);
@@ -421,7 +421,7 @@ function PixelSheet({
             </div>
 
              <div className="prototype-receipt-destination">
-               <span>Comprovante deste pixel</span>
+               <span>Certificado deste pixel</span>
                <strong>{receiptEmail}</strong>
                <button
                  type="button"
@@ -466,7 +466,7 @@ function PixelSheet({
                   disabled={isSubmittingReveal}
                 >
                   {isSubmittingReveal
-                    ? "Enviando comprovante…"
+          ? "Preparando seu certificado…"
                     : "(demo) simular pagamento confirmado"}
                 </button>
               </div>
@@ -622,11 +622,15 @@ function ReceiptEmailView({
       </div>
 
       <div className="prototype-signature-title">
-        <h2>Seu e-mail</h2>
+        <h2>Receba o certificado do seu pixel</h2>
+        <p>
+          Informe seu e-mail para receber o certificado do pixel que você está
+          revelando.
+        </p>
       </div>
 
       <label className="prototype-email-field">
-        <span>E-mail</span>
+        <span>E-mail para o certificado</span>
         <div className="prototype-identity-input prototype-email-input">
           <span className="prototype-email-icon" aria-hidden="true">
             <Mail size={17} />
@@ -649,7 +653,7 @@ function ReceiptEmailView({
 
       <div className="prototype-email-actions">
         <button className="prototype-social-primary" onClick={onContinue}>
-          Continuar para o pagamento
+          Continuar para revelar meu pixel
         </button>
       </div>
     </>
