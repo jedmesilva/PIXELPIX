@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Check, Copy, Loader2, Lock, Mail, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, Loader2, Lock, Mail } from "lucide-react";
 import { FiInstagram } from "react-icons/fi";
 import { RiTwitterXFill } from "react-icons/ri";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -799,7 +799,6 @@ function PixelGrid() {
   const [scrollTop, setScrollTop] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
-  const [profileOpen, setProfileOpen] = useState(false);
   const [, setRevealVersion] = useState(0);
   const [socialProfile, setSocialProfile] = useState<SocialProfile>(() => {
     try {
@@ -938,89 +937,11 @@ function PixelGrid() {
         />
       )}
 
-      {profileOpen && (
-        <ProfileSheet
-          profile={socialProfile}
-          onClose={() => setProfileOpen(false)}
-          onSave={(profile) => {
-            handleSaveSocialProfile(profile);
-            setProfileOpen(false);
-          }}
-        />
-      )}
-
-      <button
-        className="prototype-profile-trigger"
-        onClick={() => setProfileOpen(true)}
-        aria-label="Editar sua assinatura"
-      >
-        Sua assinatura
-      </button>
-
       {hoveredId !== null && (
         <div className="prototype-hover-badge">
           #{hoveredId.toLocaleString("pt-BR")}
         </div>
       )}
-    </div>
-  );
-}
-
-function ProfileSheet({
-  profile,
-  onClose,
-  onSave,
-}: {
-  profile: SocialProfile;
-  onClose: () => void;
-  onSave: (profile: SocialProfile) => void;
-}) {
-  const [form, setForm] = useState(profile);
-  const [error, setError] = useState("");
-
-  const save = () => {
-    const normalized = {
-      network: form.network,
-      handle: normalizeHandle(form.handle),
-    };
-    const nextError = validateSocialProfile(normalized);
-    setError(nextError);
-    if (nextError) return;
-    onSave(normalized);
-  };
-
-  return (
-    <div className="prototype-overlay" onClick={onClose}>
-      <div
-        className="prototype-sheet prototype-profile-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Sua assinatura"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="prototype-drag-handle" />
-        <div className="prototype-sheet-header">
-          <div>
-            <h2 className="prototype-profile-title">Sua assinatura</h2>
-          </div>
-          <button className="prototype-icon-close" onClick={onClose} aria-label="Fechar">
-            <X size={17} />
-          </button>
-        </div>
-        <p className="prototype-profile-description">
-          Essa assinatura aparece nos pixels que você revelar. Ela é opcional e pode ser
-          alterada a qualquer momento.
-        </p>
-        <SocialProfileForm
-          profile={form}
-          error={error}
-          onChange={setForm}
-          onSave={save}
-          onSkip={() => onSave(EMPTY_SOCIAL_PROFILE)}
-          saveLabel="Assinar esse pixel publicamente"
-          skipLabel="Remover assinatura"
-        />
-      </div>
     </div>
   );
 }

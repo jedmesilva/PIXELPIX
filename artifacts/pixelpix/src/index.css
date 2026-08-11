@@ -344,32 +344,6 @@ button:focus-visible {
   width: 100%;
 }
 
-.prototype-profile-description {
-  margin: 8px 0 18px;
-  color: #8b93a1;
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-.prototype-icon-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid #293039;
-  border-radius: 7px;
-  color: #8b93a1;
-  background: transparent;
-  cursor: pointer;
-}
-
-.prototype-icon-close:hover {
-  color: #e5e7eb;
-  background: #20262d;
-}
-
 .prototype-social-form {
   display: flex;
   flex-direction: column;
@@ -476,13 +450,6 @@ button:focus-visible {
   color: #c3c9d1;
   font-size: 12px;
   font-weight: 500;
-}
-
-.prototype-profile-title {
-  margin: 0;
-  color: #e5e7eb;
-  font-size: 16px;
-  font-weight: 700;
 }
 
 .prototype-identity-input:focus-within {
@@ -645,29 +612,6 @@ button:focus-visible {
 
 .prototype-social-secondary:hover {
   background: #20262d;
-}
-
-.prototype-profile-trigger {
-  position: fixed;
-  top: 15px;
-  right: 76px;
-  z-index: 4;
-  padding: 5px 10px;
-  border: 1px solid #1f2328;
-  border-radius: 6px;
-  color: #8b93a1;
-  background: #14171b;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.prototype-profile-trigger:hover {
-  color: #e5e7eb;
-  border-color: #36404a;
-}
-
-.prototype-profile-sheet {
-  max-width: 420px;
 }
 
 .prototype-checkout-title {
@@ -854,11 +798,6 @@ button:focus-visible {
 
   .prototype-hover-badge {
     top: 16px;
-    right: 16px;
-  }
-
-  .prototype-profile-trigger {
-    top: 56px;
     right: 16px;
   }
 
