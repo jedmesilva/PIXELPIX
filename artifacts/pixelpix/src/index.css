@@ -523,22 +523,42 @@ button:focus-visible {
   width: 100%;
   min-height: 44px;
   box-sizing: border-box;
-  padding: 11px 12px;
-  border: 1px solid #2b333c;
-  border-radius: 8px;
+  min-width: 0;
+  padding: 11px 12px 11px 4px;
+  border: 0;
   outline: 0;
   color: #e5e7eb;
-  background: #0b0d10;
+  background: transparent;
   font: inherit;
   font-size: 13px;
 }
 
-.prototype-email-field input:focus {
+.prototype-email-input {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding-left: 12px;
+  border: 1px solid #2b333c;
+  border-radius: 8px;
+  color: #7dd3fc;
+  background: #0b0d10;
+}
+
+.prototype-email-input:focus-within {
   border-color: #7dd3fc;
 }
 
-.prototype-email-field input[aria-invalid="true"] {
+.prototype-email-input input[aria-invalid="true"] {
+  border-color: transparent;
+}
+
+.prototype-email-input:has(input[aria-invalid="true"]) {
   border-color: #fca5a5;
+}
+
+.prototype-email-field input:focus {
+  outline: 0;
 }
 
 .prototype-email-field small {

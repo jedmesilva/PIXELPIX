@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Check, Copy, Loader2, Lock, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, Loader2, Lock, Mail, X } from "lucide-react";
 import { FiInstagram } from "react-icons/fi";
 import { RiTwitterXFill } from "react-icons/ri";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -25,6 +25,7 @@ const BUFFER_ROWS = 4;
 const CHUNK_SIZE = 2_500;
 const PIXEL_PRICE = 0.5;
 const RECEIPT_EMAIL_STORAGE_KEY = "pixelpix-receipt-email";
+const SOCIAL_PROFILE_STORAGE_KEY = "pixelpix-social-profile";
 
 type Pixel = {
   id: number;
@@ -138,14 +139,11 @@ function revealPixelInCache(id: number, socialProfile: SocialProfile, revealedAt
   return pixel;
 }
 
-function updateCurrentUserSocialProfile(socialProfile: SocialProfile) {
-  chunkCache.forEach((chunk) => {
-    chunk.forEach((pixel) => {
-      if (pixel.revealedBy === CURRENT_USER_NICKNAME) {
-        pixel.socialProfile = socialProfile;
-      }
-    });
-  });
+function updatePixelSocialProfile(pixelId: number, socialProfile: SocialProfile) {
+  const pixel = getPixel(pixelId);
+  if (pixel.revealedBy === CURRENT_USER_NICKNAME) {
+    pixel.socialProfile = socialProfile;
+  }
 }
 
 function normalizeHandle(value: string) {
@@ -317,9 +315,9 @@ function PixelSheet({
 
   useEffect(() => {
     if (pixel.revealed) {
-      setSocialForm(pixel.revealedBy === CURRENT_USER_NICKNAME ? socialProfile : pixel.socialProfile);
+      setSocialForm(pixel.socialProfile);
     }
-  }, [pixel.revealed, pixel.revealedBy, pixel.socialProfile, socialProfile]);
+  }, [pixel.revealed, pixel.socialProfile]);
 
   const saveSocials = () => {
     const normalized = {
@@ -330,13 +328,15 @@ function PixelSheet({
     setSocialError(error);
     if (error) return;
     onSaveSocialProfile(normalized);
+    if (pixel.revealedBy === CURRENT_USER_NICKNAME) {
+      updatePixelSocialProfile(pixel.id, normalized);
+    }
     setSocialForm(normalized);
     setSocialPromptOpen(false);
     setEditingSocials(false);
   };
 
-  const displayedSignature =
-    pixel.revealedBy === CURRENT_USER_NICKNAME ? socialProfile : pixel.socialProfile;
+  const displayedSignature = pixel.socialProfile;
   const hasSignature = Boolean(displayedSignature.handle);
 
   const confirmDemoPayment = async () => {
@@ -359,6 +359,8 @@ function PixelSheet({
     try {
       await onReveal(receipt);
       setCheckoutOpen(false);
+      setSocialForm(socialProfile);
+      setSocialError("");
       setSocialPromptOpen(true);
     } catch (error) {
       setReceiptEmailError(
@@ -577,7 +579,9 @@ function PixelSheet({
                           setEditingSocials(true);
                         }}
                       >
-                        {hasSignature ? "Editar assinatura" : "Assinar pixel"}
+                        {hasSignature
+                          ? "Editar assinatura"
+                          : "Assinar esse pixel publicamente"}
                       </button>
                     )}
                   </div>
@@ -623,18 +627,21 @@ function ReceiptEmailView({
 
       <label className="prototype-email-field">
         <span>E-mail</span>
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="voce@exemplo.com"
-          autoComplete="email"
-          autoFocus
-          aria-invalid={Boolean(error)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") onContinue();
-          }}
-        />
+        <div className="prototype-email-input">
+          <Mail size={17} aria-hidden="true" />
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="voce@exemplo.com"
+            autoComplete="email"
+            autoFocus
+            aria-invalid={Boolean(error)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") onContinue();
+            }}
+          />
+        </div>
         {error && <strong>{error}</strong>}
       </label>
 
@@ -676,11 +683,13 @@ function SignatureFormView({
         </button>
       </div>
       <div className="prototype-signature-title">
-        <h2>{isEditing ? "Editar sua assinatura" : "Assinar este pixel"}</h2>
+        <h2>
+          {isEditing ? "Editar sua assinatura" : "Assinar esse pixel publicamente"}
+        </h2>
         <p>
           {isEditing
             ? "Atualize a rede ou o @ que aparece nos pixels assinados por você."
-            : "Escolha uma rede e adicione seu @ para deixar uma assinatura pública neste pixel."}
+            : "Escolha uma rede e adicione seu @ para deixar sua assinatura pública neste pixel. Você pode confirmar, alterar ou pular."}
         </p>
       </div>
       <SocialProfileForm
@@ -689,7 +698,7 @@ function SignatureFormView({
         onChange={onChange}
         onSave={onSave}
         onSkip={onRemove ?? onClose}
-        saveLabel={isEditing ? "Salvar assinatura" : "Assinar pixel"}
+        saveLabel={isEditing ? "Salvar assinatura" : "Assinar esse pixel publicamente"}
         skipLabel={isEditing ? "Remover assinatura" : "Agora não"}
       />
     </>
@@ -788,7 +797,7 @@ function PixelGrid() {
   const [, setRevealVersion] = useState(0);
   const [socialProfile, setSocialProfile] = useState<SocialProfile>(() => {
     try {
-      const saved = window.localStorage.getItem("pixelpix-social-profile");
+      const saved = window.localStorage.getItem(SOCIAL_PROFILE_STORAGE_KEY);
       return saved ? normalizeSocialProfile(JSON.parse(saved)) : EMPTY_SOCIAL_PROFILE;
     } catch {
       return EMPTY_SOCIAL_PROFILE;
@@ -796,7 +805,7 @@ function PixelGrid() {
   });
 
   useEffect(() => {
-    window.localStorage.setItem("pixelpix-social-profile", JSON.stringify(socialProfile));
+    window.localStorage.setItem(SOCIAL_PROFILE_STORAGE_KEY, JSON.stringify(socialProfile));
   }, [socialProfile]);
 
   useEffect(() => {
@@ -860,7 +869,6 @@ function PixelGrid() {
 
   const handleSaveSocialProfile = useCallback((profile: SocialProfile) => {
     setSocialProfile(profile);
-    updateCurrentUserSocialProfile(profile);
     setRevealVersion((version) => version + 1);
   }, []);
 
@@ -1003,7 +1011,7 @@ function ProfileSheet({
           onChange={setForm}
           onSave={save}
           onSkip={() => onSave(EMPTY_SOCIAL_PROFILE)}
-          saveLabel="Assinar pixel"
+          saveLabel="Assinar esse pixel publicamente"
           skipLabel="Remover assinatura"
         />
       </div>
