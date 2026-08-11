@@ -421,7 +421,7 @@ function PixelSheet({
             </div>
 
              <div className="prototype-receipt-destination">
-               <span>Certificado deste pixel</span>
+               <span>Certificado enviado para</span>
                <strong>{receiptEmail}</strong>
                <button
                  type="button"
