@@ -534,31 +534,26 @@ button:focus-visible {
 }
 
 .prototype-email-input {
+  color: #7dd3fc;
+}
+
+.prototype-email-icon {
   display: flex;
   align-items: center;
-  min-height: 42px;
-  box-sizing: border-box;
-  padding-left: 12px;
-  border: 1px solid #2b333c;
-  border-radius: 8px;
+  justify-content: center;
+  flex: 0 0 42px;
+  align-self: stretch;
+  padding: 0;
+  border-right: 1px solid #2b333c;
   color: #7dd3fc;
-  background: #0b0d10;
 }
 
 .prototype-email-input:focus-within {
   border-color: #7dd3fc;
 }
 
-.prototype-email-input input[aria-invalid="true"] {
-  border-color: transparent;
-}
-
 .prototype-email-input:has(input[aria-invalid="true"]) {
   border-color: #fca5a5;
-}
-
-.prototype-email-field input:focus {
-  outline: 0;
 }
 
 .prototype-email-field small {

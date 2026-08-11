@@ -627,8 +627,10 @@ function ReceiptEmailView({
 
       <label className="prototype-email-field">
         <span>E-mail</span>
-        <div className="prototype-email-input">
-          <Mail size={17} aria-hidden="true" />
+        <div className="prototype-identity-input prototype-email-input">
+          <span className="prototype-email-icon" aria-hidden="true">
+            <Mail size={17} />
+          </span>
           <input
             type="email"
             value={email}
