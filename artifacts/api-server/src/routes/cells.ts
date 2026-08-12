@@ -33,6 +33,14 @@ function numericId(value: unknown) {
   return Number.isInteger(id) && id >= 0 && id < TOTAL_CELLS ? id : null;
 }
 
+function publicStatus(status: string): "available" | "reserved" | "paid" {
+  if (status === "paid") return "paid";
+  if (status === "reserved" || status === "paid_pending_prize") {
+    return "reserved";
+  }
+  return "available";
+}
+
 function clientIp(request: Request) {
   // Express req.ip is only trusted for the configured number of proxy hops.
   return request.ip || request.socket.remoteAddress || "unknown";
@@ -176,7 +184,7 @@ router.get("/cells", async (request, response) => {
   const existing = new Map(
     rows.rows.map((row: { id: number; status: string }) => [
       row.id,
-      row.status === "expired" ? "available" : row.status,
+      publicStatus(row.status),
     ]),
   );
   response.setHeader(
@@ -207,8 +215,12 @@ router.get("/cells/:id", async (request, response) => {
     [id],
   );
   const cell = result.rows[0];
-  if (!cell || cell.status === "expired" || cell.status === "reserved") {
+  if (!cell || cell.status === "expired") {
     response.json({ id, status: "available" });
+    return;
+  }
+  if (cell.status !== "paid") {
+    response.json({ id, status: "reserved" });
     return;
   }
   response.json({

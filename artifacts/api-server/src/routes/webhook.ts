@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { pool } from "@workspace/db";
 import { PRICE_CENTS, releaseActiveReservationByCell } from "./cells";
 
@@ -257,7 +257,7 @@ const EMOJIS = [
 ];
 
 function randomEmoji() {
-  return EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+  return EMOJIS[randomInt(0, EMOJIS.length)];
 }
 
 router.post("/webhook/payment-confirmed", async (request, response) => {

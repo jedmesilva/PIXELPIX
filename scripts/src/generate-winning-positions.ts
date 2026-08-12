@@ -16,6 +16,48 @@ const TIERS = [
 
 type WinningPosition = { cellId: number; tierId: number };
 
+function validateTierConfiguration() {
+  const ids = new Set<number>();
+  let totalPositions = 0;
+  let totalPoolCents = 0;
+
+  for (const tier of TIERS) {
+    if (ids.has(tier.id)) {
+      throw new Error(`Tier duplicado: ${tier.id}`);
+    }
+    ids.add(tier.id);
+    if (!Number.isInteger(tier.id) || tier.id <= 0) {
+      throw new Error(`Tier inválido: ${tier.id}`);
+    }
+    if (!Number.isInteger(tier.quantidade) || tier.quantidade < 0) {
+      throw new Error(`Quantidade inválida no tier ${tier.id}.`);
+    }
+    if (
+      !Number.isInteger(tier.nominalValueCents) ||
+      tier.nominalValueCents < 0
+    ) {
+      throw new Error(`Valor nominal inválido no tier ${tier.id}.`);
+    }
+    totalPositions += tier.quantidade;
+    totalPoolCents += tier.quantidade * tier.nominalValueCents;
+  }
+
+  if (totalPositions === 0) {
+    throw new Error("A configuração precisa ter ao menos uma posição premiada.");
+  }
+  if (totalPositions > TOTAL_CELLS) {
+    throw new Error("O total de posições premiadas ultrapassa o grid.");
+  }
+  if (totalPoolCents !== MAX_POOL_VALUE_CENTS) {
+    throw new Error(
+      `O pool precisa fechar exatamente em R$ ${(MAX_POOL_VALUE_CENTS / 100).toFixed(2)}; ` +
+        `a configuração atual fecha em R$ ${(totalPoolCents / 100).toFixed(2)}.`,
+    );
+  }
+
+  return { totalPositions, totalPoolCents };
+}
+
 function sortearIdsUnicos(total: number, count: number) {
   const chosen = new Set<number>();
   while (chosen.size < count) chosen.add(randomInt(0, total));
@@ -40,7 +82,7 @@ function gerarAtribuicaoDeTiers() {
 }
 
 function calcularCommitHash(positions: WinningPosition[]) {
-  const content = positions
+  const content = [...positions]
     .sort((left, right) => left.cellId - right.cellId)
     .map((position) => `${position.cellId}:${position.tierId}`)
     .join(",");
@@ -74,20 +116,7 @@ async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL é obrigatório para gerar o lote de prêmios.");
   }
-  const totalPositions = TIERS.reduce(
-    (sum, tier) => sum + tier.quantidade,
-    0,
-  );
-  const totalPoolCents = TIERS.reduce(
-    (sum, tier) => sum + tier.quantidade * tier.nominalValueCents,
-    0,
-  );
-  if (totalPoolCents > MAX_POOL_VALUE_CENTS) {
-    throw new Error("O pool planejado ultrapassa o teto configurado.");
-  }
-  if (totalPositions > TOTAL_CELLS) {
-    throw new Error("O total de posições premiadas ultrapassa o grid.");
-  }
+  const { totalPositions, totalPoolCents } = validateTierConfiguration();
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const client = await pool.connect();
