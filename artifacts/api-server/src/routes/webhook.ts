@@ -58,6 +58,21 @@ async function calculateAvailableCash(client: { query: Function }) {
   return Number(result.rows[0]?.balance_cents ?? 0);
 }
 
+async function recordWebhookEvent(
+  paymentId: string,
+  cellId: number | null,
+  payload: unknown,
+  signatureValid: boolean,
+  result: string,
+) {
+  await pool.query(
+    `INSERT INTO webhook_events
+       (payment_id, cell_id, payload, signature_valid, result)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [paymentId, cellId, payload, signatureValid, result],
+  );
+}
+
 export async function calculatePrize(
   client: { query: Function },
   cellId: number,
@@ -179,10 +194,23 @@ export async function processPaymentConfirmed(input: {
       `UPDATE payments
        SET status = 'confirmed', confirmed_at = NOW()
        WHERE provider_payment_id = $1
+         AND cell_id = $2
+         AND status = 'pending'
        RETURNING amount_cents`,
-      [input.paymentId],
+      [input.paymentId, input.cellId],
     );
-    const revenueCents = Number(payment.rows[0]?.amount_cents ?? PRICE_CENTS);
+    if (!payment.rows.length) {
+      await client.query("ROLLBACK");
+      await recordWebhookEvent(
+        input.paymentId,
+        input.cellId,
+        input.payload,
+        true,
+        "payment_not_pending",
+      );
+      return { result: "payment_not_pending" as const };
+    }
+    const revenueCents = Number(payment.rows[0].amount_cents);
     await client.query(
       `INSERT INTO cash_ledger (entry_type, cell_id, amount_cents)
        VALUES ('revenue', $1, $2)
@@ -281,17 +309,20 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
     const cellId = Number(reference?.cellId);
     const token = typeof reference?.token === "string" ? reference.token : "";
     if (!signatureOk) {
-      await pool.query(
-        `INSERT INTO webhook_events
-           (payment_id, cell_id, payload, signature_valid, result)
-         VALUES ($1, $2, $3, false, 'invalid_signature')`,
-        [paymentId, Number.isInteger(cellId) ? cellId : null, request.body],
+      await recordWebhookEvent(
+        paymentId,
+        Number.isInteger(cellId) ? cellId : null,
+        request.body,
+        false,
+        "invalid_signature",
       );
       response.status(401).send("Assinatura inválida");
       return;
     }
     if (
       !Number.isInteger(cellId) ||
+      cellId < 0 ||
+      cellId >= 1_000_000 ||
       !/^[0-9a-f-]{36}$/i.test(token) ||
       !paymentId ||
       paymentId === "unknown"
@@ -299,12 +330,16 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
       response.status(400).send("Referência externa inválida");
       return;
     }
-    await processPaymentConfirmed({
+    const result = await processPaymentConfirmed({
       paymentId,
       cellId,
       token,
       payload: request.body,
     });
+    if (result.result === "payment_not_pending") {
+      response.status(200).send("OK");
+      return;
+    }
     response.status(200).send("OK");
   } catch (error) {
     request.log?.error({ error }, "Payment webhook failed");

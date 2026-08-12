@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: cells
+    description: Sparse one-million-cell grid and reservation flow
+  - name: payments
+    description: Provider payment webhook
 paths:
   /healthz:
     get:
@@ -24,6 +28,161 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /cells:
+    get:
+      operationId: listCells
+      tags: [cells]
+      summary: Read a range of cells
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 999999 }
+        - name: to
+          in: query
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 999999 }
+      responses:
+        "200":
+          description: Full range, with sparse cells normalized to available
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CellRangeItem" }
+        "400":
+          description: Invalid range
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /cells/{id}:
+    get:
+      operationId: getCell
+      tags: [cells]
+      summary: Read one public cell
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 999999 }
+      responses:
+        "200":
+          description: Cell state and approved public signature
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CellDetail" }
+        "400":
+          description: Invalid cell id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /cells/reserve:
+    post:
+      operationId: reserveCell
+      tags: [cells]
+      summary: Reserve an available or expired cell
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CellReservationInput" }
+      responses:
+        "200":
+          description: Reservation won
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CellReservation" }
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Cell is already reserved or paid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "428":
+          description: CAPTCHA escalation required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CaptchaRequiredResponse" }
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /cells/email:
+    post:
+      operationId: createCellCheckout
+      tags: [cells]
+      summary: Attach an email and create an idempotent Pix checkout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CellEmailInput" }
+      responses:
+        "200":
+          description: Existing pending checkout reused or new checkout created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CheckoutResponse" }
+        "400":
+          description: Invalid reservation or email
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "503":
+          description: Payment provider is not configured
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /cells/sign:
+    post:
+      operationId: signCell
+      tags: [cells]
+      summary: Submit a one-time public social signature for moderation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CellSignatureInput" }
+      responses:
+        "200":
+          description: Signature queued for moderation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SignatureResponse" }
+        "400":
+          description: Invalid reservation or signature
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Cell already has a signature
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /webhook/payment-confirmed:
+    post:
+      operationId: paymentConfirmedWebhook
+      tags: [payments]
+      summary: Process a signed provider payment confirmation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PaymentWebhook" }
+      responses:
+        "200": { description: "Processed, duplicate, or queued for review" }
+        "400":
+          description: Invalid provider reference
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401": { description: Invalid HMAC signature }
+        "500": { description: Provider should retry after an internal error }
 components:
   schemas:
     HealthStatus:
@@ -33,4 +192,96 @@ components:
           type: string
       required:
         - status
+    ErrorResponse:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+    CellRangeItem:
+      type: object
+      properties:
+        id: { type: integer, minimum: 0, maximum: 999999 }
+        status:
+          type: string
+          enum: [available, reserved, paid]
+      required: [id, status]
+    CellDetail:
+      type: object
+      properties:
+        id: { type: integer, minimum: 0, maximum: 999999 }
+        status:
+          type: string
+          enum: [available, reserved, paid]
+        emoji: { type: ["string", "null"] }
+        prizeValueCents: { type: integer, minimum: 0 }
+        revealedBy: { type: ["string", "null"] }
+        signature:
+          oneOf:
+            - { $ref: "#/components/schemas/PublicSignature" }
+            - { type: "null" }
+      required: [id, status]
+    PublicSignature:
+      type: object
+      properties:
+        platform: { type: string, enum: [instagram, x] }
+        handle: { type: string }
+      required: [platform, handle]
+    CellReservationInput:
+      type: object
+      properties:
+        id: { type: integer, minimum: 0, maximum: 999999 }
+        deviceId: { type: string, minLength: 8, maxLength: 128 }
+        captchaToken: { type: string }
+      required: [id, deviceId]
+    CellReservation:
+      type: object
+      properties:
+        cellId: { type: integer, minimum: 0, maximum: 999999 }
+        token: { type: string, format: uuid }
+      required: [cellId, token]
+    CellEmailInput:
+      type: object
+      properties:
+        cellId: { type: integer, minimum: 0, maximum: 999999 }
+        token: { type: string, format: uuid }
+        email: { type: string, format: email }
+        deviceId: { type: string, minLength: 8, maxLength: 128 }
+      required: [cellId, token, email]
+    CheckoutResponse:
+      type: object
+      properties:
+        checkoutUrl: { type: string, format: uri-reference }
+      required: [checkoutUrl]
+    CellSignatureInput:
+      type: object
+      properties:
+        cellId: { type: integer, minimum: 0, maximum: 999999 }
+        token: { type: string, format: uuid }
+        platform: { type: string, enum: [instagram, x] }
+        handle: { type: string, minLength: 1, maxLength: 30 }
+      required: [cellId, token, platform, handle]
+    SignatureResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        status: { type: string, enum: [pending] }
+      required: [ok, status]
+    CaptchaRequiredResponse:
+      type: object
+      properties:
+        error: { type: string }
+        captchaRequired: { type: boolean, const: true }
+      required: [error, captchaRequired]
+    PaymentWebhook:
+      type: object
+      properties:
+        paymentId: { type: string }
+        referenciaExterna:
+          oneOf:
+            - { type: string }
+            - { type: object, additionalProperties: true }
+        reference:
+          type: object
+          additionalProperties: true
+      required: [paymentId]
 
