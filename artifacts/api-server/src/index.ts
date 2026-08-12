@@ -19,9 +19,9 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function start() {
   await pool.query(`
-    INSERT INTO prizes (label, weight, stock, value_cents, active)
-    SELECT 'Sem prêmio', 90, NULL, 0, true
-    WHERE NOT EXISTS (SELECT 1 FROM prizes)
+    INSERT INTO payout_safety_config (id, safety_margin_bps, updated_by)
+    VALUES (1, 2000, 'setup-inicial')
+    ON CONFLICT (id) DO NOTHING
   `);
   await expireReservations();
   setInterval(() => {

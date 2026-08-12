@@ -299,7 +299,11 @@ function PixelSheet({
   ) => Promise<void>;
   onReserve: (id: number) => Promise<string>;
   socialProfile: SocialProfile;
-  onSaveSocialProfile: (profile: SocialProfile) => void;
+  onSaveSocialProfile: (
+    profile: SocialProfile,
+    cellId: number,
+    token: string,
+  ) => Promise<void>;
 }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [emailPromptOpen, setEmailPromptOpen] = useState(false);
@@ -312,8 +316,11 @@ function PixelSheet({
   const [isSubmittingReveal, setIsSubmittingReveal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reservationToken, setReservationToken] = useState("");
+  const [reservationExpiresAt, setReservationExpiresAt] = useState<number | null>(null);
+  const [signatureSubmitted, setSignatureSubmitted] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const checkoutReference = checkoutUrl || "checkout ainda não criado";
+  const [secondsRemaining, setSecondsRemaining] = useState(300);
 
   const copyPix = useCallback(async () => {
     try {
@@ -334,8 +341,22 @@ function PixelSheet({
     setReceiptEmailError("");
     setIsSubmittingReveal(false);
     setReservationToken("");
+    setReservationExpiresAt(null);
+    setSignatureSubmitted(false);
     setCheckoutUrl("");
   }, [pixel.id]);
+
+  useEffect(() => {
+    if (!reservationExpiresAt) return;
+    const update = () => {
+      setSecondsRemaining(
+        Math.max(0, Math.ceil((reservationExpiresAt - Date.now()) / 1000)),
+      );
+    };
+    update();
+    const timer = window.setInterval(update, 1_000);
+    return () => window.clearInterval(timer);
+  }, [reservationExpiresAt]);
 
   useEffect(() => {
     if (pixel.revealed) {
@@ -351,13 +372,30 @@ function PixelSheet({
     const error = validateSocialProfile(normalized);
     setSocialError(error);
     if (error) return;
-    onSaveSocialProfile(normalized);
-    if (pixel.revealedBy === CURRENT_USER_NICKNAME) {
-      updatePixelSocialProfile(pixel.id, normalized);
+    if (!normalized.handle) {
+      setSocialPromptOpen(false);
+      return;
     }
-    setSocialForm(normalized);
-    setSocialPromptOpen(false);
-    setEditingSocials(false);
+    if (!reservationToken) {
+      setSocialError("Esta assinatura só pode ser enviada pela reserva atual.");
+      return;
+    }
+    setIsSubmittingReveal(true);
+    void onSaveSocialProfile(normalized, pixel.id, reservationToken)
+      .then(() => {
+        setSocialForm(normalized);
+        setSignatureSubmitted(true);
+        setSocialPromptOpen(false);
+        setEditingSocials(false);
+      })
+      .catch((saveError) => {
+        setSocialError(
+          saveError instanceof Error
+            ? saveError.message
+            : "Não foi possível enviar sua assinatura.",
+        );
+      })
+      .finally(() => setIsSubmittingReveal(false));
   };
 
   const displayedSignature = pixel.socialProfile;
@@ -471,9 +509,11 @@ function PixelSheet({
             <div className="prototype-checkout-title">
               <div className="prototype-eyebrow">PAGAMENTO VIA PIX</div>
               <div className="prototype-price">{formatBRL(PIXEL_PRICE)}</div>
-              <div className="prototype-subtle">
-                Pixel #{pixel.id.toLocaleString("pt-BR")}
-              </div>
+               <div className="prototype-subtle">
+                 Pixel #{pixel.id.toLocaleString("pt-BR")} · reserva expira em{" "}
+                 {String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:
+                 {String(secondsRemaining % 60).padStart(2, "0")}
+               </div>
             </div>
 
              <div className="prototype-receipt-destination">
@@ -509,7 +549,9 @@ function PixelSheet({
 
                 <div className="prototype-waiting">
                   <Loader2 size={14} className="prototype-spinner" />
-                  Aguardando pagamento…
+                  {secondsRemaining > 0
+                    ? `Aguardando pagamento · ${Math.floor(secondsRemaining / 60)}:${String(secondsRemaining % 60).padStart(2, "0")}`
+                    : "Reserva expirada"}
                 </div>
 
                 <button
@@ -546,15 +588,7 @@ function PixelSheet({
               setEditingSocials(false);
             }}
             onSave={saveSocials}
-            onRemove={
-              editingSocials
-                ? () => {
-                    onSaveSocialProfile(EMPTY_SOCIAL_PROFILE);
-                    setSocialForm(EMPTY_SOCIAL_PROFILE);
-                    setEditingSocials(false);
-                  }
-                : undefined
-            }
+            onRemove={undefined}
           />
         ) : (
           <>
@@ -594,6 +628,8 @@ function PixelSheet({
                       try {
                         const token = await onReserve(pixel.id);
                         setReservationToken(token);
+                         setReservationExpiresAt(Date.now() + 5 * 60 * 1000);
+                         setSecondsRemaining(300);
                         setEmailPromptOpen(true);
                       } catch (error) {
                         setReceiptEmailError(
@@ -636,18 +672,18 @@ function PixelSheet({
                       </div>
                     )}
 
-                    {pixel.revealedBy === CURRENT_USER_NICKNAME && (
+                    {pixel.revealedBy === CURRENT_USER_NICKNAME &&
+                      !hasSignature &&
+                      !signatureSubmitted && (
                       <button
                         className="prototype-edit-social-button"
                         onClick={() => {
-                          setSocialForm(displayedSignature);
+                           setSocialForm(EMPTY_SOCIAL_PROFILE);
                           setSocialError("");
-                          setEditingSocials(true);
+                           setEditingSocials(false);
                         }}
                       >
-                        {hasSignature
-                          ? "Editar assinatura"
-                          : "Assinar esse pixel publicamente"}
+                         Assinar esse pixel publicamente
                       </button>
                     )}
                   </div>
@@ -761,7 +797,7 @@ function SignatureFormView({
         <p>
           {isEditing
             ? "Atualize a rede ou o @ que aparece nos pixels assinados por você."
-            : "Escolha uma rede e adicione seu @ para deixar sua assinatura pública neste pixel. Você pode confirmar, alterar ou pular."}
+           : "Escolha uma rede e adicione seu @ para deixar sua assinatura pública neste pixel. Depois do envio, alterações ou remoções só podem ser solicitadas ao suporte."}
         </p>
       </div>
       <SocialProfileForm
@@ -955,7 +991,8 @@ function PixelGrid() {
       status: "available" | "reserved" | "paid";
       emoji?: string | null;
       revealedBy?: string | null;
-      socialProfile?: SocialProfile;
+      prizeValueCents?: number;
+      signature?: { platform: SignatureNetwork; handle: string } | null;
     }>(`/api/cells/${selectedId}`)
       .then((detail) => {
         const pixel = getPixel(selectedId);
@@ -964,7 +1001,9 @@ function PixelGrid() {
           pixel.emoji = detail.emoji ?? null;
           pixel.revealedBy = detail.revealedBy ?? null;
           pixel.revealedAt = pixel.revealedAt ?? new Date();
-          pixel.socialProfile = detail.socialProfile ?? EMPTY_SOCIAL_PROFILE;
+          pixel.socialProfile = detail.signature
+            ? { network: detail.signature.platform, handle: detail.signature.handle }
+            : EMPTY_SOCIAL_PROFILE;
         }
         setRevealVersion((version) => version + 1);
       })
@@ -993,10 +1032,23 @@ function PixelGrid() {
       setRevealVersion((version) => version + 1);
     }, []);
 
-  const handleSaveSocialProfile = useCallback((profile: SocialProfile) => {
-    setSocialProfile(profile);
-    setRevealVersion((version) => version + 1);
-  }, []);
+  const handleSaveSocialProfile = useCallback(
+    async (profile: SocialProfile, cellId: number, token: string) => {
+      await fetchJson<{ ok: true; status: "pending" }>("/api/cells/sign", {
+        method: "POST",
+        body: JSON.stringify({
+          cellId,
+          token,
+          platform: profile.network,
+          handle: profile.handle,
+        }),
+      });
+      setSocialProfile(profile);
+      updatePixelSocialProfile(cellId, profile);
+      setRevealVersion((version) => version + 1);
+    },
+    [],
+  );
 
   return (
     <div
