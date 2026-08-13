@@ -981,6 +981,9 @@ function PixelGrid() {
     for (let row = startRow; row < endRow; row += 1) {
       for (let col = 0; col < columns; col += 1) {
         const visualIndex = row * columns + col;
+        // The visual grid may reflow at any width, but its traversal order is
+        // always mapped back to the fixed logical 1,000-column coordinate system.
+        // This keeps the server-owned cell id stable across viewport changes.
         const logicalRow = Math.floor(visualIndex / LOGICAL_COLUMNS);
         const logicalCol = visualIndex % LOGICAL_COLUMNS;
         const id = logicalRow * LOGICAL_COLUMNS + logicalCol;

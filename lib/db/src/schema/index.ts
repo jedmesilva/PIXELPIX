@@ -118,7 +118,7 @@ export const payments = pgTable(
     cellId: index("idx_payments_cell_id").on(table.cellId),
     ipAddress: index("idx_payments_ip_address").on(table.ipAddress),
     deviceId: index("idx_payments_device_id").on(table.deviceId),
-    cellPending: index("idx_payments_cell_pending")
+    cellPending: uniqueIndex("idx_payments_cell_pending")
       .on(table.cellId)
       .where(sql`${table.status} = 'pending'`),
   }),
@@ -166,6 +166,7 @@ export const cellSignatures = pgTable(
     handle: text("handle").notNull(),
     moderationStatus: text("moderation_status").notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     moderation: index("idx_cell_signatures_moderation").on(table.moderationStatus),
