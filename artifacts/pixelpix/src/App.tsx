@@ -31,7 +31,7 @@ const CURRENT_USER_NICKNAME = "você";
 
 type Pixel = {
   id: number;
-  color: string | null;
+  backgroundColor: string | null;
   revealed: boolean;
   emoji: string | null;
   revealedBy: string | null;
@@ -49,14 +49,17 @@ type SocialProfile = {
   handle: string;
 };
 
-const EMPTY_SOCIAL_PROFILE: SocialProfile = { network: "instagram", handle: "" };
+const EMPTY_SOCIAL_PROFILE: SocialProfile = {
+  network: "instagram",
+  handle: "",
+};
 
 const chunkCache = new Map<number, Map<number, Pixel>>();
 
 function emptyPixel(id: number): Pixel {
   return {
     id,
-    color: null,
+    backgroundColor: null,
     revealed: false,
     emoji: null,
     revealedBy: null,
@@ -91,7 +94,7 @@ function getPixel(id: number) {
 function revealPixelInCache(
   id: number,
   emoji: string,
-  color: string,
+  backgroundColor: string,
   revealedBy: string | null,
   socialProfile: SocialProfile,
   prizeValueCents: number,
@@ -101,7 +104,7 @@ function revealPixelInCache(
   const pixel = getPixel(id);
   pixel.revealed = true;
   pixel.emoji = emoji;
-  pixel.color = color;
+  pixel.backgroundColor = backgroundColor;
   pixel.revealedBy = revealedBy;
   pixel.revealedAt = revealedAt;
   pixel.prizeValueCents = prizeValueCents;
@@ -121,7 +124,7 @@ function applyCellStatus(
 ) {
   const pixel = getPixel(id);
   if (visual?.backgroundColor !== undefined) {
-    pixel.color = visual.backgroundColor;
+    pixel.backgroundColor = visual.backgroundColor;
   }
   if (visual?.emoji !== undefined) {
     pixel.emoji = visual.emoji;
@@ -176,8 +179,14 @@ function normalizeSocialProfile(value: unknown): SocialProfile {
     instagram?: string;
     x?: string;
   };
-  if (profile.network && (profile.network === "instagram" || profile.network === "x")) {
-    return { network: profile.network, handle: normalizeHandle(profile.handle ?? "") };
+  if (
+    profile.network &&
+    (profile.network === "instagram" || profile.network === "x")
+  ) {
+    return {
+      network: profile.network,
+      handle: normalizeHandle(profile.handle ?? ""),
+    };
   }
   if (profile.instagram) {
     return { network: "instagram", handle: normalizeHandle(profile.instagram) };
@@ -261,7 +270,10 @@ function SignatureIcon({
 }
 
 function signatureUrl(profile: SocialProfile) {
-  const base = profile.network === "instagram" ? "https://instagram.com/" : "https://x.com/";
+  const base =
+    profile.network === "instagram"
+      ? "https://instagram.com/"
+      : "https://x.com/";
   return `${base}${profile.handle}`;
 }
 
@@ -296,9 +308,7 @@ function PixelSheet({
 }: {
   pixel: Pixel;
   onClose: () => void;
-  onReveal: (
-    receipt: ReceiptPayload,
-  ) => Promise<void>;
+  onReveal: (receipt: ReceiptPayload) => Promise<void>;
   onReserve: (id: number) => Promise<string>;
   socialProfile: SocialProfile;
   onSaveSocialProfile: (
@@ -311,14 +321,17 @@ function PixelSheet({
   const [emailPromptOpen, setEmailPromptOpen] = useState(false);
   const [socialPromptOpen, setSocialPromptOpen] = useState(false);
   const [editingSocials, setEditingSocials] = useState(false);
-  const [socialForm, setSocialForm] = useState<SocialProfile>(EMPTY_SOCIAL_PROFILE);
+  const [socialForm, setSocialForm] =
+    useState<SocialProfile>(EMPTY_SOCIAL_PROFILE);
   const [socialError, setSocialError] = useState("");
   const [receiptEmail, setReceiptEmail] = useState(getStoredReceiptEmail);
   const [receiptEmailError, setReceiptEmailError] = useState("");
   const [isSubmittingReveal, setIsSubmittingReveal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reservationToken, setReservationToken] = useState("");
-  const [reservationExpiresAt, setReservationExpiresAt] = useState<number | null>(null);
+  const [reservationExpiresAt, setReservationExpiresAt] = useState<
+    number | null
+  >(null);
   const [signatureSubmitted, setSignatureSubmitted] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [checkoutAmountCents, setCheckoutAmountCents] = useState(
@@ -422,7 +435,7 @@ function PixelSheet({
       );
       const detail = await fetchJson<{
         id: number;
-        emoji: string | null;
+        emoji: string;
         backgroundColor: string;
         status: string;
         revealedAt: string | null;
@@ -436,7 +449,7 @@ function PixelSheet({
         paymentId: "server-confirmed",
         revealedAt: detail.revealedAt,
         value: Number(detail.prizeValueCents ?? 0) / 100,
-        emoji: detail.emoji ?? "",
+        emoji: detail.emoji,
         backgroundColor: detail.backgroundColor,
         revealedBy: detail.revealedBy,
         prizeValueCents: Number(detail.prizeValueCents ?? 0),
@@ -528,41 +541,39 @@ function PixelSheet({
 
             <div className="prototype-checkout-title">
               <div className="prototype-eyebrow">PAGAMENTO VIA PIX</div>
-               <div className="prototype-price">
-                 {formatBRL(checkoutAmountCents / 100)}
-               </div>
-               <div className="prototype-subtle">
-                 Pixel #{pixel.id.toLocaleString("pt-BR")} · reserva expira em{" "}
-                 {String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:
-                 {String(secondsRemaining % 60).padStart(2, "0")}
-               </div>
+              <div className="prototype-price">
+                {formatBRL(checkoutAmountCents / 100)}
+              </div>
+              <div className="prototype-subtle">
+                Pixel #{pixel.id.toLocaleString("pt-BR")} · reserva expira em{" "}
+                {String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:
+                {String(secondsRemaining % 60).padStart(2, "0")}
+              </div>
             </div>
 
-             <div className="prototype-receipt-destination">
-               <span>Certificado enviado para</span>
-               <strong>{receiptEmail}</strong>
-               <button
-                 type="button"
-                 onClick={() => {
-                   setCheckoutOpen(false);
-                   setEmailPromptOpen(true);
-                 }}
-               >
-                 Alterar e-mail
-               </button>
-             </div>
+            <div className="prototype-receipt-destination">
+              <span>Certificado enviado para</span>
+              <strong>{receiptEmail}</strong>
+              <button
+                type="button"
+                onClick={() => {
+                  setCheckoutOpen(false);
+                  setEmailPromptOpen(true);
+                }}
+              >
+                Alterar e-mail
+              </button>
+            </div>
 
             <div className="prototype-checkout-layout">
               <div className="prototype-qr-wrap">
-                 <div className="prototype-qr prototype-qr-placeholder">
-                   PIX
-                 </div>
+                <div className="prototype-qr prototype-qr-placeholder">PIX</div>
               </div>
 
               <div className="prototype-checkout-info">
-                 <div className="prototype-pix-label">Checkout Pix seguro</div>
+                <div className="prototype-pix-label">Checkout Pix seguro</div>
                 <div className="prototype-pix-row">
-                   <span className="prototype-pix-key">{checkoutReference}</span>
+                  <span className="prototype-pix-key">{checkoutReference}</span>
                   <button className="prototype-copy-button" onClick={copyPix}>
                     {copied ? <Check size={13} /> : <Copy size={13} />}
                     {copied ? "Copiado" : "Copiar"}
@@ -582,8 +593,8 @@ function PixelSheet({
                   disabled={isSubmittingReveal}
                 >
                   {isSubmittingReveal
-          ? "Preparando seu certificado…"
-                     : "(desenvolvimento) simular webhook confirmado"}
+                    ? "Preparando seu certificado…"
+                    : "(desenvolvimento) simular webhook confirmado"}
                 </button>
               </div>
             </div>
@@ -629,7 +640,7 @@ function PixelSheet({
             <div className="prototype-detail-layout">
               <div
                 className="prototype-pixel-hero"
-                style={{ background: pixel.color ?? undefined }}
+                style={{ background: pixel.backgroundColor ?? undefined }}
               >
                 {pixel.revealed ? (
                   <span className="prototype-hero-emoji">{pixel.emoji}</span>
@@ -650,8 +661,8 @@ function PixelSheet({
                       try {
                         const token = await onReserve(pixel.id);
                         setReservationToken(token);
-                         setReservationExpiresAt(Date.now() + 5 * 60 * 1000);
-                         setSecondsRemaining(300);
+                        setReservationExpiresAt(Date.now() + 5 * 60 * 1000);
+                        setSecondsRemaining(300);
                         setEmailPromptOpen(true);
                       } catch (error) {
                         setReceiptEmailError(
@@ -687,7 +698,10 @@ function PixelSheet({
                             rel="noreferrer"
                             aria-label={`Abrir @${displayedSignature.handle} no ${displayedSignature.network}`}
                           >
-                            <SignatureIcon network={displayedSignature.network} size={17} />
+                            <SignatureIcon
+                              network={displayedSignature.network}
+                              size={17}
+                            />
                             <span>@{displayedSignature.handle}</span>
                           </a>
                         </div>
@@ -698,24 +712,23 @@ function PixelSheet({
                       pixel.revealedBy === CURRENT_USER_NICKNAME &&
                       !hasSignature &&
                       !signatureSubmitted && (
-                      <button
-                        className="prototype-edit-social-button"
-                        onClick={() => {
-                           setSocialForm(EMPTY_SOCIAL_PROFILE);
-                          setSocialError("");
-                           setEditingSocials(false);
-                        }}
-                      >
-                         Assinar esse pixel publicamente
-                      </button>
-                    )}
+                        <button
+                          className="prototype-edit-social-button"
+                          onClick={() => {
+                            setSocialForm(EMPTY_SOCIAL_PROFILE);
+                            setSocialError("");
+                            setEditingSocials(false);
+                          }}
+                        >
+                          Assinar esse pixel publicamente
+                        </button>
+                      )}
                   </div>
                 )}
               </div>
             </div>
           </>
         )}
-
       </div>
     </div>
   );
@@ -737,7 +750,11 @@ function ReceiptEmailView({
   return (
     <>
       <div className="prototype-sheet-header">
-        <button className="prototype-back-button" onClick={onBack} aria-label="Voltar">
+        <button
+          className="prototype-back-button"
+          onClick={onBack}
+          aria-label="Voltar"
+        >
           <ArrowLeft size={16} />
           Voltar
         </button>
@@ -805,7 +822,11 @@ function SignatureFormView({
   return (
     <>
       <div className="prototype-sheet-header">
-        <button className="prototype-back-button" onClick={onClose} aria-label="Voltar">
+        <button
+          className="prototype-back-button"
+          onClick={onClose}
+          aria-label="Voltar"
+        >
           <ArrowLeft size={16} />
           Voltar
         </button>
@@ -815,12 +836,14 @@ function SignatureFormView({
       </div>
       <div className="prototype-signature-title">
         <h2>
-          {isEditing ? "Editar sua assinatura" : "Assinar esse pixel publicamente"}
+          {isEditing
+            ? "Editar sua assinatura"
+            : "Assinar esse pixel publicamente"}
         </h2>
-          <p>
-           Escolha uma rede e adicione seu @ para deixar sua assinatura pública
-           neste pixel. A assinatura passa por moderação e, depois do envio,
-           alterações ou remoções só podem ser solicitadas ao suporte.
+        <p>
+          Escolha uma rede e adicione seu @ para deixar sua assinatura pública
+          neste pixel. A assinatura passa por moderação e, depois do envio,
+          alterações ou remoções só podem ser solicitadas ao suporte.
         </p>
       </div>
       <SocialProfileForm
@@ -829,7 +852,9 @@ function SignatureFormView({
         onChange={onChange}
         onSave={onSave}
         onSkip={onRemove ?? onClose}
-        saveLabel={isEditing ? "Salvar assinatura" : "Assinar esse pixel publicamente"}
+        saveLabel={
+          isEditing ? "Salvar assinatura" : "Assinar esse pixel publicamente"
+        }
         skipLabel={isEditing ? "Remover assinatura" : "Agora não"}
       />
     </>
@@ -859,7 +884,9 @@ function SocialProfileForm({
     <div className="prototype-social-form">
       <label className="prototype-handle-field">
         <span>Seu @usuário</span>
-        <div className={`prototype-identity-input ${networkMenuOpen ? "is-open" : ""}`}>
+        <div
+          className={`prototype-identity-input ${networkMenuOpen ? "is-open" : ""}`}
+        >
           <button
             type="button"
             className="prototype-network-icon-button"
@@ -873,7 +900,11 @@ function SocialProfileForm({
             <SignatureIcon network={profile.network} size={17} />
           </button>
           {networkMenuOpen && (
-            <div className="prototype-network-menu" role="listbox" aria-label="Redes sociais">
+            <div
+              className="prototype-network-menu"
+              role="listbox"
+              aria-label="Redes sociais"
+            >
               {(["instagram", "x"] as const).map((network) => (
                 <button
                   key={network}
@@ -890,7 +921,9 @@ function SocialProfileForm({
                 >
                   <SignatureIcon network={network} size={15} />
                   <span>{network === "instagram" ? "Instagram" : "X"}</span>
-                  {profile.network === network && <Check size={14} aria-hidden="true" />}
+                  {profile.network === network && (
+                    <Check size={14} aria-hidden="true" />
+                  )}
                 </button>
               ))}
             </div>
@@ -898,7 +931,9 @@ function SocialProfileForm({
           <span className="prototype-handle-prefix">@</span>
           <input
             value={profile.handle}
-            onChange={(event) => onChange({ ...profile, handle: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...profile, handle: event.target.value })
+            }
             placeholder="seuusuario"
             autoComplete="off"
             aria-invalid={Boolean(error)}
@@ -928,14 +963,19 @@ function PixelGrid() {
   const [socialProfile, setSocialProfile] = useState<SocialProfile>(() => {
     try {
       const saved = window.localStorage.getItem(SOCIAL_PROFILE_STORAGE_KEY);
-      return saved ? normalizeSocialProfile(JSON.parse(saved)) : EMPTY_SOCIAL_PROFILE;
+      return saved
+        ? normalizeSocialProfile(JSON.parse(saved))
+        : EMPTY_SOCIAL_PROFILE;
     } catch {
       return EMPTY_SOCIAL_PROFILE;
     }
   });
 
   useEffect(() => {
-    window.localStorage.setItem(SOCIAL_PROFILE_STORAGE_KEY, JSON.stringify(socialProfile));
+    window.localStorage.setItem(
+      SOCIAL_PROFILE_STORAGE_KEY,
+      JSON.stringify(socialProfile),
+    );
   }, [socialProfile]);
 
   useEffect(() => {
@@ -1002,8 +1042,8 @@ function PixelGrid() {
       Array<{
         id: number;
         status: "available" | "reserved" | "paid";
-        emoji: string | null;
-        backgroundColor: string | null;
+        emoji: string;
+        backgroundColor: string;
       }>
     >(`/api/cells?from=${from}&to=${to}`)
       .then((cells) => {
@@ -1025,8 +1065,8 @@ function PixelGrid() {
     void fetchJson<{
       id: number;
       status: "available" | "reserved" | "paid";
-      emoji?: string | null;
-      backgroundColor?: string | null;
+      emoji: string;
+      backgroundColor: string;
       revealedBy?: string | null;
       revealedAt?: string | null;
       prizeValueCents?: number;
@@ -1047,7 +1087,10 @@ function PixelGrid() {
             ? new Date(detail.revealedAt)
             : null;
           pixel.socialProfile = detail.signature
-            ? { network: detail.signature.platform, handle: detail.signature.handle }
+            ? {
+                network: detail.signature.platform,
+                handle: detail.signature.handle,
+              }
             : EMPTY_SOCIAL_PROFILE;
         }
         setRevealVersion((version) => version + 1);
@@ -1069,18 +1112,18 @@ function PixelGrid() {
   }, []);
 
   const handleReveal = useCallback(async (receipt: ReceiptPayload) => {
-      revealPixelInCache(
-        receipt.pixelId,
-        receipt.emoji,
-        receipt.backgroundColor,
-        receipt.revealedBy,
-        receipt.socialProfile,
-        receipt.prizeValueCents,
-        receipt.prizeLabel,
-        receipt.revealedAt ? new Date(receipt.revealedAt) : null,
-      );
-      setRevealVersion((version) => version + 1);
-    }, []);
+    revealPixelInCache(
+      receipt.pixelId,
+      receipt.emoji,
+      receipt.backgroundColor,
+      receipt.revealedBy,
+      receipt.socialProfile,
+      receipt.prizeValueCents,
+      receipt.prizeLabel,
+      receipt.revealedAt ? new Date(receipt.revealedAt) : null,
+    );
+    setRevealVersion((version) => version + 1);
+  }, []);
 
   const handleSaveSocialProfile = useCallback(
     async (profile: SocialProfile, cellId: number, token: string) => {
@@ -1104,10 +1147,7 @@ function PixelGrid() {
       className="prototype-scroll-area"
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
     >
-      <div
-        className="prototype-grid-canvas"
-        style={{ height: totalHeight }}
-      >
+      <div className="prototype-grid-canvas" style={{ height: totalHeight }}>
         {visiblePixels.map(({ id, row, col }) => {
           const pixel = getPixel(id);
           const selected = id === selectedId;
@@ -1124,9 +1164,9 @@ function PixelGrid() {
                 width: cellSize,
                 height: cellSize,
                 background: pixel.revealed
-                  ? pixel.color ?? undefined
-                  : pixel.color
-                    ? `repeating-linear-gradient(45deg, ${pixel.color}, ${pixel.color} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
+                  ? (pixel.backgroundColor ?? undefined)
+                  : pixel.backgroundColor
+                    ? `repeating-linear-gradient(45deg, ${pixel.backgroundColor}, ${pixel.backgroundColor} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
                     : undefined,
               }}
               onClick={() => setSelectedId(id)}
@@ -1155,7 +1195,7 @@ function PixelGrid() {
           pixel={selected}
           onClose={() => setSelectedId(null)}
           onReveal={handleReveal}
-           onReserve={handleReserve}
+          onReserve={handleReserve}
           socialProfile={socialProfile}
           onSaveSocialProfile={handleSaveSocialProfile}
         />
