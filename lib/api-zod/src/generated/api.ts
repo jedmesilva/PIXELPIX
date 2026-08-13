@@ -40,7 +40,9 @@ export const listCellsResponseIdMax = 999999;
 
 export const ListCellsResponseItem = zod.object({
   "id": zod.int().min(listCellsResponseIdMin).max(listCellsResponseIdMax),
-  "status": zod.enum(['available', 'reserved', 'paid'])
+  "status": zod.enum(['available', 'reserved', 'paid']),
+  "emoji": zod.string(),
+  "backgroundColor": zod.string()
 })
 export const ListCellsResponse = zod.array(ListCellsResponseItem)
 
@@ -65,17 +67,17 @@ export const getCellResponsePrizeValueCentsMin = 0;
 
 
 export const GetCellResponse = zod.object({
-  "id": zod.int().min(getCellResponseIdMin).max(getCellResponseIdMax).optional(),
-  "status": zod.enum(['available', 'reserved', 'paid']).optional(),
-  "emoji": zod.string().nullish(),
+  "id": zod.int().min(getCellResponseIdMin).max(getCellResponseIdMax),
+  "status": zod.enum(['available', 'reserved', 'paid']),
+  "emoji": zod.string(),
+  "backgroundColor": zod.string(),
   "prizeValueCents": zod.int().min(getCellResponsePrizeValueCentsMin).optional(),
   "prizeLabel": zod.string().nullish(),
   "revealedBy": zod.string().nullish(),
   "signature": zod.union([zod.object({
   "platform": zod.enum(['instagram', 'x']),
   "handle": zod.string()
-}),zod.null()]).optional(),
-  "required": zod.unknown().optional()
+}),zod.null()]).optional()
 })
 
 

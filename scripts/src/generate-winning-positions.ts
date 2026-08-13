@@ -158,6 +158,11 @@ async function main() {
     }
     await inserirEmLotes(client, positions);
     await client.query(
+      `UPDATE cells
+          SET emoji = '💰'
+        WHERE id IN (SELECT cell_id FROM winning_positions)`,
+    );
+    await client.query(
       `INSERT INTO prize_tier_batch (id, commit_hash) VALUES (1, $1)`,
       [commitHash],
     );

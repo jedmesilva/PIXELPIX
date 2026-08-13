@@ -25,7 +25,7 @@ export const cells = pgTable(
     reservedAt: timestamp("reserved_at", { withTimezone: true }).defaultNow().notNull(),
     paymentId: text("payment_id").unique(),
     prizeValueCents: integer("prize_value_cents").notNull().default(0),
-    emoji: text("emoji"),
+    emoji: text("emoji").notNull().default("🌟"),
     backgroundColor: text("background_color")
       .notNull()
       .default("hsl(220, 8%, 18%)"),

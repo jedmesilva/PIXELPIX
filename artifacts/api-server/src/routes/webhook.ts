@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { pool } from "@workspace/db";
 import { releaseActiveReservationByCell } from "./cells";
 import { logger } from "../lib/logger";
@@ -350,13 +350,14 @@ export async function processPaymentConfirmed(input: {
     );
 
     const prize = await calculatePrize(client, input.cellId);
-    const cellEmoji = prize.tierId === null ? randomEmoji() : "💰";
     await client.query(
       `UPDATE cells
-        SET status = 'paid', prize_value_cents = $1, emoji = $2,
+        SET status = 'paid',
+            prize_value_cents = $1,
+            emoji = CASE WHEN $2::integer IS NULL THEN emoji ELSE '💰' END,
             revealed_by = 'você', revealed_at = NOW()
        WHERE id = $3`,
-      [prize.releasedValueCents, cellEmoji, input.cellId],
+      [prize.releasedValueCents, prize.tierId, input.cellId],
     );
     if (prize.releasedValueCents > 0) {
       await client.query(
@@ -383,33 +384,6 @@ export async function processPaymentConfirmed(input: {
   } finally {
     client.release();
   }
-}
-
-const EMOJIS = [
-  "🌟",
-  "🔥",
-  "🌊",
-  "🍀",
-  "⚡",
-  "🎯",
-  "🪐",
-  "🌙",
-  "🦋",
-  "🍁",
-  "🌵",
-  "🐚",
-  "🍄",
-  "🎈",
-  "🧿",
-  "🪁",
-  "🌈",
-  "🍉",
-  "🦖",
-  "🎲",
-];
-
-function randomEmoji() {
-  return EMOJIS[randomInt(0, EMOJIS.length)];
 }
 
 router.post("/webhook/payment-confirmed", async (request, response) => {

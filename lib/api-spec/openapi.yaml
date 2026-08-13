@@ -204,7 +204,9 @@ components:
         status:
           type: string
           enum: [available, reserved, paid]
-      required: [id, status]
+        emoji: { type: string }
+        backgroundColor: { type: string }
+      required: [id, status, emoji, backgroundColor]
     CellDetail:
       type: object
       properties:
@@ -212,7 +214,8 @@ components:
         status:
           type: string
           enum: [available, reserved, paid]
-        emoji: { type: ["string", "null"] }
+        emoji: { type: string }
+        backgroundColor: { type: string }
         prizeValueCents: { type: integer, minimum: 0 }
         prizeLabel: { type: ["string", "null"] }
         revealedBy: { type: ["string", "null"] }
@@ -220,7 +223,7 @@ components:
           oneOf:
             - { $ref: "#/components/schemas/PublicSignature" }
             - { type: "null" }
-        required: [id, status]
+      required: [id, status, emoji, backgroundColor]
     PublicSignature:
       type: object
       properties:

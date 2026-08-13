@@ -9,6 +9,31 @@ export const RESERVATION_TTL_MS = 5 * 60 * 1000;
 export const MIN_PRICE_CENTS = 100;
 export const MAX_PRICE_CENTS = 100_000;
 const TOTAL_CELL_SEED = 1_000_000;
+const DEFAULT_CELL_BACKGROUND = "hsl(220, 8%, 18%)";
+const CELL_EMOJIS = [
+  "🌟",
+  "🔥",
+  "🌊",
+  "🍀",
+  "⚡",
+  "🎯",
+  "🪐",
+  "🌙",
+  "🦋",
+  "🍁",
+  "🌵",
+  "🐚",
+  "🍄",
+  "🎈",
+  "🧿",
+  "🪁",
+  "🌈",
+  "🍉",
+  "🦖",
+  "🎲",
+] as const;
+const DEFAULT_CELL_EMOJI = CELL_EMOJIS[0];
+const CELL_EMOJIS_SQL = `ARRAY[${CELL_EMOJIS.map((emoji) => `'${emoji}'`).join(", ")}]`;
 
 const ACTIVE_LIMIT = 5;
 const ATTEMPT_LIMIT = 12;
@@ -54,24 +79,41 @@ function publicStatus(status: string): "available" | "reserved" | "paid" {
 
 export async function ensureCellRecords() {
   await pool.query(`
-    INSERT INTO cells (id, status, background_color)
+    INSERT INTO cells (id, status, emoji, background_color)
     SELECT
-      cell_id,
+      generated.cell_id,
       'available',
+      CASE
+        WHEN winning.cell_id IS NOT NULL THEN '💰'
+        ELSE (${CELL_EMOJIS_SQL})[
+          1 + mod(
+            mod(generated.cell_id::bigint * 1103515245 + 12345, 2147483647),
+            ${CELL_EMOJIS.length}
+          )
+        ]
+      END,
       'hsl(220, 8%, ' ||
         to_char(
           14 + (
             mod(
-              mod(cell_id::bigint * 2654435761, 4294967296),
+              mod(generated.cell_id::bigint * 2654435761, 4294967296),
               1000
             ) / 100.0
           ),
           'FM990.###'
         ) ||
       '%)'
-    FROM generate_series(0, ${TOTAL_CELL_SEED - 1}) AS cell_id
+    FROM generate_series(0, ${TOTAL_CELL_SEED - 1}) AS generated(cell_id)
+    LEFT JOIN winning_positions AS winning ON winning.cell_id = generated.cell_id
     ON CONFLICT (id) DO UPDATE
-      SET background_color = COALESCE(cells.background_color, EXCLUDED.background_color)
+      SET emoji = CASE
+        WHEN EXISTS (
+          SELECT 1 FROM winning_positions
+          WHERE winning_positions.cell_id = cells.id
+        ) THEN '💰'
+        ELSE COALESCE(cells.emoji, EXCLUDED.emoji)
+      END,
+      background_color = COALESCE(cells.background_color, EXCLUDED.background_color)
   `);
 }
 
@@ -295,7 +337,7 @@ router.get("/cells", async (request, response) => {
         row.id,
         {
           status: publicStatus(row.status),
-          emoji: row.emoji,
+           emoji: row.emoji ?? DEFAULT_CELL_EMOJI,
           backgroundColor: row.background_color,
         },
       ],
@@ -311,9 +353,9 @@ router.get("/cells", async (request, response) => {
       return {
         id,
         ...(existing.get(id) ?? {
-          status: "available" as const,
-          emoji: null,
-          backgroundColor: null,
+           status: "available" as const,
+           emoji: DEFAULT_CELL_EMOJI,
+           backgroundColor: DEFAULT_CELL_BACKGROUND,
         }),
       };
     }),
@@ -343,8 +385,8 @@ router.get("/cells/:id", async (request, response) => {
     response.json({
       id,
       status: "available",
-      emoji: null,
-      backgroundColor: cell?.background_color ?? null,
+      emoji: cell?.emoji ?? DEFAULT_CELL_EMOJI,
+      backgroundColor: cell?.background_color ?? DEFAULT_CELL_BACKGROUND,
     });
     return;
   }
@@ -352,8 +394,8 @@ router.get("/cells/:id", async (request, response) => {
     response.json({
       id,
       status: publicStatus(cell.status),
-      emoji: null,
-      backgroundColor: cell.background_color,
+      emoji: cell.emoji ?? DEFAULT_CELL_EMOJI,
+      backgroundColor: cell.background_color ?? DEFAULT_CELL_BACKGROUND,
     });
     return;
   }
@@ -412,7 +454,6 @@ router.post("/cells/reserve", async (request, response) => {
              reserved_at = NOW(),
              payment_id = NULL,
              prize_value_cents = 0,
-             emoji = NULL,
              revealed_by = NULL,
              certificate_sent_at = NULL
         WHERE cells.status IN ('available', 'expired')

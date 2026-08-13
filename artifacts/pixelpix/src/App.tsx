@@ -27,6 +27,7 @@ const CHUNK_SIZE = 2_500;
 const STARTING_PIXEL_PRICE = 1;
 const RECEIPT_EMAIL_STORAGE_KEY = "pixelpix-receipt-email";
 const SOCIAL_PROFILE_STORAGE_KEY = "pixelpix-social-profile";
+const CURRENT_USER_NICKNAME = "você";
 
 type Pixel = {
   id: number;
@@ -128,7 +129,6 @@ function applyCellStatus(
   pixel.status = status;
   pixel.revealed = status === "paid";
   if (!pixel.revealed) {
-    pixel.emoji = null;
     pixel.revealedBy = null;
     pixel.revealedAt = null;
     pixel.prizeValueCents = 0;
@@ -629,7 +629,7 @@ function PixelSheet({
             <div className="prototype-detail-layout">
               <div
                 className="prototype-pixel-hero"
-                style={{ background: pixel.color }}
+                style={{ background: pixel.color ?? undefined }}
               >
                 {pixel.revealed ? (
                   <span className="prototype-hero-emoji">{pixel.emoji}</span>
@@ -694,8 +694,8 @@ function PixelSheet({
                       </div>
                     )}
 
-                     {reservationToken &&
-                       pixel.revealedBy === CURRENT_USER_NICKNAME &&
+                    {reservationToken &&
+                      pixel.revealedBy === CURRENT_USER_NICKNAME &&
                       !hasSignature &&
                       !signatureSubmitted && (
                       <button
@@ -1124,8 +1124,10 @@ function PixelGrid() {
                 width: cellSize,
                 height: cellSize,
                 background: pixel.revealed
-                  ? pixel.color
-                  : `repeating-linear-gradient(45deg, ${pixel.color}, ${pixel.color} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`,
+                  ? pixel.color ?? undefined
+                  : pixel.color
+                    ? `repeating-linear-gradient(45deg, ${pixel.color}, ${pixel.color} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
+                    : undefined,
               }}
               onClick={() => setSelectedId(id)}
               onMouseEnter={() => setHoveredId(id)}
@@ -1138,7 +1140,7 @@ function PixelGrid() {
                   : `Pixel ${id}, não revelado`
               }
             >
-              {pixel.revealed ? (
+              {pixel.revealed || pixel.emoji === "💰" ? (
                 <span style={{ fontSize: emojiSize }}>{pixel.emoji}</span>
               ) : (
                 <Lock size={iconSize} color="rgba(255,255,255,.75)" />

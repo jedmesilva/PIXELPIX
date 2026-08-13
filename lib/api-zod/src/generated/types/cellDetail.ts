@@ -13,10 +13,10 @@ export interface CellDetail {
      * @minimum 0
      * @maximum 999999
      */
-  id?: number;
-  status?: CellDetailStatus;
-  /** @nullable */
-  emoji?: string | null;
+  id: number;
+  status: CellDetailStatus;
+  emoji: string;
+  backgroundColor: string;
   /** @minimum 0 */
   prizeValueCents?: number;
   /** @nullable */
@@ -24,5 +24,4 @@ export interface CellDetail {
   /** @nullable */
   revealedBy?: string | null;
   signature?: PublicSignature | null;
-  required?: unknown;
 }

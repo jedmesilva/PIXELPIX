@@ -14,4 +14,6 @@ export interface CellRangeItem {
      */
   id: number;
   status: CellRangeItemStatus;
+  emoji: string;
+  backgroundColor: string;
 }
