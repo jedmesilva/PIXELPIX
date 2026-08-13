@@ -2,6 +2,7 @@ import {
   bigint,
   bigserial,
   boolean,
+  check,
   index,
   inet,
   integer,
@@ -27,11 +28,24 @@ export const cells = pgTable(
     emoji: text("emoji"),
     revealedBy: text("revealed_by"),
     certificateSentAt: timestamp("certificate_sent_at", { withTimezone: true }),
+    certificateAttempts: integer("certificate_attempts").notNull().default(0),
+    certificateLastAttemptAt: timestamp("certificate_last_attempt_at", {
+      withTimezone: true,
+    }),
+    certificateLastError: text("certificate_last_error"),
   },
   (table) => ({
     statusReservedAt: index("idx_cells_status_reserved_at").on(
       table.status,
       table.reservedAt,
+    ),
+    statusValues: check(
+      "cells_status_values",
+      sql`${table.status} IN ('reserved', 'paid_pending_prize', 'paid', 'expired')`,
+    ),
+    prizeNonNegative: check(
+      "cells_prize_non_negative",
+      sql`${table.prizeValueCents} >= 0`,
     ),
   }),
 );
@@ -44,7 +58,14 @@ export const prizePool = pgTable("prize_pool", {
   totalPositions: integer("total_positions").notNull(),
   remainingValueCents: bigint("remaining_value_cents", { mode: "number" }).notNull(),
   remainingPositions: integer("remaining_positions").notNull(),
-});
+  },
+  (table) => ({
+    valuesNonNegative: check(
+      "prize_pool_values_non_negative",
+      sql`${table.remainingValueCents} >= 0 AND ${table.remainingPositions} >= 0`,
+    ),
+  }),
+);
 
 export const winningPositions = pgTable(
   "winning_positions",
@@ -113,6 +134,7 @@ export const payments = pgTable(
     geoCity: text("geo_city"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    externalReference: text("external_reference"),
   },
   (table) => ({
     cellId: index("idx_payments_cell_id").on(table.cellId),
@@ -121,6 +143,14 @@ export const payments = pgTable(
     cellPending: uniqueIndex("idx_payments_cell_pending")
       .on(table.cellId)
       .where(sql`${table.status} = 'pending'`),
+    statusValues: check(
+      "payments_status_values",
+      sql`${table.status} IN ('pending', 'confirmed', 'failed', 'refunded')`,
+    ),
+    amountPositive: check(
+      "payments_amount_positive",
+      sql`${table.amountCents} > 0`,
+    ),
   }),
 );
 
@@ -137,6 +167,10 @@ export const webhookEvents = pgTable(
   },
   (table) => ({
     paymentId: index("idx_webhook_events_payment_id").on(table.paymentId),
+    resultValues: check(
+      "webhook_events_result_values",
+      sql`${table.result} IN ('processed', 'duplicate', 'invalid_signature', 'invalid_reference', 'payment_not_pending', 'stale_token_conflict', 'error')`,
+    ),
   }),
 );
 
@@ -155,6 +189,14 @@ export const cashLedger = pgTable(
       table.entryType,
       table.createdAt,
     ),
+    typeValues: check(
+      "cash_ledger_entry_type_values",
+      sql`${table.entryType} IN ('revenue', 'prize_payout', 'refund')`,
+    ),
+    amountPositive: check(
+      "cash_ledger_amount_positive",
+      sql`${table.amountCents} > 0`,
+    ),
   }),
 );
 
@@ -170,6 +212,14 @@ export const cellSignatures = pgTable(
   },
   (table) => ({
     moderation: index("idx_cell_signatures_moderation").on(table.moderationStatus),
+    platformValues: check(
+      "cell_signatures_platform_values",
+      sql`${table.platform} IN ('instagram', 'x')`,
+    ),
+    moderationValues: check(
+      "cell_signatures_moderation_values",
+      sql`${table.moderationStatus} IN ('pending', 'approved', 'hidden')`,
+    ),
   }),
 );
 

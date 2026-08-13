@@ -252,8 +252,8 @@ components:
       type: object
       properties:
         checkoutUrl: { type: string, format: uri-reference }
-         amountCents: { type: integer, minimum: 0 }
-         currency: { type: string }
+        amountCents: { type: integer, minimum: 0 }
+        currency: { type: string }
       required: [checkoutUrl]
     CellSignatureInput:
       type: object

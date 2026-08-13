@@ -18,7 +18,15 @@ const RAPID_CLICK_MS = 1_500;
 
 type Counter = { startedAt: number; attempts: number };
 type Escalation = { startedAt: number; hits: number };
-type Behavior = { lastAt: number; rapidHits: number };
+type Behavior = {
+  startedAt: number;
+  lastAt: number;
+  attempts: number;
+  rapidHits: number;
+  sameCellHits: number;
+  lastCellId: number | null;
+  deviceIds: Set<string>;
+};
 
 const ipCounters = new Map<string, Counter>();
 const deviceCounters = new Map<string, Counter>();
@@ -86,18 +94,39 @@ function captchaRequired(key: string) {
   );
 }
 
-function checkBehavioralLimit(request: Request) {
+function checkBehavioralLimit(
+  request: Request,
+  cellId: number,
+  deviceId: string,
+) {
   const key = `network:${ipNetwork(clientIp(request))}`;
   const now = Date.now();
   const current = behaviorByNetwork.get(key);
-  if (!current || now - current.lastAt >= WINDOW_MS) {
-    behaviorByNetwork.set(key, { lastAt: now, rapidHits: 0 });
+  if (!current || now - current.startedAt >= WINDOW_MS) {
+    behaviorByNetwork.set(key, {
+      startedAt: now,
+      lastAt: now,
+      attempts: 1,
+      rapidHits: 0,
+      sameCellHits: 1,
+      lastCellId: cellId,
+      deviceIds: new Set([deviceId]),
+    });
     return false;
   }
   const wasTooFast = now - current.lastAt < RAPID_CLICK_MS;
   current.lastAt = now;
+  current.attempts += 1;
   if (wasTooFast) current.rapidHits += 1;
-  if (current.rapidHits >= ATTEMPT_LIMIT) {
+  if (current.lastCellId === cellId) current.sameCellHits += 1;
+  else current.sameCellHits = 1;
+  current.lastCellId = cellId;
+  current.deviceIds.add(deviceId);
+  if (
+    current.rapidHits >= ATTEMPT_LIMIT ||
+    current.sameCellHits >= 6 ||
+    (current.attempts >= 30 && current.deviceIds.size >= 20)
+  ) {
     registerLimitHit(key);
     return true;
   }
@@ -107,7 +136,6 @@ function checkBehavioralLimit(request: Request) {
 function checkReserveLimit(
   request: Request,
   deviceId: string,
-  captchaToken: string | null,
 ) {
   const now = Date.now();
   pruneActiveReservations(now);
@@ -125,12 +153,6 @@ function checkReserveLimit(
     captchaRequired(deviceKey) ||
     captchaRequired(networkKey)
   ) {
-    if (captchaToken) {
-      // The token is intentionally accepted only as a provider-issued proof.
-      // A CAPTCHA provider can be wired through the edge without changing the
-      // reservation transaction or exposing the reservation token.
-      return null;
-    }
     return {
       code: 428,
       message: "Verificação adicional necessária",
@@ -148,7 +170,7 @@ function checkReserveLimit(
     ipCounter.attempts >= ATTEMPT_LIMIT ||
     activeForIp >= ACTIVE_LIMIT ||
     activeForDevice >= ACTIVE_LIMIT ||
-    checkBehavioralLimit(request)
+    checkBehavioralLimit(request, Number(request.body?.id), deviceId)
   ) {
     registerLimitHit(ipKey);
     registerLimitHit(deviceKey);
@@ -162,6 +184,36 @@ function checkReserveLimit(
   ipCounter.attempts += 1;
   deviceCounter.attempts += 1;
   return null;
+}
+
+async function verifyCaptchaToken(token: string, request: Request) {
+  const verificationUrl = process.env.CAPTCHA_VERIFY_URL;
+  const secret = process.env.CAPTCHA_SECRET;
+  if (!verificationUrl || !secret) return false;
+
+  try {
+    const result = await fetch(verificationUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secret,
+        response: token,
+        remoteip: clientIp(request),
+      }),
+    });
+    if (!result.ok) return false;
+    const body = (await result.json()) as { success?: boolean };
+    return body.success === true;
+  } catch (error) {
+    request.log?.warn({ error }, "CAPTCHA verification failed");
+    return false;
+  }
+}
+
+function clearCaptchaEscalation(request: Request, deviceId: string) {
+  escalations.delete(`ip:${clientIp(request)}`);
+  escalations.delete(`device:${deviceId}`);
+  escalations.delete(`network:${ipNetwork(clientIp(request))}`);
 }
 
 async function calculateCellPriceCents(client: { query: Function }) {
@@ -273,11 +325,19 @@ router.post("/cells/reserve", async (request, response) => {
     response.status(400).json({ error: "id e deviceId são obrigatórios" });
     return;
   }
-  const limit = checkReserveLimit(request, deviceId, captchaToken);
-  if (limit) {
+  const limit = checkReserveLimit(request, deviceId);
+  if (limit?.captcha) {
+    if (!captchaToken || !(await verifyCaptchaToken(captchaToken, request))) {
+      response.status(428).json({
+        error: "Verificação adicional necessária",
+        captchaRequired: true,
+      });
+      return;
+    }
+    clearCaptchaEscalation(request, deviceId);
+  } else if (limit) {
     response.status(limit.code).json({
       error: limit.message,
-      ...(limit.captcha ? { captchaRequired: true } : {}),
     });
     return;
   }
@@ -363,6 +423,8 @@ router.post("/cells/email", async (request, response) => {
       return;
     }
 
+    // The reservation row stays locked until COMMIT. Concurrent retries
+    // serialize here and observe the pending checkout created by the winner.
     const existing = await client.query(
       `SELECT checkout_url, amount_cents, currency FROM payments
        WHERE cell_id = $1 AND status = 'pending'
@@ -528,12 +590,58 @@ router.post("/checkout/local/:paymentId/confirm", async (request, response) => {
 });
 
 export async function expireReservations() {
-  await pool.query(
+  const expired = await pool.query(
     `UPDATE cells SET status = 'expired'
      WHERE status = 'reserved'
-       AND reserved_at < NOW() - INTERVAL '5 minutes'`,
+       AND reserved_at < NOW() - INTERVAL '5 minutes'
+     RETURNING id`,
   );
+  for (const row of expired.rows) {
+    releaseActiveReservationByCell(Number(row.id));
+  }
   pruneActiveReservations(Date.now());
+}
+
+export async function deleteSignatureForSupport(input: {
+  cellId: number;
+  requesterEmail: string;
+  requestedVia?: string;
+  deletedBy: string;
+}) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const owner = await client.query(
+      `SELECT email FROM cells WHERE id = $1 FOR UPDATE`,
+      [input.cellId],
+    );
+    const storedEmail = String(owner.rows[0]?.email ?? "").toLowerCase();
+    if (!storedEmail || storedEmail !== input.requesterEmail.trim().toLowerCase()) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+
+    const deleted = await client.query(
+      `DELETE FROM cell_signatures WHERE cell_id = $1 RETURNING cell_id`,
+      [input.cellId],
+    );
+    if (!deleted.rows.length) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+    await client.query(
+      `INSERT INTO signature_deletion_log (cell_id, requested_via, deleted_by)
+       VALUES ($1, $2, $3)`,
+      [input.cellId, input.requestedVia ?? null, input.deletedBy],
+    );
+    await client.query("COMMIT");
+    return true;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export default router;

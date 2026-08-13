@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { expireReservations } from "./routes/cells";
+import { processPendingCertificates } from "./routes/webhook";
 import { pool } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
@@ -24,9 +25,13 @@ async function start() {
     ON CONFLICT (id) DO NOTHING
   `);
   await expireReservations();
+  await processPendingCertificates();
   setInterval(() => {
     void expireReservations().catch((error) =>
       logger.error({ error }, "Reservation expiration failed"),
+    );
+    void processPendingCertificates().catch((error) =>
+      logger.error({ error }, "Certificate retry job failed"),
     );
   }, 30_000);
   app.listen(port, (err) => {

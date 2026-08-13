@@ -11,7 +11,7 @@ const alertByCell = new Map<number, number>();
 let alertsThisHour = 0;
 let alertWindowStartedAt = Date.now();
 
-function alertOperationsWithLimit(cellId: number, paymentId: string) {
+async function alertOperationsWithLimit(cellId: number, paymentId: string) {
   const now = Date.now();
   if (now - alertWindowStartedAt >= 60 * 60_000) {
     alertWindowStartedAt = now;
@@ -26,13 +26,19 @@ function alertOperationsWithLimit(cellId: number, paymentId: string) {
   }
   alertByCell.set(cellId, now);
   alertsThisHour += 1;
-  // Replace this bounded hook with an authenticated operations connector when one
-  // is selected. The audit row is always written independently of this alert.
+  const payment = await pool.query(
+    `SELECT ip_address, device_id FROM payments
+     WHERE provider_payment_id = $1
+     ORDER BY created_at DESC LIMIT 1`,
+    [paymentId],
+  );
   logger.warn(
     {
       event: "stale_token_conflict",
       cellId,
       paymentId,
+      ipAddress: payment.rows[0]?.ip_address ?? null,
+      deviceId: payment.rows[0]?.device_id ?? null,
       alertSuppressedAfterHourlyLimit: false,
     },
     "Payment requires manual review",
@@ -73,6 +79,119 @@ async function recordWebhookEvent(
      VALUES ($1, $2, $3, $4, $5)`,
     [paymentId, cellId, payload, signatureValid, result],
   );
+}
+
+async function safeRecordWebhookEvent(
+  paymentId: string,
+  cellId: number | null,
+  payload: unknown,
+  signatureValid: boolean,
+  result: string,
+) {
+  try {
+    await recordWebhookEvent(paymentId, cellId, payload, signatureValid, result);
+  } catch (error) {
+    logger.error(
+      { error, paymentId, cellId, result },
+      "Could not persist webhook audit event",
+    );
+  }
+}
+
+async function sendCertificateEmail(input: {
+  email: string;
+  cellId: number;
+  prizeValueCents: number;
+}) {
+  const deliveryUrl = process.env.CERTIFICATE_DELIVERY_URL;
+  if (!deliveryUrl) {
+    logger.warn(
+      { cellId: input.cellId },
+      "Certificate delivery deferred; provider is not configured",
+    );
+    return false;
+  }
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (process.env.CERTIFICATE_DELIVERY_SECRET) {
+      headers.Authorization = `Bearer ${process.env.CERTIFICATE_DELIVERY_SECRET}`;
+    }
+    const result = await fetch(deliveryUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(input),
+    });
+    if (!result.ok) {
+      logger.warn(
+        { cellId: input.cellId, statusCode: result.status },
+        "Certificate provider rejected delivery",
+      );
+      return false;
+    }
+    return true;
+  } catch (error) {
+    logger.warn({ error, cellId: input.cellId }, "Certificate delivery failed");
+    return false;
+  }
+}
+
+export async function deliverCertificateForCell(cellId: number) {
+  const claimed = await pool.query(
+    `UPDATE cells
+       SET certificate_attempts = certificate_attempts + 1,
+           certificate_last_attempt_at = NOW(),
+           certificate_last_error = NULL
+     WHERE id = $1
+       AND status = 'paid'
+       AND email IS NOT NULL
+       AND certificate_sent_at IS NULL
+       AND (
+         certificate_last_attempt_at IS NULL
+         OR certificate_last_attempt_at < NOW() - INTERVAL '1 minute'
+       )
+     RETURNING email, prize_value_cents`,
+    [cellId],
+  );
+  if (!claimed.rows[0]) return false;
+
+  const delivered = await sendCertificateEmail({
+    email: String(claimed.rows[0].email),
+    cellId,
+    prizeValueCents: Number(claimed.rows[0].prize_value_cents ?? 0),
+  });
+  if (delivered) {
+    await pool.query(
+      `UPDATE cells
+          SET certificate_sent_at = NOW(), certificate_last_error = NULL
+        WHERE id = $1 AND status = 'paid' AND certificate_sent_at IS NULL`,
+      [cellId],
+    );
+  } else {
+    await pool.query(
+      `UPDATE cells
+          SET certificate_last_error = 'delivery_failed'
+        WHERE id = $1 AND certificate_sent_at IS NULL`,
+      [cellId],
+    );
+  }
+  return delivered;
+}
+
+export async function processPendingCertificates() {
+  const pending = await pool.query(
+    `SELECT id FROM cells
+      WHERE status = 'paid'
+        AND email IS NOT NULL
+        AND certificate_sent_at IS NULL
+      ORDER BY id
+      LIMIT 25`,
+  );
+  for (const row of pending.rows) {
+    await deliverCertificateForCell(Number(row.id));
+  }
 }
 
 export async function calculatePrize(
@@ -179,7 +298,7 @@ export async function processPaymentConfirmed(input: {
       );
       if (current.rows[0]?.payment_id === input.paymentId) {
         await client.query("ROLLBACK");
-        await recordWebhookEvent(
+        await safeRecordWebhookEvent(
           input.paymentId,
           input.cellId,
           input.payload,
@@ -188,14 +307,17 @@ export async function processPaymentConfirmed(input: {
         );
         return { result: "duplicate" as const };
       }
-      await client.query(
-        `INSERT INTO webhook_events
-           (payment_id, cell_id, payload, signature_valid, result)
-         VALUES ($1, $2, $3, true, 'stale_token_conflict')`,
-        [input.paymentId, input.cellId, input.payload],
-      );
       await client.query("COMMIT");
-      alertOperationsWithLimit(input.cellId, input.paymentId);
+      await safeRecordWebhookEvent(
+        input.paymentId,
+        input.cellId,
+        input.payload,
+        true,
+        "stale_token_conflict",
+      );
+      void alertOperationsWithLimit(input.cellId, input.paymentId).catch((error) =>
+        logger.error({ error }, "Could not alert operations about token conflict"),
+      );
       return { result: "stale_token_conflict" as const };
     }
 
@@ -210,7 +332,7 @@ export async function processPaymentConfirmed(input: {
     );
     if (!payment.rows.length) {
       await client.query("ROLLBACK");
-      await recordWebhookEvent(
+      await safeRecordWebhookEvent(
         input.paymentId,
         input.cellId,
         input.payload,
@@ -243,24 +365,16 @@ export async function processPaymentConfirmed(input: {
         [input.cellId, prize.releasedValueCents],
       );
     }
-    await client.query(
-      `INSERT INTO webhook_events
-         (payment_id, cell_id, payload, signature_valid, result)
-       VALUES ($1, $2, $3, true, 'processed')`,
-      [input.paymentId, input.cellId, input.payload],
-    );
     await client.query("COMMIT");
     releaseActiveReservationByCell(input.cellId);
-
-    // Email delivery is deliberately outside the transaction. A real provider
-    // can consume paid rows where certificate_sent_at IS NULL without changing
-    // payment or prize state.
-    await pool.query(
-      `UPDATE cells
-       SET certificate_sent_at = NOW()
-       WHERE id = $1 AND status = 'paid' AND certificate_sent_at IS NULL`,
-      [input.cellId],
+    await safeRecordWebhookEvent(
+      input.paymentId,
+      input.cellId,
+      input.payload,
+      true,
+      "processed",
     );
+    await deliverCertificateForCell(input.cellId);
     return { result: "processed" as const };
   } catch (error) {
     await client.query("ROLLBACK");
@@ -310,6 +424,7 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
       ? request.body.paymentId
       : "unknown";
 
+  let parsedCellId: number | null = null;
   try {
     let reference: Record<string, unknown> | null = null;
     if (typeof request.body?.referenciaExterna === "string") {
@@ -331,9 +446,10 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
       reference = request.body.reference as Record<string, unknown>;
     }
     const cellId = Number(reference?.cellId);
+    parsedCellId = Number.isInteger(cellId) ? cellId : null;
     const token = typeof reference?.token === "string" ? reference.token : "";
     if (!signatureOk) {
-      await recordWebhookEvent(
+      await safeRecordWebhookEvent(
         paymentId,
         Number.isInteger(cellId) ? cellId : null,
         request.body,
@@ -351,7 +467,7 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
       !paymentId ||
       paymentId === "unknown"
     ) {
-      await recordWebhookEvent(
+      await safeRecordWebhookEvent(
         paymentId,
         Number.isInteger(cellId) ? cellId : null,
         request.body,
@@ -374,6 +490,13 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
     response.status(200).send("OK");
   } catch (error) {
     request.log?.error({ error }, "Payment webhook failed");
+    await safeRecordWebhookEvent(
+      paymentId,
+      parsedCellId,
+      request.body,
+      signatureOk,
+      "error",
+    );
     response.status(500).send("Erro interno");
   }
 });
