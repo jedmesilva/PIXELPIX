@@ -490,11 +490,15 @@ router.post("/cells/sign", async (request, response) => {
     typeof request.body?.handle === "string"
       ? request.body.handle.trim().replace(/^@/, "").toLowerCase()
       : "";
+  const validHandle =
+    platform === "x"
+      ? /^[a-z0-9_]{1,15}$/.test(handle)
+      : /^[a-z0-9._]{1,30}$/.test(handle);
   if (
     cellId === null ||
     !token ||
     (platform !== "instagram" && platform !== "x") ||
-    !/^[a-z0-9._]{1,30}$/.test(handle)
+    !validHandle
   ) {
     response.status(400).json({ error: "Rede, username ou reserva inválidos" });
     return;
