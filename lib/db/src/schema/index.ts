@@ -26,7 +26,11 @@ export const cells = pgTable(
     paymentId: text("payment_id").unique(),
     prizeValueCents: integer("prize_value_cents").notNull().default(0),
     emoji: text("emoji"),
+    backgroundColor: text("background_color")
+      .notNull()
+      .default("hsl(220, 8%, 18%)"),
     revealedBy: text("revealed_by"),
+    revealedAt: timestamp("revealed_at", { withTimezone: true }),
     certificateSentAt: timestamp("certificate_sent_at", { withTimezone: true }),
     certificateAttempts: integer("certificate_attempts").notNull().default(0),
     certificateLastAttemptAt: timestamp("certificate_last_attempt_at", {
@@ -41,7 +45,7 @@ export const cells = pgTable(
     ),
     statusValues: check(
       "cells_status_values",
-      sql`${table.status} IN ('reserved', 'paid_pending_prize', 'paid', 'expired')`,
+      sql`${table.status} IN ('available', 'reserved', 'paid_pending_prize', 'paid', 'expired')`,
     ),
     prizeNonNegative: check(
       "cells_prize_non_negative",

@@ -30,7 +30,7 @@ const SOCIAL_PROFILE_STORAGE_KEY = "pixelpix-social-profile";
 
 type Pixel = {
   id: number;
-  color: string;
+  color: string | null;
   revealed: boolean;
   emoji: string | null;
   revealedBy: string | null;
@@ -52,31 +52,10 @@ const EMPTY_SOCIAL_PROFILE: SocialProfile = { network: "instagram", handle: "" }
 
 const chunkCache = new Map<number, Map<number, Pixel>>();
 
-const EMOJI_SET = [
-  "🌟", "🔥", "🌊", "🍀", "⚡", "🎯", "🪐", "🌙", "🦋", "🍁",
-  "🌵", "🐚", "🍄", "🎈", "🧿", "🪁", "🌈", "🍉", "🦖", "🎲",
-];
-
-const CURRENT_USER_NICKNAME = "você";
-
-function seedFor(id: number) {
-  return (id * 2_654_435_761) >>> 0;
-}
-
-function hashColor(id: number) {
-  const seed = seedFor(id);
-  const lightness = 14 + ((seed % 1_000) / 1_000) * 10;
-  return `hsl(220, 8%, ${lightness}%)`;
-}
-
-function pickEmoji(id: number) {
-  return EMOJI_SET[seedFor(id) % EMOJI_SET.length];
-}
-
 function emptyPixel(id: number): Pixel {
   return {
     id,
-    color: hashColor(id),
+    color: null,
     revealed: false,
     emoji: null,
     revealedBy: null,
@@ -110,15 +89,19 @@ function getPixel(id: number) {
 
 function revealPixelInCache(
   id: number,
+  emoji: string,
+  color: string,
+  revealedBy: string | null,
   socialProfile: SocialProfile,
   prizeValueCents: number,
   prizeLabel: string | null,
-  revealedAt = new Date(),
+  revealedAt: Date | null,
 ) {
   const pixel = getPixel(id);
   pixel.revealed = true;
-  pixel.emoji = pickEmoji(id);
-  pixel.revealedBy = CURRENT_USER_NICKNAME;
+  pixel.emoji = emoji;
+  pixel.color = color;
+  pixel.revealedBy = revealedBy;
   pixel.revealedAt = revealedAt;
   pixel.prizeValueCents = prizeValueCents;
   pixel.prizeLabel = prizeLabel;
@@ -130,8 +113,18 @@ function revealPixelInCache(
 function applyCellStatus(
   id: number,
   status: "available" | "reserved" | "paid",
+  visual?: {
+    backgroundColor?: string | null;
+    emoji?: string | null;
+  },
 ) {
   const pixel = getPixel(id);
+  if (visual?.backgroundColor !== undefined) {
+    pixel.color = visual.backgroundColor;
+  }
+  if (visual?.emoji !== undefined) {
+    pixel.emoji = visual.emoji;
+  }
   pixel.status = status;
   pixel.revealed = status === "paid";
   if (!pixel.revealed) {
@@ -243,9 +236,11 @@ type ReceiptPayload = {
   pixelId: number;
   email: string;
   paymentId: string;
-  revealedAt: string;
+  revealedAt: string | null;
   value: number;
   emoji: string;
+  backgroundColor: string;
+  revealedBy: string | null;
   prizeValueCents: number;
   prizeLabel: string | null;
   socialProfile: SocialProfile;
@@ -428,7 +423,10 @@ function PixelSheet({
       const detail = await fetchJson<{
         id: number;
         emoji: string | null;
+        backgroundColor: string;
         status: string;
+        revealedAt: string | null;
+        revealedBy: string | null;
         prizeValueCents?: number;
         prizeLabel?: string | null;
       }>(`/api/cells/${confirmation.cellId}`);
@@ -436,9 +434,11 @@ function PixelSheet({
         pixelId: confirmation.cellId,
         email: normalizedEmail,
         paymentId: "server-confirmed",
-        revealedAt: new Date().toISOString(),
+        revealedAt: detail.revealedAt,
         value: Number(detail.prizeValueCents ?? 0) / 100,
-        emoji: detail.emoji ?? pickEmoji(confirmation.cellId),
+        emoji: detail.emoji ?? "",
+        backgroundColor: detail.backgroundColor,
+        revealedBy: detail.revealedBy,
         prizeValueCents: Number(detail.prizeValueCents ?? 0),
         prizeLabel: detail.prizeLabel ?? null,
         socialProfile: EMPTY_SOCIAL_PROFILE,
@@ -998,11 +998,21 @@ function PixelGrid() {
     if (!containerSize.width || !cellSize || startRow >= endRow) return;
     const from = startRow * columns;
     const to = Math.min(TOTAL_PIXELS - 1, endRow * columns - 1);
-    void fetchJson<Array<{ id: number; status: "available" | "reserved" | "paid" }>>(
-      `/api/cells?from=${from}&to=${to}`,
-    )
+    void fetchJson<
+      Array<{
+        id: number;
+        status: "available" | "reserved" | "paid";
+        emoji: string | null;
+        backgroundColor: string | null;
+      }>
+    >(`/api/cells?from=${from}&to=${to}`)
       .then((cells) => {
-        cells.forEach((cell) => applyCellStatus(cell.id, cell.status));
+        cells.forEach((cell) =>
+          applyCellStatus(cell.id, cell.status, {
+            backgroundColor: cell.backgroundColor,
+            emoji: cell.emoji,
+          }),
+        );
         setRevealVersion((version) => version + 1);
       })
       .catch(() => {
@@ -1016,20 +1026,26 @@ function PixelGrid() {
       id: number;
       status: "available" | "reserved" | "paid";
       emoji?: string | null;
+      backgroundColor?: string | null;
       revealedBy?: string | null;
+      revealedAt?: string | null;
       prizeValueCents?: number;
       prizeLabel?: string | null;
       signature?: { platform: SignatureNetwork; handle: string } | null;
     }>(`/api/cells/${selectedId}`)
       .then((detail) => {
         const pixel = getPixel(selectedId);
-        applyCellStatus(selectedId, detail.status);
+        applyCellStatus(selectedId, detail.status, {
+          backgroundColor: detail.backgroundColor,
+          emoji: detail.emoji,
+        });
         if (detail.status === "paid") {
-          pixel.emoji = detail.emoji ?? null;
           pixel.revealedBy = detail.revealedBy ?? null;
           pixel.prizeValueCents = Number(detail.prizeValueCents ?? 0);
           pixel.prizeLabel = detail.prizeLabel ?? null;
-          pixel.revealedAt = pixel.revealedAt ?? new Date();
+          pixel.revealedAt = detail.revealedAt
+            ? new Date(detail.revealedAt)
+            : null;
           pixel.socialProfile = detail.signature
             ? { network: detail.signature.platform, handle: detail.signature.handle }
             : EMPTY_SOCIAL_PROFILE;
@@ -1055,10 +1071,13 @@ function PixelGrid() {
   const handleReveal = useCallback(async (receipt: ReceiptPayload) => {
       revealPixelInCache(
         receipt.pixelId,
+        receipt.emoji,
+        receipt.backgroundColor,
+        receipt.revealedBy,
         receipt.socialProfile,
         receipt.prizeValueCents,
         receipt.prizeLabel,
-        new Date(receipt.revealedAt),
+        receipt.revealedAt ? new Date(receipt.revealedAt) : null,
       );
       setRevealVersion((version) => version + 1);
     }, []);

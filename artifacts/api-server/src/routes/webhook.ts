@@ -350,12 +350,13 @@ export async function processPaymentConfirmed(input: {
     );
 
     const prize = await calculatePrize(client, input.cellId);
+    const cellEmoji = prize.tierId === null ? randomEmoji() : "💰";
     await client.query(
       `UPDATE cells
-       SET status = 'paid', prize_value_cents = $1, emoji = $2,
-           revealed_by = 'você'
+        SET status = 'paid', prize_value_cents = $1, emoji = $2,
+            revealed_by = 'você', revealed_at = NOW()
        WHERE id = $3`,
-      [prize.releasedValueCents, randomEmoji(), input.cellId],
+      [prize.releasedValueCents, cellEmoji, input.cellId],
     );
     if (prize.releasedValueCents > 0) {
       await client.query(

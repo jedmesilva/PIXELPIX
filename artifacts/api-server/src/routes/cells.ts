@@ -8,6 +8,7 @@ export const TOTAL_CELLS = 1_000_000;
 export const RESERVATION_TTL_MS = 5 * 60 * 1000;
 export const MIN_PRICE_CENTS = 100;
 export const MAX_PRICE_CENTS = 100_000;
+const TOTAL_CELL_SEED = 1_000_000;
 
 const ACTIVE_LIMIT = 5;
 const ATTEMPT_LIMIT = 12;
@@ -43,11 +44,35 @@ function numericId(value: unknown) {
 }
 
 function publicStatus(status: string): "available" | "reserved" | "paid" {
+  if (status === "available") return "available";
   if (status === "paid") return "paid";
   if (status === "reserved" || status === "paid_pending_prize") {
     return "reserved";
   }
   return "available";
+}
+
+export async function ensureCellRecords() {
+  await pool.query(`
+    INSERT INTO cells (id, status, background_color)
+    SELECT
+      cell_id,
+      'available',
+      'hsl(220, 8%, ' ||
+        to_char(
+          14 + (
+            mod(
+              mod(cell_id::bigint * 2654435761, 4294967296),
+              1000
+            ) / 100.0
+          ),
+          'FM990.###'
+        ) ||
+      '%)'
+    FROM generate_series(0, ${TOTAL_CELL_SEED - 1}) AS cell_id
+    ON CONFLICT (id) DO UPDATE
+      SET background_color = COALESCE(cells.background_color, EXCLUDED.background_color)
+  `);
 }
 
 function clientIp(request: Request) {
@@ -254,14 +279,27 @@ router.get("/cells", async (request, response) => {
   }
 
   const rows = await pool.query(
-    `SELECT id, status FROM cells WHERE id BETWEEN $1 AND $2`,
+    `SELECT id, status, emoji, background_color
+       FROM cells
+      WHERE id BETWEEN $1 AND $2`,
     [from, to],
   );
   const existing = new Map(
-    rows.rows.map((row: { id: number; status: string }) => [
-      row.id,
-      publicStatus(row.status),
-    ]),
+    rows.rows.map(
+      (row: {
+        id: number;
+        status: string;
+        emoji: string | null;
+        background_color: string;
+      }) => [
+        row.id,
+        {
+          status: publicStatus(row.status),
+          emoji: row.emoji,
+          backgroundColor: row.background_color,
+        },
+      ],
+    ),
   );
   response.setHeader(
     "Cache-Control",
@@ -270,7 +308,14 @@ router.get("/cells", async (request, response) => {
   response.json(
     Array.from({ length: to - from + 1 }, (_, index) => {
       const id = from + index;
-      return { id, status: existing.get(id) ?? "available" };
+      return {
+        id,
+        ...(existing.get(id) ?? {
+          status: "available" as const,
+          emoji: null,
+          backgroundColor: null,
+        }),
+      };
     }),
   );
 });
@@ -282,7 +327,8 @@ router.get("/cells/:id", async (request, response) => {
     return;
   }
   const result = await pool.query(
-    `SELECT c.id, c.status, c.emoji, c.revealed_by, c.prize_value_cents,
+    `SELECT c.id, c.status, c.emoji, c.background_color, c.revealed_by,
+            c.revealed_at, c.prize_value_cents,
             s.platform, s.handle, pp.label AS prize_label
        FROM cells c
        LEFT JOIN cell_signatures s
@@ -294,17 +340,29 @@ router.get("/cells/:id", async (request, response) => {
   );
   const cell = result.rows[0];
   if (!cell || cell.status === "expired") {
-    response.json({ id, status: "available" });
+    response.json({
+      id,
+      status: "available",
+      emoji: null,
+      backgroundColor: cell?.background_color ?? null,
+    });
     return;
   }
   if (cell.status !== "paid") {
-    response.json({ id, status: "reserved" });
+    response.json({
+      id,
+      status: publicStatus(cell.status),
+      emoji: null,
+      backgroundColor: cell.background_color,
+    });
     return;
   }
   response.json({
     id,
     status: cell.status,
     emoji: cell.emoji,
+    backgroundColor: cell.background_color,
+    revealedAt: cell.revealed_at,
     prizeValueCents: Number(cell.prize_value_cents ?? 0),
     prizeLabel: cell.prize_label ?? null,
     revealedBy: cell.revealed_by,
@@ -357,7 +415,7 @@ router.post("/cells/reserve", async (request, response) => {
              emoji = NULL,
              revealed_by = NULL,
              certificate_sent_at = NULL
-       WHERE cells.status = 'expired'
+        WHERE cells.status IN ('available', 'expired')
        RETURNING id, reservation_token`,
       [id],
     );

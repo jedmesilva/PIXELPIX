@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { expireReservations } from "./routes/cells";
+import { ensureCellRecords, expireReservations } from "./routes/cells";
 import { processPendingCertificates } from "./routes/webhook";
 import { pool } from "@workspace/db";
 
@@ -19,6 +19,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function start() {
+  await ensureCellRecords();
   await pool.query(`
     INSERT INTO payout_safety_config (id, safety_margin_bps, updated_by)
     VALUES (1, 2000, 'setup-inicial')
