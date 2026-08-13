@@ -66,9 +66,7 @@ function seedFor(id: number) {
 function hashColor(id: number) {
   const seed = seedFor(id);
   const lightness = 14 + ((seed % 1_000) / 1_000) * 10;
-  const hueShift = id % 7 === 0 ? 210 : 220;
-  const saturation = id % 13 === 0 ? 55 : 8;
-  return `hsl(${hueShift}, ${saturation}%, ${lightness}%)`;
+  return `hsl(220, 8%, ${lightness}%)`;
 }
 
 function pickEmoji(id: number) {
