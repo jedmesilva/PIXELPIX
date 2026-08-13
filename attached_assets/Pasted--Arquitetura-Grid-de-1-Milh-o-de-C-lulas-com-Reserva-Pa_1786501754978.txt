@@ -1,0 +1,2040 @@
+# Arquitetura: Grid de 1 Milhão de Células com Reserva, Pagamento e Prêmios
+
+> **v2** — incorpora três correções de segurança: rate limit reforçado com `device_id`
+> e escalonamento para CAPTCHA (seção 3.1), proibição explícita de token em URL
+> (seção 6), e idempotência na criação de cobrança Pix (seção 4.3.1).
+
+> **v3** — substitui o modelo de sorteio independente (`prizes` com `weight`/`stock`,
+> seção 8.2 da v2) por um modelo de **solvência garantida por construção**: quais
+> células são premiadas é decidido e commitado (hash público) antes da primeira venda
+> (`winning_positions`), e o valor pago por cada uma é calculado dinamicamente no
+> momento do pagamento, nunca excedendo o caixa disponível (`prize_pool`,
+> `prize_calculation_log`). Isso elimina dois riscos do modelo anterior: (a) prêmio
+> sorteado sem caixa suficiente para cobrir, e (b) todas as células serem vendidas sem
+> que o total de prêmios prometido seja de fato distribuído.
+
+> **v4** — estende o modelo de solvência da v3 para suportar **múltiplas denominações
+> de prêmio** (ex: R$10, R$100, R$1.000, R$10.000, R$50.000) em vez de um pool único e
+> homogêneo. `winning_positions` ganha `tier_id`; `prize_pool` deixa de ser singleton e
+> vira uma linha por tier, cada uma com seu próprio saldo e solvência calculada de
+> forma independente — um tier ficar sem caixa suficiente não afeta os demais.
+
+> **v5** — adiciona uma **margem de segurança de liquidez**: nenhum pagamento pode
+> consumir mais que um percentual configurável do caixa disponível de uma vez (padrão
+> 20%), mesmo que a cota justa do tier permita mais. Isso evita que um único prêmio
+> "esvazie" o caixa e deixe os pagamentos seguintes (de qualquer tier) sem margem para
+> operar até o caixa se recompor. Também desacopla o teto do pool de prêmios
+> (`MAX_POOL_VALUE_CENTS`, R$1.000.000 fixo) do preço por célula, já que a
+> precificação passou a ser progressiva (célula de R$1 até um teto de R$1.000) — o
+> caixa real arrecadado passou a ser muito maior e incerto em relação ao pool de
+> prêmios, e os dois são agora decisões de negócio independentes.
+
+Este documento explica a lógica de estrutura para um grid de células (estilo "pixel war")
+onde usuários revelam células bloqueadas, passam por um checkout de pagamento, e podem
+ganhar prêmios sorteados pelo servidor.
+
+---
+
+## 1. Identificação da célula
+
+Cada célula tem um **id numérico único e estável**, de `0` a `999.999`. Esse id nunca
+muda, independente de como o grid é exibido na tela.
+
+- **Não é necessário numerar visualmente** as células para o usuário — o número é
+  apenas um dado interno que trafega entre front e back.
+- Em telas responsivas, o número de colunas visíveis (`columns`) pode variar (ex: 20
+  colunas no mobile, 45 no desktop). Isso é só um detalhe de **layout/renderização**.
+- O `id` lógico da célula é calculado a partir de `row` e `col` **apenas para saber onde
+  desenhar** o quadradinho na tela:
+
+```js
+const id = row * columns + col; // usado só para renderizar/posicionar
+```
+
+- No banco de dados, a chave de verdade é o **`id` único**, não `row`/`col` — porque
+  `row`/`col` dependem de `columns`, que muda por tela. `id` não muda nunca.
+
+```sql
+CREATE TABLE cells (
+  id INT PRIMARY KEY,   -- 0 a 999999, estável em qualquer resolução de tela
+  ...
+);
+```
+
+### 1.1 ⚠️ Bug identificado na implementação atual (`PixelGrid.jsx`)
+
+O protótipo atual **viola o princípio acima**. Hoje o `id` é calculado assim:
+
+```js
+// implementação atual — INCORRETA
+const cols = Math.max(1, Math.floor(width / MIN_CELL_PX)); // varia por tela
+...
+const id = row * columns + col; // usa "columns" que muda por tela
+```
+
+`columns` é derivado da largura do viewport (`width / MIN_CELL_PX`), então o número de
+colunas visíveis muda entre dispositivos — por exemplo, 20 colunas no mobile, 45 no
+desktop. Como o `id` é calculado com esse valor variável, **a mesma célula física pode
+receber números diferentes dependendo do tamanho da tela** em que é exibida ou clicada.
+
+Isso é usado tanto para posicionar a célula na tela (`top: row * cellSize, left: col *
+cellSize`) quanto para gerar o número exibido no modal de detalhe:
+
+```jsx
+<span style={styles.sheetEyebrow}>
+  Pixel #{detail.id.toLocaleString("pt-BR")}
+</span>
+```
+
+**Por que isso é um problema real, não só teórico:** se um usuário reserva uma célula no
+desktop e depois abre o mesmo link no celular (ou só redimensiona a janela), o id
+mostrado — e potencialmente enviado numa reserva — pode não corresponder à mesma célula
+física. Isso quebra a premissa de id estável que sustenta toda a lógica de reserva,
+token e webhook descrita nas seções 3 e 4.
+
+#### Correção necessária
+
+Separar **duas geometrias diferentes**, que hoje estão fundidas numa só variável:
+
+1. **Geometria visual** (`visualColumns`) — quantas colunas cabem na tela agora. Pode e
+   deve continuar variando por dispositivo; é só o que decide onde desenhar cada célula
+   na tela (`top`/`left`). Não deve influenciar o `id`.
+
+2. **Geometria lógica** (`LOGICAL_COLUMNS`) — uma constante fixa, que nunca muda,
+   independente de tela. É ela que deve ser usada para calcular o `id` da célula.
+
+```js
+// proposta — CORRETA
+const LOGICAL_COLUMNS = 1000; // fixo, compartilhado entre front e back, nunca muda
+
+// geometria visual: só decide layout/posicionamento na tela atual
+const visualColumns = Math.max(1, Math.floor(width / MIN_CELL_PX));
+
+// geometria lógica: decide o id — independente da tela
+const id = logicalRow * LOGICAL_COLUMNS + logicalCol;
+```
+
+Com `LOGICAL_COLUMNS` fixo, a célula "linha 6, coluna 30" é sempre `id = 6030`,
+não importa se o dispositivo mostra 20, 45 ou 100 colunas por vez na tela. O `visualColumns`
+continua livre para variar por viewport — isso não afeta a UX responsiva já existente,
+afeta só o cálculo do identificador.
+
+#### Onde essa fórmula roda: front, não back
+
+O cálculo `id = row × LOGICAL_COLUMNS + col` acontece **no front**, no momento do
+clique/reserva — não no backend. O front calcula o `id` usando a constante fixa e o
+envia pronto na requisição de reserva (seção 4.2):
+
+```js
+// front — calcula o id e envia pronto
+const id = logicalRow * LOGICAL_COLUMNS + logicalCol;
+POST /api/cells/reserve { id }
+```
+
+O **back nunca recalcula** `row`/`col`/`columns` a partir de nada — ele recebe o `id`
+como um valor opaco e o usa diretamente como chave primária (`INSERT ... WHERE id =
+$1`). A responsabilidade do back é ser a autoridade sobre **disponibilidade** daquele
+id (se já está reservado, pago, expirado), nunca sobre **qual é o id correto** de uma
+célula — isso é definido inteiramente pela fórmula fixa do lado do front.
+
+Essa distinção importa porque `LOGICAL_COLUMNS` precisa ser a mesma constante nos dois
+lados (front e, se algum dia o back também precisar derivar `row`/`col` a partir de um
+`id` — por exemplo, para preencher um mapa visual de estatísticas —, ele deve usar o
+valor inverso da mesma constante, nunca uma geometria diferente).
+
+**Escopo da correção:** como ainda não existe backend nem reservas gravadas — só o
+protótipo de front (`PixelGrid.jsx`) —, essa é uma correção simples de aplicar agora,
+sem necessidade de migração de dados. O ideal é corrigir antes de implementar o back
+(seções 3 e 4), para que a API já nasça usando a fórmula de `id` correta e estável.
+
+---
+
+## 2. Por que não pré-popular 1 milhão de linhas
+
+Como os prêmios são decididos **no momento do clique** (não existem de antemão), não há
+necessidade de já ter 1 milhão de registros no banco desde o início.
+
+- **Abordagem esparsa (recomendada neste caso):** o registro só é criado quando a célula
+  é clicada/reservada. Economiza espaço e evita 1 milhão de inserts de setup.
+- **Pré-popular faria sentido** apenas se o conteúdo de cada célula já fosse definido
+  antes de qualquer clique (ex: um mapa fixo gerado no início). Não é o caso aqui.
+
+### 2.1 Consequência: como o front sabe o status de uma célula
+
+Como a tabela é esparsa, **ausência de linha = célula disponível**. O endpoint que
+alimenta o grid virtualizado precisa refletir isso explicitamente, e não pode assumir
+que "não retornou nada" é um erro:
+
+```js
+// GET /api/cells?from=1000&to=1500
+app.get('/api/cells', async (req, res) => {
+  const { from, to } = req.query;
+
+  const rows = await db.query(
+    `SELECT id, status FROM cells WHERE id BETWEEN $1 AND $2`,
+    [from, to]
+  );
+
+  const existing = new Map(rows.rows.map(r => [r.id, r.status]));
+
+  // preenche o range inteiro — ids sem linha no banco = 'available'
+  const result = [];
+  for (let id = from; id <= to; id++) {
+    result.push({ id, status: existing.get(id) ?? 'available' });
+  }
+
+  res.json(result);
+});
+```
+
+- O front pede por **range de ids** (equivalente ao "chunk" que o grid virtualizado
+  já busca por scroll), nunca célula por célula.
+- Células com status `expired` devem ser tratadas como `available` na resposta ao
+  front — o usuário não precisa saber que alguém tentou e não pagou antes.
+- Esse endpoint é somente leitura e pode (e deve) ser cacheado agressivamente por
+  poucos segundos, já que a maior parte do grid muda pouco entre polls.
+
+---
+
+## 3. O problema da concorrência (race condition)
+
+Se dois usuários clicarem na mesma célula quase ao mesmo tempo, é preciso garantir que
+**só um consiga reservar/revelar** aquela célula.
+
+### ❌ O que NÃO funciona
+
+```js
+// Tem uma brecha: entre o SELECT e o INSERT, outro request pode passar
+const existe = await db.query('SELECT * FROM cells WHERE id = ?', [id]);
+if (!existe) {
+  await db.query('INSERT INTO cells (id, user_id) VALUES (?, ?)', [id, userId]);
+}
+```
+
+Dois requests podem executar o `SELECT` simultaneamente, ambos verem "não existe", e
+ambos tentarem o `INSERT`.
+
+### ✅ O que funciona: `UNIQUE` + `ON CONFLICT DO NOTHING`
+
+A garantia precisa vir do **banco de dados**, não da lógica da aplicação, porque o banco
+processa a constraint `UNIQUE` de forma atômica — não existe zona cinzenta, mesmo que
+dois requests cheguem no mesmo milissegundo.
+
+```sql
+INSERT INTO cells (id, user_id, status)
+VALUES ($1, $2, 'reserved')
+ON CONFLICT (id) DO NOTHING
+RETURNING id;
+```
+
+- Se o `INSERT` **retornar uma linha** → esse request "ganhou a corrida".
+- Se **não retornar nada** → outra pessoa já reservou essa célula (não importa se foi há
+  1 hora ou 0,3ms atrás).
+
+### 3.1 Abuso do endpoint de reserva
+
+Reservar uma célula é uma ação "grátis" do ponto de vista do usuário — não exige
+pagamento nem e-mail ainda. Isso abre espaço para abuso: um script pode reservar
+continuamente as células mais desejáveis (ex: as do centro do grid) e deixá-las expirar
+de propósito, travando-as por 5 minutos repetidamente e impedindo outros usuários de
+sequer tentar.
+
+⚠️ **Correção:** rate limit só por IP é insuficiente sozinho. Um atacante com proxy
+residencial rotativo ou VPN troca de IP a cada request e contorna qualquer limite
+baseado só nesse sinal — na prática, cada tentativa "nova" chega como se fosse um
+usuário diferente. IP continua sendo a primeira linha de defesa (é gratuito, já vem em
+toda requisição), mas precisa ser combinado com um segundo sinal mais caro de forjar, e
+com um mecanismo de escalonamento quando o padrão sugerir abuso coordenado.
+
+- **Sinal primário — IP:**
+  - Rate limit por IP no total de reservas ativas simultâneas (teto curto, tipo 3–5).
+  - Rate limit por IP no total de tentativas por minuto, independente de sucesso —
+    evita varredura sequencial de ids.
+- **Sinal secundário — `device_id` (fingerprint de front, ex: FingerprintJS):**
+  - Capturado no momento do clique em "Revelar" e enviado junto com o `POST
+    /api/cells/reserve` (não só depois, no checkout — ver seção 8.4).
+  - Aplicar o mesmo teto de reservas ativas simultâneas **por `device_id`**, além do
+    teto por IP. Um `device_id` que reaparece atrás de IPs diferentes num curto
+    intervalo é o padrão típico de VPN rotativa, e é esse cruzamento que o rate limit
+    por IP sozinho não enxerga.
+  - `device_id` é um sinal probabilístico (pode ser resetado, spoofado com esforço
+    maior) — não substitui o IP, soma-se a ele. A combinação dos dois eleva o custo do
+    ataque sem exigir conta de usuário.
+- **Escalonamento — CAPTCHA:**
+  - Quando o mesmo `device_id` ou faixa de IPs ultrapassar os tetos acima repetidas
+    vezes numa janela curta (ex: 3 rate-limits acionados em 10 minutos), o próximo
+    `POST /api/cells/reserve` desse `device_id`/IP passa a exigir um desafio CAPTCHA
+    resolvido antes de a reserva ser aceita.
+  - Isso evita exigir CAPTCHA de todo mundo (ruim para conversão) e reserva o atrito
+    só para o padrão que já demonstrou comportamento de abuso.
+
+⚠️ **Correção:** IP e `device_id` cobrem o caso de um mesmo sinal se repetir. Mas um
+atacante com proxies residenciais rotativos **e** perfis de navegador descartáveis
+(incógnito, containers, reset de fingerprint) pode trocar os dois juntos a cada
+request — cada tentativa passa como "usuário novo" nos dois contadores
+simultaneamente, porque nenhum dos dois é reutilizado o bastante pra acionar o
+próprio limite individual. Rate limit por contador não pega esse padrão; é preciso
+uma camada de detecção que olhe o **comportamento agregado**, não sinais isolados:
+
+- **Detecção por padrão comportamental** (job assíncrono ou regra em stream, não
+  bloqueia o request em si):
+  - Volume de reservas por faixa de IP/ASN (subnet ou provedor de rede) num período
+    curto, mesmo que cada IP individual dentro da faixa fique abaixo do teto —
+    proxies residenciais tendem a se agrupar em blocos de ASN conhecidos.
+  - Velocidade de reserva incompatível com uso humano (ex: múltiplas células
+    reservadas em menos de 1–2 segundos entre cliques).
+  - Concentração anormal de reservas nas mesmas células "desejáveis" (ex: região
+    central do grid) vindas de `device_id`s nunca vistos antes, dentro de uma janela
+    curta — esse é o padrão específico de quem está tentando travar posições
+    valiosas, não só reservar ao acaso.
+  - Quando esse job identificar um cluster suspeito, a ação recomendada é a mesma
+    escalada de CAPTCHA acima, mas aplicada à faixa de IP/ASN inteira, não só a um
+    IP ou `device_id` isolado — é a única forma de responder a rotação coordenada
+    dos dois sinais ao mesmo tempo.
+  - Esse tipo de detecção normalmente já vem embutido em serviços de proteção de
+    borda (ex: Cloudflare Bot Management, AWS WAF com regras gerenciadas) — vale
+    avaliar isso antes de construir a lógica de clustering do zero.
+- Isso é defesa de infraestrutura (proxy/API gateway ou middleware), não muda a lógica
+  de concorrência do banco descrita acima — as camadas são complementares.
+
+---
+
+## 4. Sem autenticação: token de reserva
+
+O sistema não tem login/conta de usuário. O usuário só informa um **e-mail** durante o
+checkout, e é para esse e-mail que um certificado é enviado após o pagamento confirmado.
+
+Isso muda como identificamos "de quem" é uma reserva: em vez de um `user_id` vinculado a
+uma conta, cada reserva recebe um **token aleatório** (UUID), gerado pelo servidor no
+momento do clique. Esse token não é autenticação de conta — é uma chave temporária que
+prova que uma requisição posterior (informar e-mail, confirmar pagamento) pertence à
+mesma reserva que originou o clique.
+
+Sem esse token, qualquer pessoa poderia, em teoria, chamar a API tentando confirmar ou
+associar um e-mail a uma célula que não foi ela quem reservou.
+
+### 4.1 Estrutura da tabela
+
+```sql
+CREATE TABLE cells (
+  id INT PRIMARY KEY,
+  reservation_token UUID NOT NULL DEFAULT gen_random_uuid(),
+  email TEXT,                              -- preenchido na etapa de e-mail
+  status TEXT NOT NULL DEFAULT 'reserved',
+  -- reserved | paid_pending_prize | paid | expired
+  reserved_at TIMESTAMP DEFAULT NOW(),
+  payment_id TEXT UNIQUE,                  -- garante idempotência do webhook
+  prize_value_cents INT NOT NULL DEFAULT 0, -- valor REAL liberado ao usuário, calculado
+                                             -- no momento do pagamento (seção 8.2) — não
+                                             -- é um valor "de catálogo" fixo
+  certificate_sent_at TIMESTAMP
+);
+```
+
+> O status `paid_pending_prize` foi adicionado na seção 4.4 — é o que resolve o
+> problema de não-atomicidade descrito abaixo.
+>
+> **Mudança na v3:** a coluna `prize_id` (referência a um catálogo `prizes` com
+> `weight`/`stock`) foi substituída por `prize_value_cents`. O motivo é explicado na
+> seção 8.2 — o valor do prêmio deixou de ser sorteado de um catálogo fixo e passou a
+> ser calculado dinamicamente, então não há mais um "prêmio de catálogo" para
+> referenciar por id.
+
+### 4.2 Passo 1 — Clique: tenta reservar
+
+⚠️ **Correção:** a versão abaixo substitui a query original. A versão original usava
+apenas `ON CONFLICT (id) DO NOTHING`, que cobre só o caso de célula nunca tocada — para
+uma célula **expirada**, já existe uma linha com aquele `id`, então `DO NOTHING` não
+faz nada e o endpoint erroneamente responde "célula indisponível" para uma célula que na
+verdade podia (e devia) ser reaberta. A query correta trata os dois casos numa só
+chamada, sempre:
+
+```js
+const result = await db.query(
+  `INSERT INTO cells (id, status)
+   VALUES ($1, 'reserved')
+   ON CONFLICT (id) DO UPDATE
+     SET reservation_token = gen_random_uuid(),
+         email = NULL,
+         status = 'reserved',
+         reserved_at = NOW()
+   WHERE cells.status = 'expired'
+   RETURNING id, reservation_token`,
+  [id]
+);
+
+if (result.rows.length === 0) {
+  return { error: 'Célula já reservada ou revelada' };
+}
+
+const { reservation_token } = result.rows[0];
+return { cellId: id, token: reservation_token };
+```
+
+- Se a célula **nunca existiu** → o `INSERT` puro cria a linha, retorna normalmente.
+- Se a célula está **`expired`** → o `ON CONFLICT DO UPDATE ... WHERE status = 'expired'`
+  reabre com um **novo** `reservation_token` (invalidando qualquer token antigo que o
+  usuário anterior, que não pagou, ainda tivesse guardado), e retorna normalmente.
+- Se a célula está **`reserved`**, **`paid_pending_prize`** ou **`paid`** → a cláusula
+  `WHERE cells.status = 'expired'` não bate, o `UPDATE` não altera nada, e o `RETURNING`
+  não devolve linha — o endpoint responde "célula já reservada ou revelada", como
+  esperado.
+
+A partir do momento em que a linha é criada ou reaberta, a constraint `UNIQUE` do `id`
+impede que qualquer outra pessoa reserve essa mesma célula — a disputa já foi resolvida.
+O `token` retornado é guardado pelo front (em memória / estado da aplicação) e enviado
+em toda requisição seguinte relacionada a essa reserva — **sempre no corpo da
+requisição, nunca em URL** (ver seção 6).
+
+> A antiga seção "4.6 Reabertura de célula expirada" foi incorporada aqui — não existe
+> mais uma query separada para reabertura; é a mesma chamada usada em todo clique de
+> "Revelar", célula nova ou expirada.
+
+### 4.3 Passo 2 — Usuário informa o e-mail
+
+```js
+const result = await db.query(
+  `UPDATE cells SET email = $1
+   WHERE id = $2 AND reservation_token = $3 AND status = 'reserved'
+   RETURNING id`,
+  [email, cellId, token]
+);
+
+if (result.rows.length === 0) {
+  return { error: 'Reserva inválida, expirada ou token incorreto' };
+}
+
+const checkoutUrl = await criarCheckout(cellId, token);
+return { checkoutUrl };
+```
+
+O `WHERE ... AND reservation_token = $3` garante que só quem tem o token certo (quem
+realmente clicou naquela célula) consegue associar um e-mail a ela.
+
+#### 4.3.1 Como o `token` chega de volta no webhook — e idempotência da cobrança
+
+O webhook (seção 4.4) usa `req.body.token` como se ele viesse pronto no payload — mas
+isso só funciona se o token for **embutido na cobrança Pix no momento da criação**, e o
+provedor o devolver de volta no payload do webhook. Isso não acontece sozinho; precisa
+ser configurado explicitamente em `criarCheckout`.
+
+⚠️ **Correção:** a versão original de `criarCheckout` criava uma cobrança nova a cada
+chamada, sem checar se já existia uma em aberto para aquela reserva. Como o endpoint
+`POST /api/cells/email` (seção 4.3) não muda o `status` da célula ao gravar o e-mail —
+ele continua `reserved` — nada impedia uma segunda chamada (refresh da página, duplo
+clique no botão, retry de rede) de cair de novo em `criarCheckout(cellId, token)` e
+gerar uma **segunda cobrança Pix** para a mesma célula. Isso confunde o usuário (dois
+QR codes/links diferentes para a mesma reserva) e abre espaço para o caso em que ele
+paga os dois por engano. A versão corrigida verifica primeiro se já existe uma cobrança
+`pending` para aquele `cellId` + `token`, e reaproveita o checkout existente em vez de
+criar outro:
+
+```js
+async function criarCheckout(cellId, token) {
+  // idempotência: se já existe uma cobrança pendente para essa reserva,
+  // reaproveita em vez de criar uma nova
+  const existente = await db.query(
+    `SELECT provider_payment_id, checkout_url
+     FROM payments
+     WHERE cell_id = $1 AND status = 'pending'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [cellId]
+  );
+
+  if (existente.rows.length > 0) {
+    return existente.rows[0].checkout_url;
+  }
+
+  const cobranca = await provedorPix.criarCobranca({
+    valor: PRECO_CELULA,
+    // campo de referência externa — cada provedor tem o seu nome pra isso
+    // (ex: "externalReference" no Asaas, "metadata" no Stripe)
+    referenciaExterna: JSON.stringify({ cellId, token }),
+  });
+
+  await db.query(
+    `INSERT INTO payments (cell_id, provider_payment_id, amount_cents, status, checkout_url)
+     VALUES ($1, $2, $3, 'pending', $4)`,
+    [cellId, cobranca.paymentId, PRECO_CELULA, cobranca.checkoutUrl]
+  );
+
+  return cobranca.checkoutUrl;
+}
+```
+
+- A checagem é por `cell_id` + `status = 'pending'`, não por `token` — o token já foi
+  validado na etapa anterior (`UPDATE ... WHERE reservation_token = $3`), então
+  qualquer cobrança pendente associada àquele `cell_id` nesse ponto do fluxo pertence
+  legitimamente à mesma reserva.
+- Isso exige a coluna `checkout_url` na tabela `payments` (adicionada na seção 8.4)
+  para poder devolver a mesma URL sem chamar o provedor de novo.
+- Se a cobrança pendente já tiver expirado do lado do provedor (prazo próprio do Pix,
+  geralmente mais curto que os 5 minutos de reserva), o provedor normalmente rejeita o
+  pagamento no ato — o usuário simplesmente cai no fluxo de reserva expirada da seção
+  4.5 no próximo tentativa de clique. Não é necessário tratamento adicional aqui.
+
+No webhook, o `cellId` e o `token` são extraídos dessa referência externa devolvida
+pelo provedor — não de um campo arbitrário que o provedor "por acaso" tenha:
+
+```js
+app.post('/webhook/payment-confirmed', async (req, res) => {
+  // ...validação de assinatura...
+
+  const { cellId, token } = JSON.parse(req.body.referenciaExterna);
+  const paymentId = req.body.paymentId;
+  // ...segue igual à seção 4.4.3...
+});
+```
+
+Vale checar a documentação do provedor Pix escolhido (Asaas, por exemplo) para
+confirmar o nome exato do campo de referência externa e o formato em que ele é
+devolvido no payload do webhook — isso varia por provedor e precisa ser validado antes
+de implementar.
+
+### 4.4 Passo 3 — Pagamento confirmado via webhook
+
+O pagamento **nunca deve ser confirmado pelo retorno direto do front** (ex: redirecionamento
+de sucesso) — sempre por um webhook do provedor de pagamento, que é a fonte confiável.
+
+#### 4.4.1 Validar a assinatura antes de processar qualquer coisa
+
+O `req.body` de um endpoint público não é confiável só porque a URL é
+`/webhook/payment-confirmed`. Sem verificar a assinatura HMAC que o provedor envia,
+qualquer pessoa pode forjar essa chamada e "confirmar" um pagamento que nunca aconteceu.
+
+```js
+const crypto = require('crypto');
+
+function verificarAssinaturaWebhook(rawBody, signatureHeader, secret) {
+  const esperado = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('hex');
+
+  // comparação em tempo constante — evita timing attack
+  return crypto.timingSafeEqual(
+    Buffer.from(esperado),
+    Buffer.from(signatureHeader || '')
+  );
+}
+```
+
+O handler deve rejeitar a requisição (`401`) **antes** de tocar no banco se a assinatura
+não bater. A maioria dos provedores (Stripe, Asaas, etc.) documenta o header específico
+e o formato exato da assinatura — vale conferir a doc do provedor escolhido em vez de
+assumir um formato genérico.
+
+#### 4.4.2 O problema: múltiplas escritas não-atômicas
+
+A versão original do fluxo fazia isso em passos soltos:
+
+```
+UPDATE status = 'paid'
+   ↓
+sortearPremio()
+   ↓
+UPDATE prize_id
+   ↓
+enviarCertificadoPorEmail()
+   ↓
+UPDATE certificate_sent_at
+```
+
+Se o processo cair (crash, deploy, timeout) entre o primeiro `UPDATE` e o resto, a
+célula fica presa em `paid` **sem prêmio sorteado e sem certificado enviado** — e como
+o webhook do provedor normalmente faz retry automático até receber `200 OK`, esse retry
+bateria de novo no endpoint. Mas a query original filtra por `WHERE status = 'reserved'`,
+que não é mais verdade depois do primeiro `UPDATE` — então o retry **não reprocessa
+nada**, e a reserva fica travada permanentemente nesse estado intermediário quebrado.
+
+#### 4.4.3 Solução: transação + estado intermediário + idempotência
+
+⚠️ **Correção adicional:** a versão original filtrava só por `status = 'reserved'`. Isso
+tem um buraco: se o pagamento for confirmado bem na borda dos 5 minutos, o job de
+expiração (seção 4.5) pode rodar **antes** do webhook chegar, virando o status para
+`expired`. Nesse caso, o `UPDATE ... WHERE status = 'reserved'` não encontra a linha, e
+a versão original trataria isso como "já processado" — mas na verdade **o usuário pagou
+de verdade** e a célula foi liberada por engano. A versão abaixo distingue esse caso de
+uma duplicata legítima:
+
+```js
+app.post('/webhook/payment-confirmed', async (req, res) => {
+  const rawBody = req.rawBody; // configurar o middleware pra preservar o body cru
+  const assinaturaOk = verificarAssinaturaWebhook(
+    rawBody,
+    req.headers['x-webhook-signature'],
+    process.env.WEBHOOK_SECRET
+  );
+
+  if (!assinaturaOk) {
+    return res.status(401).send('Assinatura inválida');
+  }
+
+  const { cellId, paymentId, token } = req.body;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // aceita tanto 'reserved' quanto 'expired': se o token ainda bate, ninguém
+    // reabriu a célula depois da expiração, então o pagamento ainda é válido
+    const marcado = await client.query(
+      `UPDATE cells
+       SET status = 'paid_pending_prize', payment_id = $1
+       WHERE id = $2 AND reservation_token = $3
+         AND status IN ('reserved', 'expired')
+       RETURNING email`,
+      [paymentId, cellId, token]
+    );
+
+    if (marcado.rows.length === 0) {
+      // não deu match — precisa distinguir duplicata (ok) de conflito real (não ok)
+      const atual = await client.query(
+        `SELECT payment_id FROM cells WHERE id = $1`,
+        [cellId]
+      );
+
+      if (atual.rows[0]?.payment_id === paymentId) {
+        // retry legítimo do provedor pra um pagamento já processado — idempotente
+        await client.query('ROLLBACK');
+        return res.status(200).send('OK');
+      }
+
+      // token não bate: a célula expirou E já foi reaberta/reservada por outra
+      // pessoa antes desse webhook chegar. Não dá pra completar a reserva original
+      // automaticamente sem risco de sobrescrever a reserva de quem reabriu —
+      // fica registrado para revisão manual (provável reembolso).
+      await client.query(
+        `INSERT INTO webhook_events
+           (payment_id, cell_id, payload, signature_valid, result)
+         VALUES ($1, $2, $3, true, 'stale_token_conflict')`,
+        [paymentId, cellId, JSON.stringify(req.body)]
+      );
+      await client.query('COMMIT');
+      await alertarTimeDeOperacoesComLimite({ cellId, paymentId }); // fila de revisão manual, com limite
+
+      return res.status(200).send('OK'); // aceita o webhook, mas não completa a reserva
+    }
+
+    const email = marcado.rows[0].email;
+
+    // sincroniza a tabela payments dentro da mesma transação
+    const pagamento = await client.query(
+      `UPDATE payments SET status = 'confirmed', confirmed_at = NOW()
+       WHERE provider_payment_id = $1
+       RETURNING amount_cents`,
+      [paymentId]
+    );
+    const revenueCents = pagamento.rows[0].amount_cents;
+
+    // entrada de caixa (receita) — mesma transação, nunca calculada depois via
+    // agregação sobre payments (ver seção 9 para o porquê de um ledger dedicado)
+    await client.query(
+      `INSERT INTO cash_ledger (entry_type, cell_id, amount_cents)
+       VALUES ('revenue', $1, $2)
+       ON CONFLICT (entry_type, cell_id) DO NOTHING`,
+      [cellId, revenueCents]
+    );
+
+    // calcularPremio() substitui sortearPremio() na v3 — não sorteia mais: consulta
+    // se a célula é uma posição premiada pré-commitada, e se for, calcula quanto pode
+    // ser liberado agora sem exceder o caixa disponível (seção 8.2)
+    const prize = await calcularPremio(client, cellId);
+
+    await client.query(
+      `UPDATE cells SET status = 'paid', prize_value_cents = $1 WHERE id = $2`,
+      [prize.valorLiberadoCents, cellId]
+    );
+
+    // saída de caixa (prêmio) — só grava se algo foi de fato liberado;
+    // célula não-premiada (valorLiberadoCents = 0) não gera lançamento
+    if (prize.valorLiberadoCents > 0) {
+      await client.query(
+        `INSERT INTO cash_ledger (entry_type, cell_id, amount_cents)
+         VALUES ('prize_payout', $1, $2)
+         ON CONFLICT (entry_type, cell_id) DO NOTHING`,
+        [cellId, prize.valorLiberadoCents]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    // envio de e-mail é I/O externo — fica fora da transação de propósito,
+    // mas o estado 'paid' já está gravado e é a fonte de verdade
+    await enviarCertificadoPorEmail(email, cellId, prize);
+    await pool.query(
+      `UPDATE cells SET certificate_sent_at = NOW() WHERE id = $1`,
+      [cellId]
+    );
+
+    res.status(200).send('OK');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).send('Erro interno'); // provedor faz retry
+  } finally {
+    client.release();
+  }
+});
+```
+
+Pontos-chave dessa versão:
+
+- **`status IN ('reserved', 'expired')`** cobre o caso de borda: se o token ainda é o
+  mesmo (ninguém reabriu a célula), o pagamento é honrado mesmo que o job de expiração
+  já tenha rodado — o token é a prova real de posse, não o status.
+- **Distinção entre duplicata e conflito real:** se o `UPDATE` não encontrar linha, o
+  código verifica se é porque o `payment_id` já foi gravado antes (retry inofensivo) ou
+  porque o `token` não bate mais (a célula foi reaberta por outra pessoa nesse meio
+  tempo — cenário raro, mas precisa de revisão manual em vez de falhar silenciosamente).
+- **`payment_id UNIQUE`** garante que, mesmo se o webhook chegar duas vezes com o
+  mesmo `paymentId`, o segundo processamento não calcula um prêmio novo nem reenvia
+  e-mail.
+- **Transação (`BEGIN`/`COMMIT`)** garante que `status = 'paid'`, `prize_value_cents`,
+  o consumo de `winning_positions`/`prize_pool` (seção 8.2.3), o espelhamento em
+  `payments` e os lançamentos em `cash_ledger` são gravados juntos, atomicamente —
+  nunca existe um estado onde um está salvo e o outro não.
+- **`cash_ledger` nunca é escrito fora dessa transação** — se ficasse pra depois (ex:
+  um job separado agregando `payments`), um crash entre o `COMMIT` do pagamento e a
+  gravação do ledger deixaria o saldo de caixa incorreto sem nenhum sinal de erro.
+  Gravar dentro da mesma transação elimina essa classe de bug (seção 9).
+- **Estado `paid_pending_prize`** existe para dar visibilidade operacional: se um job
+  de monitoramento encontrar células paradas nesse status por mais que alguns
+  segundos, é sinal de crash no meio da transação e precisa de investigação manual
+  (recuperação automática total é possível, mas exige um job de reconciliação
+  separado — fora do escopo deste documento).
+- **Envio de e-mail fica fora da transação** porque é uma chamada de rede externa
+  lenta e sujeita a falha independente do banco; se falhar, o estado `paid` com
+  `prize_value_cents` já gravado permanece correto, e um job separado pode reprocessar
+  apenas o envio de certificado (consultando `WHERE status = 'paid' AND
+  certificate_sent_at IS NULL`).
+- **Retornar `200 OK` mesmo em duplicata ou conflito** é importante — devolver erro
+  faria o provedor continuar tentando reenviar um webhook que já foi tratado (mesmo
+  que o tratamento, no caso de conflito, seja só registrar para revisão manual).
+
+O sorteio do prêmio continua acontecendo **depois** da confirmação de pagamento, sempre
+no servidor — nunca no front.
+
+#### 4.4.4 A fila de revisão manual precisa de limite próprio
+
+⚠️ **Correção:** a versão original chamava `alertarTimeDeOperacoes` uma vez por
+ocorrência de `stale_token_conflict`, sem nenhum teto. Esse caminho é acionável por
+qualquer pessoa que entenda o fluxo: reservar uma célula, deixá-la quase expirar, e
+provocar reabertura por outro token bem na janela em que um pagamento de valor mínimo
+está a caminho. Repetir isso não custa nada a mais pro atacante, mas cada ocorrência
+gera uma notificação que exige atenção humana — em escala, isso não rouba células, mas
+**satura a fila de operações**, criando ruído que pode encobrir outros abusos
+acontecendo ao mesmo tempo.
+
+`alertarTimeDeOperacoesComLimite` precisa, no mínimo:
+
+- **Deduplicar por `cellId`** dentro de uma janela curta — se a mesma célula gerar
+  `stale_token_conflict` mais de uma vez seguida, é o mesmo padrão se repetindo, não
+  um novo caso; um único alerta (ou um alerta "agrupado" incrementando contador) basta.
+- **Aplicar um teto de alertas individuais por período** (ex: no máximo N notificações
+  diretas por hora); acima disso, os eventos continuam sendo gravados em
+  `webhook_events` normalmente (a auditoria nunca para), mas a notificação em tempo
+  real ao time vira um resumo agregado ("X conflitos nas últimas Y horas, ver
+  `webhook_events`") em vez de um alerta por ocorrência.
+- **Correlacionar com o `device_id`/IP da reserva que gerou o conflito** (disponível
+  via `payments`, seção 8.4) — se o mesmo `device_id` aparece em múltiplos conflitos,
+  isso é sinal mais forte de abuso deliberado do que de coincidência de timing, e pode
+  alimentar o mesmo mecanismo de escalonamento para CAPTCHA/bloqueio da seção 3.1, não
+  só gerar mais um ticket de revisão manual.
+
+Esse limite protege a capacidade operacional do time, não a integridade dos dados — a
+gravação em `webhook_events` (seção 8.3) continua acontecendo sempre, sem limite,
+porque ela é a fonte de auditoria; o que muda é só a quantidade de notificações ativas
+que chegam a uma pessoa.
+
+### 4.5 Passo 4 — Expiração de reservas não pagas
+
+Sem esse mecanismo, uma célula reservada e nunca paga ficaria bloqueada para sempre.
+
+```sql
+-- Job periódico (cron), roda a cada 30 segundos:
+UPDATE cells
+SET status = 'expired'
+WHERE status = 'reserved'
+  AND reserved_at < NOW() - INTERVAL '5 minutes';
+```
+
+- **Tempo de expiração:** 5 minutos.
+- **Frequência do job:** recomendado rodar a cada 30s (mais frequente que o próprio
+  intervalo de expiração), para não deixar a célula presa por tempo adicional além do
+  prazo já vencido.
+- **UX recomendada:** mostrar um contador visível no checkout (ex: "você tem 5:00 para
+  concluir o pagamento"), para o usuário entender que a reserva não é permanente.
+
+### 4.6 Reabertura de célula expirada
+
+Removida como seção separada — a lógica de reabertura já está incorporada na query
+única de reserva (seção 4.2). Não existe mais uma segunda query específica para esse
+caso.
+
+### 4.7 Passo 5 (opcional, pós-pagamento) — Assinatura pública com rede social
+
+Depois do pagamento confirmado, o usuário pode opcionalmente escolher uma rede
+(Instagram ou X) e informar um username, que passa a ser exibido publicamente junto
+com a célula. É só um campo de texto — **não há OAuth, não há verificação de que o
+username pertence de fato a quem está reivindicando**. Isso é uma decisão de escopo
+deliberada (ver seção 6), não um descuido.
+
+**Autenticação reaproveita o mesmo `token`:** nada no fluxo invalida o
+`reservation_token` depois do pagamento — `cells.reservation_token` continua sendo a
+prova de posse da reserva em qualquer etapa posterior, exatamente como já é usado na
+etapa de e-mail (seção 4.3) e no webhook (seção 4.4.3). Isso significa que essa etapa
+não precisa de nenhum mecanismo novo de autenticação: o mesmo token que o front já tem
+guardado em memória desde o clique em "Revelar" continua válido.
+
+**Só é permitido depois de `status = 'paid'`** — assinar publicamente é uma
+recompensa do pagamento confirmado, não algo que faça sentido numa reserva ainda não
+paga (que pode expirar e ser reaberta por outra pessoa a qualquer momento).
+
+⚠️ **Decisão de produto:** a assinatura é **gravada uma única vez, sem edição via
+API**. Não existe endpoint autenticado para alterar ou remover uma assinatura depois
+de enviada — nem pelo `token` (que o front só guarda em memória e perde ao fechar/dar
+refresh na página, então na prática já não seria reutilizável de qualquer forma na
+maioria dos casos), nem por nenhum outro mecanismo self-service. A única forma de
+alteração ou remoção é a pessoa entrar em contato com o suporte, que executa a ação
+manualmente por um canal interno (seção 4.7.1) — não por este endpoint.
+
+```js
+app.post('/api/cells/sign', async (req, res) => {
+  const { cellId, token, platform, handle } = req.body;
+
+  if (!['instagram', 'x'].includes(platform)) {
+    return res.status(400).json({ error: 'Rede inválida' });
+  }
+
+  // normaliza: remove @ inicial, espaços, força minúsculas — só formatação,
+  // não é verificação de que a conta existe ou pertence ao usuário
+  const handleNormalizado = handle.trim().replace(/^@/, '').toLowerCase();
+
+  if (!handleNormalizado || handleNormalizado.length > 30) {
+    return res.status(400).json({ error: 'Username inválido' });
+  }
+
+  const result = await db.query(
+    `SELECT id FROM cells
+     WHERE id = $1 AND reservation_token = $2 AND status = 'paid'`,
+    [cellId, token]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(400).json({ error: 'Reserva inválida ou pagamento não confirmado' });
+  }
+
+  // gravação única — sem ON CONFLICT DO UPDATE. Uma segunda tentativa para a
+  // mesma célula falha explicitamente, em vez de sobrescrever silenciosamente.
+  const inserted = await db.query(
+    `INSERT INTO cell_signatures (cell_id, platform, handle, moderation_status)
+     VALUES ($1, $2, $3, 'pending')
+     ON CONFLICT (cell_id) DO NOTHING
+     RETURNING cell_id`,
+    [cellId, platform, handleNormalizado]
+  );
+
+  if (inserted.rows.length === 0) {
+    return res.status(409).json({
+      error: 'Esta célula já tem uma assinatura registrada. Para alterar ou remover, entre em contato com o suporte.',
+    });
+  }
+
+  res.status(200).json({ ok: true, status: 'pending' });
+});
+```
+
+- **Etapa opcional e independente do fluxo de pagamento** — se o usuário fechar o
+  modal sem assinar, a célula continua `paid` normalmente, só sem entrada em
+  `cell_signatures`.
+- **Vale revisar a cópia do front pra deixar isso explícito antes do envio** — algo
+  como "essa informação não pode ser editada depois, apenas removida mediante
+  contato com o suporte" no próprio modal, já que a API não vai permitir corrigir um
+  typo depois do clique em enviar. É melhor o usuário confirmar isso conscientemente
+  do que descobrir a limitação só ao tentar editar.
+- **Sem rate limit dedicado além do que o token já garante** — como a ação exige um
+  `token` válido de uma célula já paga, ela não é abusável em escala do mesmo jeito
+  que o endpoint de reserva (seção 3.1): não dá pra gerar milhares de assinaturas sem
+  ter pago milhares de células antes. Ainda assim, vale um rate limit leve por
+  IP/token (ex: N submissões por minuto) só para conter reenvios acidentais em loop
+  no front, não abuso deliberado.
+
+### 4.7.1 Exclusão sob solicitação — processo interno, fora da API pública
+
+Como não há conta de usuário, a única identidade que a plataforma tem é o `email`
+gravado em `cells.email` no momento da reserva (seção 4.1) — é esse o vínculo usado
+para verificar que quem está pedindo a exclusão é de fato quem comprou a célula.
+
+- **Não existe endpoint público para isso.** A exclusão é executada por alguém do
+  suporte através de uma ferramenta interna (painel admin ou acesso direto,
+  autenticado com credenciais de equipe — fora do escopo deste documento), nunca por
+  um endpoint que aceite o `reservation_token` do usuário.
+- **Verificação:** a pessoa entra em contato (e-mail, formulário, canal de suporte)
+  informando o `id` da célula; o suporte confere se o e-mail de origem do contato
+  bate com `cells.email` daquela célula antes de agir. Não é uma verificação forte
+  (e-mail pode ser falsificado em teoria), mas é proporcional ao risco — o pior caso
+  de uma exclusão indevida é a assinatura pública sumir, não um dano financeiro.
+- **Ação:** `DELETE FROM cell_signatures WHERE cell_id = $1` — remoção real da linha,
+  não um soft-delete com o `handle` ainda armazenado em algum lugar. Se o pedido for
+  de exclusão de dado pessoal, manter o dado escondido (`moderation_status =
+  'hidden'`) não atende ao pedido — o dado continuaria no banco.
+- **Registro de que a exclusão aconteceu, sem reter o dado excluído:** vale manter um
+  log leve (ex: `cell_id`, `deleted_at`, canal de contato usado) numa tabela de
+  auditoria separada — **sem o `handle` ou `platform` originais** — só para
+  comprovar operacionalmente que o pedido foi atendido, sem recriar o mesmo problema
+  que a exclusão resolveu.
+- **Depois da exclusão, a célula permanece `paid` normalmente** — remover a
+  assinatura não afeta o estado da célula, o prêmio, ou qualquer outra parte do
+  fluxo. `cell_signatures` é estritamente opcional e desacoplada do resto.
+
+---
+
+## 5. Resumo do fluxo completo (jornada de UI)
+
+1. **Clique na célula** → abre um **modal** com um botão "Revelar".
+   - Nenhuma reserva é criada ainda neste ponto — é só uma visualização.
+2. **Clique em "Revelar"** → dispara a reserva no back:
+   - `INSERT ... ON CONFLICT DO UPDATE ... WHERE status = 'expired'` (seção 4.2) —
+     cria a célula se nunca existiu, ou reabre se estava `expired`, sempre gerando um
+     token novo. Sujeito a rate limit por IP + `device_id`, com escalonamento para
+     CAPTCHA em caso de abuso (seção 3.1).
+   - Se falhar → célula já ocupada (`reserved`/`paid`), modal informa que não está mais
+     disponível.
+   - Se funcionar → back retorna `{ cellId, token }`; front guarda o `token` em estado
+     (memória da aplicação, nunca em URL) e avança para a etapa de e-mail.
+3. **Etapa de e-mail** (dentro do mesmo fluxo/modal) → usuário informa o e-mail
+   (obrigatório).
+   - Front envia `{ cellId, token, email }` no corpo do POST → back grava o e-mail na
+     reserva, validando o `token`, e chama `criarCheckout` de forma idempotente
+     (reaproveita cobrança `pending` existente em vez de duplicar — seção 4.3.1).
+4. **Checkout de pagamento** → usuário é direcionado para pagar, com `cellId` e `token`
+   vinculados ao checkout **via referência externa servidor-a-servidor**, nunca em
+   parâmetro de URL visível ao navegador (seção 6).
+   - Se não pagar em 5 minutos, a reserva expira e a célula é liberada (ver seção 4.5).
+5. **Provedor de pagamento → Back (webhook)** → confirma o pagamento.
+   - Back valida a **assinatura HMAC** do webhook.
+   - Back valida `cellId` + `token` + idempotência via `payment_id`.
+   - Numa transação: atualiza status para `paid_pending_prize` → consulta se a célula
+     é uma posição premiada e calcula o valor liberado (`calcularPremio()`, seção
+     8.2.3) → grava `prize_value_cents` → status final `paid`.
+   - Envia o certificado para o e-mail informado (fora da transação, com reprocessamento
+     possível se falhar).
+6. **Modal de visualização da célula revelada** → front exibe o resultado final
+   (célula revelada, com ou sem prêmio).
+7. **Etapa opcional: assinatura pública** (seção 4.7) → front oferece ao usuário
+   escolher rede social (Instagram/X) e informar username, avisando que não será
+   editável depois — só removível mediante contato com o suporte.
+   - Front envia `{ cellId, token, platform, handle }` → back valida o `token` (o
+     mesmo da reserva, ainda válido — status precisa já ser `paid`) e grava em
+     `cell_signatures` com `moderation_status = 'pending'`. Uma segunda tentativa
+     para a mesma célula é rejeitada (`409`), não sobrescrita.
+   - A assinatura só aparece publicamente em `GET /api/cells/:id` depois de aprovada
+     por moderação — não é automática.
+
+### Diagrama resumido
+
+```
+[Clique na célula]
+       │
+       ▼
+[Modal: botão "Revelar"]
+       │  clique em Revelar (rate limit IP + device_id; CAPTCHA se abuso)
+       ▼
+[Back: INSERT ou reabre se expired] ──falha──▶ [Modal: célula indisponível]
+       │ sucesso (retorna token novo, guardado em memória — nunca em URL)
+       ▼
+[Etapa: informar e-mail] ──▶ [Back: UPDATE email (valida token)]
+       │                           │
+       │                           ▼
+       │                  [criarCheckout idempotente:
+       │                   reaproveita cobrança pending
+       │                   ou cria uma nova]
+       ▼
+[Checkout de pagamento] ──expirou (5 min)──▶ [Back: status = expired, libera célula]
+       │ pagamento confirmado (webhook, assinatura validada)
+       ▼
+[Back: token ainda bate? (reserved OU expired)]
+       │ sim                              │ não (célula já reaberta por outro token)
+       ▼                                  ▼
+[paid_pending_prize] ──(transação)──▶     [registra conflito, aciona revisão manual]
+[sorteia prêmio, status = paid, lança receita+payout no cash_ledger]
+       │
+       ▼
+[Envia certificado] ──falhou──▶ [job de reprocessamento por certificate_sent_at IS NULL]
+       │ sucesso
+       ▼
+[Modal: célula revelada — resultado final]
+       │
+       ▼ (opcional)
+[Etapa: assinar publicamente] ──▶ [Back: UPDATE/INSERT cell_signatures, status = pending]
+       │
+       ▼
+[Moderação (fora do fluxo do usuário)] ──▶ [approved → visível em GET /api/cells/:id]
+                                       └──▶ [hidden → nunca exibido]
+```
+
+---
+
+## 6. Pontos de segurança importantes
+
+- **O `id` da célula pode ser manipulado livremente pelo usuário** — isso não é uma
+  falha, é apenas "qual célula ele quer reivindicar". O servidor é sempre a autoridade
+  final sobre disponibilidade e resultado.
+- **O sorteio do prêmio nunca pode ser calculado no front**, nem por fórmula
+  determinística (ex: hash do id) — isso permitiria a qualquer pessoa calcular
+  antecipadamente quais células têm os melhores prêmios antes mesmo de clicar.
+- **A confirmação de pagamento deve vir de um webhook do provedor**, nunca de um
+  parâmetro enviado pelo front após redirecionamento — evita que alguém simule "paguei"
+  sem realmente ter pago.
+- **A assinatura do webhook precisa ser validada** antes de qualquer escrita no banco —
+  a URL do endpoint não é segredo suficiente.
+- **O processamento do webhook precisa ser idempotente e atômico** — retries do
+  provedor não podem sortear prêmio duas vezes nem travar a célula num estado
+  intermediário quebrado.
+- **A janela entre expiração e confirmação de pagamento precisa de tratamento
+  explícito** (seção 4.4.3) — um pagamento pode chegar depois do job de expiração ter
+  rodado; o `token`, não o `status`, é a prova real de que o pagamento pertence àquela
+  reserva.
+- **O endpoint de reserva precisa de rate limit em múltiplas camadas** — IP sozinho é
+  contornável com proxy/VPN rotativo. `device_id` (fingerprint) soma-se ao IP como
+  segundo sinal, e um padrão repetido de rate-limit acionado escalona para exigir
+  CAPTCHA antes da próxima tentativa (seção 3.1).
+- **O IP usado em rate limit e antifraude precisa vir de uma fonte confiável, não do
+  `X-Forwarded-For` cru** — esse header é escrito pelo próprio cliente na origem; sem
+  o proxy de borda sobrescrevê-lo (ou a aplicação saber quantos hops de proxy confiável
+  existem na cadeia), qualquer requisição pode declarar o IP que quiser e todo o rate
+  limit por IP da seção 3.1 vira decorativo (seção 8.4).
+- **Rate limit por contador (IP, `device_id`) não pega rotação combinada dos dois
+  sinais ao mesmo tempo** — um atacante que troca IP e device juntos a cada request
+  passa despercebido por contadores isolados. É preciso uma camada adicional de
+  detecção por padrão agregado (volume por faixa de IP/ASN, velocidade incompatível
+  com uso humano, concentração em células "desejáveis" vindas de devices nunca vistos)
+  que escale para CAPTCHA na faixa inteira, não só no IP/device individual (seção 3.1).
+- **A fila de revisão manual de conflitos (`stale_token_conflict`, seção 4.4.3) precisa
+  de teto e deduplicação próprios** — sem limite, é um caminho que um atacante pode
+  forçar repetidamente sem custo adicional, saturando a capacidade de atenção do time
+  de operações e criando ruído que pode encobrir outros abusos (seção 4.4.4).
+- **O `reservation_token` nunca deve trafegar em query string ou qualquer parte visível
+  de URL** — nem no link de checkout, nem em redirecionamentos. Um token em URL pode
+  vazar pelo header `Referer` para o provedor de pagamento, ficar gravado em logs de
+  servidor/analytics de terceiros, ou permanecer no histórico do navegador do usuário.
+  O token só deve trafegar (a) no corpo (`body`) de requisições POST entre front e back,
+  e (b) na referência externa embutida na cobrança Pix, enviada servidor-a-servidor
+  entre o back e o provedor de pagamento (seção 4.3.1) — nunca como algo que o
+  navegador exponha ou redirecione.
+- **A criação de cobrança Pix precisa ser idempotente por reserva** — sem isso, um
+  refresh de página, duplo clique ou retry de rede na etapa de e-mail gera múltiplas
+  cobranças para a mesma célula, confundindo o usuário e abrindo espaço para pagamento
+  duplicado por engano. `criarCheckout` deve verificar se já existe uma cobrança
+  `pending` para aquele `cell_id` antes de criar uma nova (seção 4.3.1).
+- **Sem autenticação de conta, o `reservation_token` faz esse papel de forma temporária**:
+  é a única prova de que uma etapa posterior (informar e-mail, confirmar pagamento,
+  assinar publicamente) pertence à mesma reserva originada pelo clique. Ele deve ser
+  aleatório e não-adivinhável (UUID), nunca sequencial ou derivado do `id` da célula.
+- **A assinatura pública com rede social não verifica propriedade da conta** (seção
+  4.7) — é só um campo de texto que o usuário digita, sem OAuth. Isso é uma decisão
+  de escopo consciente (verificação real exigiria integração com cada plataforma), mas
+  precisa estar claro pro produto: qualquer pessoa pode digitar o username de outra
+  pessoa. A mitigação é a moderação antes de exibir publicamente (próximo bullet), não
+  uma garantia de autenticidade.
+- **Toda assinatura pública passa por moderação antes de ficar visível** — o campo
+  `moderation_status` (seção 8.5) nasce sempre `pending`; `GET /api/cells/:id` só
+  devolve o `handle` quando `approved`. Isso vale tanto para conteúdo ofensivo/spam
+  quanto para o caso do bullet anterior (impersonation) — a moderação é a única
+  barreira real nos dois casos, já que não há verificação técnica de identidade.
+- **Não existe endpoint de edição ou exclusão de assinatura na API pública** (seção
+  4.7.1) — uma vez gravada, a única forma de alteração é contato com o suporte, que
+  age através de uma ferramenta interna autenticada por credenciais de equipe, nunca
+  pelo `reservation_token` do usuário. A verificação de identidade nesse contato é
+  feita cruzando com `cells.email` (seção 4.1), o único vínculo de identidade que a
+  plataforma tem sem sistema de contas.
+
+---
+
+## 7. Superfície da API
+
+Resumo de todos os endpoints necessários para implementar o fluxo descrito neste
+documento, mais o job periódico de expiração. Nenhum deles ainda existe — hoje só
+existe o front (`PixelGrid.jsx`).
+
+### 7.1 `GET /api/cells`
+
+Leitura do estado de um range de células, usada para popular o grid virtualizado
+conforme o usuário rola a tela (seção 2.1).
+
+- **Auth:** nenhuma — endpoint público, só leitura de estado visual.
+- **Rate limit:** leve, mais por proteção de infraestrutura que por segurança.
+- **Cache:** recomendado, poucos segundos (o estado muda pouco entre polls).
+
+```
+GET /api/cells?from=480000&to=480050
+```
+
+```json
+// 200 OK
+[
+  { "id": 480000, "status": "available" },
+  { "id": 480001, "status": "reserved" },
+  { "id": 480002, "status": "paid" },
+  ...
+]
+```
+
+`expired` nunca aparece na resposta — é normalizado para `available` (seção 2.1).
+
+### 7.2 `POST /api/cells/reserve`
+
+Disparado ao clicar em "Revelar" no modal. Tenta reservar a célula — cria se nunca
+existiu, ou reabre se estava `expired` (query unificada, seção 4.2).
+
+- **Auth:** nenhuma.
+- **Rate limit:** obrigatório, em múltiplas camadas (seção 3.1):
+  - por IP (total de reservas ativas + tentativas por minuto);
+  - por `device_id` (mesmo teto de reservas ativas simultâneas);
+  - escalonamento para CAPTCHA quando um IP ou `device_id` acionar o limite repetidas
+    vezes numa janela curta.
+
+```json
+// Request
+POST /api/cells/reserve
+{ "id": 480030, "deviceId": "fp_9a3c1e..." }
+```
+
+```json
+// 200 OK — reserva bem-sucedida
+{ "cellId": 480030, "token": "b3f1c2a0-...-uuid" }
+```
+
+```json
+// 409 Conflict — já reservada/paga por outra pessoa
+{ "error": "Célula já reservada ou revelada" }
+```
+
+```json
+// 429 Too Many Requests — rate limit acionado
+{ "error": "Muitas tentativas, aguarde e tente novamente" }
+```
+
+```json
+// 428 Precondition Required — escalonado para CAPTCHA após abuso repetido
+{ "error": "Verificação adicional necessária", "captchaRequired": true }
+```
+
+### 7.3 `POST /api/cells/email`
+
+Etapa de e-mail do fluxo, associa o e-mail à reserva e gera (ou reaproveita) o link de
+checkout (seção 4.3 e 4.3.1).
+
+- **Auth:** validação via `token` (não é autenticação de conta, é prova de posse
+  da reserva — seção 4).
+- **Idempotência:** chamadas repetidas para a mesma reserva reaproveitam a cobrança
+  Pix `pending` já existente, em vez de criar uma nova (seção 4.3.1). O `token` é
+  sempre recebido no corpo da requisição, nunca em query string.
+
+```json
+// Request
+POST /api/cells/email
+{ "cellId": 480030, "token": "b3f1c2a0-...-uuid", "email": "usuario@example.com" }
+```
+
+```json
+// 200 OK
+{ "checkoutUrl": "https://checkout.provedor.com/sessao/xyz" }
+```
+
+```json
+// 400 Bad Request — token inválido, reserva expirada, ou id/token não combinam
+{ "error": "Reserva inválida, expirada ou token incorreto" }
+```
+
+### 7.4 `GET /api/cells/:id`
+
+Detalhe de uma célula específica — usado quando o modal abre para exibir o
+resultado de uma célula já paga (emoji, prêmio), não só o status genérico que vem
+do endpoint de range (7.1).
+
+- **Auth:** nenhuma — mesmo nível de exposição pública do estado do grid.
+- Não substitui o `token`: este endpoint não permite nenhuma ação sobre a célula,
+  só leitura do resultado já público (célula revelada é visível para qualquer
+  visitante, é o conceito central do produto).
+- **`signature`:** só aparece no payload se existir uma linha em `cell_signatures`
+  (seção 8.5) com `moderation_status = 'approved'` para essa célula. Uma assinatura
+  `pending` ou `hidden` nunca é incluída aqui — o `JOIN` no back já filtra por isso,
+  não é um campo que o front esconde condicionalmente.
+
+```json
+// Request
+GET /api/cells/480030
+```
+
+```json
+// 200 OK — célula paga/revelada, com assinatura pública aprovada
+{
+  "id": 480030,
+  "status": "paid",
+  "emoji": "🌟",
+  "prizeLabel": null,
+  "signature": { "platform": "instagram", "handle": "usuario_exemplo" }
+}
+```
+
+```json
+// 200 OK — célula paga/revelada, sem assinatura (não enviou, ou ainda em moderação)
+{
+  "id": 480030,
+  "status": "paid",
+  "emoji": "🌟",
+  "prizeLabel": null,
+  "signature": null
+}
+```
+
+```json
+// 200 OK — célula ainda disponível
+{ "id": 480030, "status": "available" }
+```
+
+### 7.4.1 `POST /api/cells/sign`
+
+Etapa opcional pós-pagamento (seção 4.7): usuário escolhe rede social e informa
+username, exibido publicamente depois de aprovado por moderação.
+
+- **Auth:** validação via `token` — o mesmo `reservation_token` já usado nas etapas
+  anteriores, ainda válido depois do pagamento. Exige `status = 'paid'`.
+- **Rate limit:** leve, só para conter reenvio acidental (o `token` já limita o abuso
+  em escala — seção 4.7).
+- **Gravação única, sem edição:** uma segunda chamada para a mesma célula retorna
+  `409`, nunca sobrescreve. Alteração ou remoção só acontece por contato com o
+  suporte (seção 4.7.1), fora desta API.
+
+```json
+// Request
+POST /api/cells/sign
+{ "cellId": 480030, "token": "b3f1c2a0-...-uuid", "platform": "instagram", "handle": "usuario_exemplo" }
+```
+
+```json
+// 200 OK
+{ "ok": true, "status": "pending" }
+```
+
+```json
+// 400 Bad Request — token/reserva inválidos, pagamento não confirmado, ou rede/handle inválidos
+{ "error": "Reserva inválida ou pagamento não confirmado" }
+```
+
+```json
+// 409 Conflict — célula já tem assinatura registrada, não pode ser sobrescrita
+{ "error": "Esta célula já tem uma assinatura registrada. Para alterar ou remover, entre em contato com o suporte." }
+```
+
+### 7.5 `POST /webhook/payment-confirmed`
+
+Recebido do provedor de pagamento (Asaas/Stripe/etc.), nunca chamado pelo front
+(seção 4.4).
+
+- **Auth:** validação de assinatura HMAC do provedor — obrigatória antes de
+  processar qualquer coisa (seção 4.4.1).
+- **Idempotência:** garantida via `payment_id UNIQUE` + transação, incluindo o caso de
+  borda entre expiração e confirmação (seção 4.4.3), e a criação de cobrança já é
+  idempotente rio acima, na seção 4.3.1.
+- **`cellId`/`token`:** não chegam como campos soltos no payload — são extraídos do
+  campo de referência externa que o provedor devolve, o mesmo que foi embutido na
+  criação da cobrança Pix (seção 4.3.1), sempre servidor-a-servidor, nunca via URL
+  visível ao navegador. O formato exato do payload varia por provedor.
+
+```json
+// Request (exemplo ilustrativo — formato real depende do provedor escolhido)
+POST /webhook/payment-confirmed
+{
+  "paymentId": "pay_abc123",
+  "referenciaExterna": "{\"cellId\":480030,\"token\":\"b3f1c2a0-...-uuid\"}"
+}
+```
+
+```
+200 OK   — processado com sucesso, ou já processado antes (idempotente)
+401      — assinatura inválida
+500      — erro interno, provedor deve tentar novamente
+```
+
+Este endpoint nunca retorna dado nenhum sobre o prêmio sorteado no corpo da
+resposta — o resultado só chega ao usuário pelo certificado por e-mail e pela
+leitura pública em 7.4/7.1.
+
+### 7.6 Job: expiração de reservas
+
+Não é uma API — é um processo periódico (cron), descrito na seção 4.5.
+
+- **Frequência:** a cada 30 segundos.
+- **Ação:** `UPDATE cells SET status = 'expired' WHERE status = 'reserved' AND
+  reserved_at < NOW() - INTERVAL '5 minutes'`.
+- Não expõe endpoint HTTP — roda internamente no servidor/worker.
+
+### 7.7 Resumo
+
+| Endpoint | Método | Auth | Chamado por |
+|---|---|---|---|
+| `/api/cells` | GET | nenhuma | front (scroll do grid) |
+| `/api/cells/reserve` | POST | rate limit (IP + device_id, CAPTCHA se abuso) | front (clique "Revelar") |
+| `/api/cells/email` | POST | token | front (etapa de e-mail) |
+| `/api/cells/:id` | GET | nenhuma | front (abrir modal de detalhe) |
+| `/api/cells/sign` | POST | token (status paid) | front (etapa opcional de assinatura pública) |
+| `/webhook/payment-confirmed` | POST | assinatura HMAC | provedor de pagamento |
+| *(job de expiração)* | — | — | cron interno |
+
+---
+
+## 8. Estrutura de tabelas
+
+Várias tabelas cobrem o fluxo completo. A `cells` já estava definida (seção 4.1); as
+demais ficaram implícitas até agora e precisam ser explicitadas.
+
+### 8.1 `cells` — já definida, com um ajuste
+
+A definição da seção 4.1 fica assim (idêntica à do fim da seção 4.1, repetida aqui por
+completude):
+
+```sql
+CREATE TABLE cells (
+  id INT PRIMARY KEY,
+  reservation_token UUID NOT NULL DEFAULT gen_random_uuid(),
+  email TEXT,
+  status TEXT NOT NULL DEFAULT 'reserved',
+  -- reserved | paid_pending_prize | paid | expired
+  reserved_at TIMESTAMP DEFAULT NOW(),
+  payment_id TEXT UNIQUE,
+  prize_value_cents INT NOT NULL DEFAULT 0,  -- calculado por calcularPremio() (8.2.3),
+                                              -- não referencia catálogo nenhum
+  certificate_sent_at TIMESTAMP
+);
+
+-- índices necessários para as queries já descritas no doc:
+CREATE INDEX idx_cells_status_reserved_at ON cells (status, reserved_at);
+-- ↑ usado pelo job de expiração (seção 4.5) e pela leitura de range (seção 2.1)
+```
+
+### 8.2 Modelo de prêmios com solvência garantida por construção
+
+⚠️ **Mudança de v2 para v3:** a v2 sorteava o prêmio de forma independente a cada
+pagamento (`sortearPremio()`, ponderado por `weight`, com `stock` decrementado). Isso
+tem dois problemas: (a) nada impede um prêmio caro de sair muito cedo, antes de o
+caixa acumulado cobrir o valor — risco de insolvência; e (b) é probabilístico "solto",
+sem garantia de que a soma de tudo sorteado bata exatamente com o total de prêmios
+prometido ao público.
+
+A v3 resolve isso separando duas decisões que antes estavam misturadas numa função só:
+**quais** células são premiadas (decidido e travado antes da primeira venda) e
+**quanto** cada uma paga (calculado no momento do pagamento, nunca excedendo o caixa
+disponível).
+
+⚠️ **Mudança de v3 para v4:** a v3 tratava o pool de prêmios como um único bloco
+homogêneo — uma "cota justa" só, igual para qualquer posição premiada. Isso não
+suporta o caso real do produto: múltiplas denominações (ex: R$10, R$100, R$1.000,
+R$10.000, R$50.000), cada uma com uma quantidade de posições diferente. A v4 introduz
+**tiers**: cada denominação vira um "pote" próprio, com seu próprio saldo e sua
+própria solvência, calculados de forma independente dos demais.
+
+**A ideia central de um tier:** você não define "essa posição vale R$1.000" como um
+valor fixo gravado numa linha. Você define um pote com um **saldo total** (ex:
+R$150.000) dividido entre uma **quantidade de posições** (ex: 150) — o "R$1.000" que
+aparece no planejamento é só o valor médio esperado por posição daquele pote, nunca
+uma promessa individual travada. O valor real liberado em cada abertura continua
+sendo `MIN(saldo_restante_do_tier ÷ posições_restantes_do_tier,
+caixa_disponível_no_momento)` — a mesma fórmula da v3, só que agora aplicada dentro de
+cada tier isoladamente, em vez de num pool único.
+
+#### 8.2.1 `winning_positions` — quais células são premiadas, de qual tier (pré-commitado)
+
+```sql
+CREATE TABLE winning_positions (
+  cell_id INT PRIMARY KEY,          -- id lógico da célula (seção 1) — não é FK para
+                                     -- cells, porque cells é populada de forma esparsa
+                                     -- (seção 2) e pode não existir ainda quando este
+                                     -- array é gerado
+  tier_id INT NOT NULL REFERENCES prize_pool(tier_id), -- de qual pote/denominação
+                                                          -- essa posição faz parte
+  claimed BOOLEAN NOT NULL DEFAULT false,
+  claimed_at TIMESTAMP
+);
+
+CREATE INDEX idx_winning_positions_tier ON winning_positions (tier_id);
+```
+
+- Gerada **uma única vez**, antes de vender a célula nº 1: sorteia-se quais ids (do
+  universo de 0 a 999.999) são premiados **e** de qual tier cada um é — respeitando as
+  quantidades exatas definidas por denominação (seção 8.2.2) — insere-se essas linhas,
+  e pronto. A tabela nunca ganha nem perde linhas depois disso.
+- Ausência de linha para um `cell_id` = célula não-premiada, permanentemente. Mesma
+  filosofia de "ausência = disponível" já usada em `cells` (seção 2.1).
+- **Commit-reveal para transparência:** antes de abrir a venda, publica-se o hash
+  SHA-256 da lista completa e ordenada de `(cell_id, tier_id)` premiados (guardado em
+  `prize_tier_batch.commit_hash`, seção 8.2.2). Depois que o lote se esgota (ou
+  periodicamente), a lista completa é publicada e qualquer pessoa pode conferir que o
+  hash bate — prova de que a lista (incluindo qual posição pertence a qual tier) não
+  foi alterada no meio do caminho.
+- `claimed`/`claimed_at` existem só para consulta rápida de progresso (ex: dashboard
+  interno "quantas posições do tier R$1.000 já foram abertas") — a trava de
+  concorrência de verdade acontece em `prize_pool` (abaixo), não aqui.
+
+#### 8.2.2 `prize_pool` — um "pote" por tier, e `prize_tier_batch` — o commit do lote
+
+`prize_pool` deixa de ser singleton (uma linha só, como na v3) e vira **uma linha por
+denominação**:
+
+```sql
+CREATE TABLE prize_pool (
+  tier_id INT PRIMARY KEY,
+  label TEXT NOT NULL,                     -- só exibição/log, ex: "R$10", "R$50.000"
+  nominal_value_cents BIGINT NOT NULL,      -- valor médio esperado por posição do tier
+  total_value_cents BIGINT NOT NULL,        -- nominal_value_cents × total_positions
+  total_positions INT NOT NULL,             -- deve bater com
+                                             -- COUNT(*) FROM winning_positions WHERE tier_id = ...
+  remaining_value_cents BIGINT NOT NULL,    -- decrementado a cada pagamento liberado
+                                             -- NESTE tier
+  remaining_positions INT NOT NULL          -- decrementado a cada posição
+                                             -- premiada aberta NESTE tier
+);
+```
+
+Exemplo de povoamento, fechando exatamente R$1.000.000 no total (ajuste conforme os
+valores reais do produto):
+
+```sql
+INSERT INTO prize_pool (tier_id, label, nominal_value_cents, total_value_cents, total_positions, remaining_value_cents, remaining_positions) VALUES
+  (1, 'R$10',     1000,     50000000000 / 100, 50000, 50000000000 / 100, 50000), -- R$500.000 / 50.000 posições
+  (2, 'R$100',    10000,    30000000,          3000,  30000000,          3000),  -- R$300.000 / 3.000 posições
+  (3, 'R$1.000',  100000,   15000000,          150,   15000000,          150),   -- R$150.000 / 150 posições
+  (4, 'R$10.000', 1000000,  4000000,           4,     4000000,           4),     -- R$40.000  / 4 posições
+  (5, 'R$50.000', 5000000,  1000000,           1,     1000000,           1);     -- R$50.000  / 1 posição
+-- soma dos total_value_cents deve fechar exatamente o pool total planejado
+```
+
+> Os literais acima estão simplificados para ilustrar a proporção — ao gerar o SQL
+> real, calcule `total_value_cents` em centavos com cuidado (ex: R$500.000,00 =
+> `50000000` centavos, não `50000000000 / 100`) para não introduzir erro de
+> arredondamento no commit inicial.
+
+**Nova tabela auxiliar `prize_tier_batch`** — guarda o commit-reveal do lote inteiro
+(substitui os campos `commit_hash`/`revealed_at` que na v3 viviam dentro do
+`prize_pool` singleton; agora que `prize_pool` tem uma linha por tier, o hash de
+commit precisa de um lugar próprio, único para o lote inteiro):
+
+```sql
+CREATE TABLE prize_tier_batch (
+  id INT PRIMARY KEY DEFAULT 1,      -- singleton: 1 linha por lote/rodada
+  commit_hash TEXT NOT NULL,         -- hash publicado antes da 1ª venda
+  revealed_at TIMESTAMP,             -- quando a lista completa foi publicada
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+- Cada linha de `prize_pool` é lida com `SELECT ... FOR UPDATE WHERE tier_id = $1`
+  **dentro da mesma transação** do webhook — trava só o tier daquela posição
+  específica, não os outros. Dois pagamentos de tiers diferentes acontecendo ao mesmo
+  tempo não se bloqueiam entre si; só pagamentos do **mesmo** tier são serializados.
+  Mesmo princípio da v3 (seção 8.2.2 anterior), só que agora com granularidade por
+  tier em vez de granularidade global.
+- Um tier ficar com `remaining_positions = 0` não afeta os demais — cada pote é
+  esgotado de forma totalmente independente.
+
+#### 8.2.3 `payout_safety_config` — margem de segurança de liquidez
+
+Antes de calcular quanto liberar, falta uma peça: um teto que impede um único
+pagamento de consumir o caixa disponível inteiro, mesmo quando a cota justa do tier
+permitiria. Sem isso, um prêmio grande que sai cedo pode "esvaziar" o caixa e deixar
+os pagamentos seguintes — de qualquer tier — sem margem para operar até o caixa se
+recompor.
+
+```sql
+CREATE TABLE payout_safety_config (
+  id INT PRIMARY KEY DEFAULT 1,          -- singleton (global, todos os tiers)
+  safety_margin_bps INT NOT NULL,        -- em pontos-base (2000 = 20,00%) — pontos-base
+                                          -- evita imprecisão de float em percentual
+                                          -- direto
+  updated_at TIMESTAMP DEFAULT NOW(),
+  updated_by TEXT                        -- quem alterou, para auditoria
+);
+
+INSERT INTO payout_safety_config (safety_margin_bps, updated_by)
+VALUES (2000, 'setup-inicial'); -- 20%
+```
+
+- Guardado em tabela, não como constante no código, porque esse percentual
+  provavelmente será calibrado na prática, observando o comportamento real do caixa —
+  ajustar isso não deve exigir redeploy.
+- É **global** por enquanto (mesmo percentual para qualquer tier). Isso é suficiente
+  porque, na prática, o teto de segurança só se torna a restrição ativa (em vez da
+  cota justa) para os tiers de maior valor e apenas enquanto o caixa acumulado ainda é
+  pequeno — tiers pequenos (ex: R$10) raramente sentem diferença, o caixa os cobre de
+  sobra desde o início. Se a calibração mostrar necessidade de tetos diferentes por
+  tier, a tabela pode evoluir de singleton para uma linha por `tier_id` sem quebrar o
+  restante do modelo.
+- Nunca deve ser lido e usado fora de uma transação que também vá gravar o pagamento —
+  senão um ajuste de margem no meio de um pagamento em andamento poderia gerar
+  inconsistência entre o que foi calculado e o que foi de fato liberado.
+
+#### 8.2.4 `calcularPremio()` — resolve o tier, aplica a margem de segurança
+
+```js
+async function calcularPremio(client, cellId) {
+  const winning = await client.query(
+    `SELECT tier_id, claimed FROM winning_positions WHERE cell_id = $1 FOR UPDATE`,
+    [cellId]
+  );
+
+  if (winning.rows.length === 0) {
+    // não é (e nunca foi) uma posição premiada — decidido no commit inicial
+    return { valorLiberadoCents: 0, tierId: null };
+  }
+  if (winning.rows[0].claimed) {
+    // segurança extra: nunca deveria acontecer dado o UNIQUE em payment_id,
+    // mas trava aqui também para nunca pagar a mesma posição duas vezes
+    return { valorLiberadoCents: 0, tierId: winning.rows[0].tier_id };
+  }
+
+  const tierId = winning.rows[0].tier_id;
+
+  const pool = await client.query(
+    `SELECT remaining_value_cents, remaining_positions
+     FROM prize_pool WHERE tier_id = $1 FOR UPDATE`,
+    [tierId]
+  );
+  const { remaining_value_cents, remaining_positions } = pool.rows[0];
+
+  const caixaDisponivelCents = await calcularCaixaDisponivel(client); // seção 9.3 —
+                                                                        // saldo GERAL
+                                                                        // do produto,
+                                                                        // não por tier
+                                                                        // (ver nota
+                                                                        // abaixo)
+
+  const safetyConfig = await client.query(
+    `SELECT safety_margin_bps FROM payout_safety_config WHERE id = 1`
+  );
+  const safetyMarginBps = safetyConfig.rows[0].safety_margin_bps;
+
+  // teto de segurança: nunca liberar de uma vez mais que essa fração do caixa
+  // disponível, mesmo que a cota justa do tier permita mais
+  const tetoSegurancaCents = Math.floor(
+    (caixaDisponivelCents * safetyMarginBps) / 10000
+  );
+
+  const cotaJustaCents = Math.floor(
+    remaining_value_cents / remaining_positions
+  );
+  const valorLiberadoCents = Math.max(
+    0,
+    Math.min(cotaJustaCents, tetoSegurancaCents)
+  );
+
+  await client.query(
+    `UPDATE prize_pool
+     SET remaining_value_cents = remaining_value_cents - $1,
+         remaining_positions = remaining_positions - 1
+     WHERE tier_id = $2`,
+    [valorLiberadoCents, tierId]
+  );
+
+  await client.query(
+    `UPDATE winning_positions SET claimed = true, claimed_at = NOW()
+     WHERE cell_id = $1`,
+    [cellId]
+  );
+
+  await client.query(
+    `INSERT INTO prize_calculation_log
+       (cell_id, tier_id, pool_remaining_before_cents, positions_remaining_before,
+        cota_justa_cents, caixa_disponivel_cents, safety_margin_bps,
+        teto_seguranca_cents, valor_liberado_cents)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [cellId, tierId, remaining_value_cents, remaining_positions,
+     cotaJustaCents, caixaDisponivelCents, safetyMarginBps,
+     tetoSegurancaCents, valorLiberadoCents]
+  );
+
+  return { valorLiberadoCents, tierId };
+}
+```
+
+- **O teto do pagamento agora é `MIN(cotaJustaCents, tetoSegurancaCents)`** — o
+  `caixaDisponivelCents` puro deixou de ser usado diretamente como limite; ele só
+  entra como insumo pra calcular `tetoSegurancaCents` (uma fração dele). Essa é a
+  única mudança estrutural da v5 em relação à v4 — o resto da função permanece igual.
+- **`remaining_value_cents -= valorLiberadoCents`** (não `-= cotaJustaCents`), **dentro
+  do tier** — se o teto de segurança (ou a cota justa) limitou o pagamento, a
+  diferença permanece **no mesmo tier** e é redistribuída entre as posições restantes
+  daquela denominação, elevando a cota delas. O "acumulado" fica contido dentro do
+  próprio tier — não vaza para os demais (ex: um pagamento parcial do tier R$1.000
+  nunca reduz o que sobra para o tier R$10).
+- **`remaining_positions -= 1` sempre**, mesmo se `valorLiberadoCents` ficou abaixo da
+  cota — a posição foi consumida, só o valor é que ficou limitado.
+- **`caixaDisponivelCents` continua sendo o saldo geral do produto**, não um saldo por
+  tier — não existe "conta separada" de caixa para cada denominação; o que existe de
+  separado é só o **saldo de prêmio a distribuir** por tier. Isso é intencional: o
+  caixa é um recurso único e compartilhado (a mesma receita de vendas cobre qualquer
+  tier), só a alocação do *quanto ainda falta pagar* é que é dividida por denominação.
+- Tudo dentro da mesma transação do webhook (seção 4.4.3): se o processo cair no meio,
+  o rollback desfaz `winning_positions.claimed`, `prize_pool` e o `cash_ledger` juntos
+  — nunca fica um estado parcial.
+
+#### 8.2.5 `prize_calculation_log` — auditoria do cálculo
+
+```sql
+CREATE TABLE prize_calculation_log (
+  id BIGSERIAL PRIMARY KEY,
+  cell_id INT NOT NULL,
+  tier_id INT NOT NULL,
+  pool_remaining_before_cents BIGINT NOT NULL,
+  positions_remaining_before INT NOT NULL,
+  cota_justa_cents BIGINT NOT NULL,
+  caixa_disponivel_cents BIGINT NOT NULL,
+  safety_margin_bps INT NOT NULL,        -- qual margem estava configurada nesse momento
+  teto_seguranca_cents BIGINT NOT NULL,  -- caixa_disponivel_cents × safety_margin_bps
+  valor_liberado_cents BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_prize_calculation_log_tier ON prize_calculation_log (tier_id);
+```
+
+- `safety_margin_bps` e `teto_seguranca_cents` são novos na v5 — permitem responder,
+  depois, se um pagamento ficou abaixo da cota justa por causa do **caixa
+  insuficiente no geral** ou por causa da **margem de segurança** ter limitado mesmo
+  havendo caixa de sobra (`teto_seguranca_cents < cota_justa_cents <
+  caixa_disponivel_cents` é o caso onde a margem foi a restrição ativa, não o caixa em
+  si) — distinção importante para calibrar o percentual de `payout_safety_config` com
+  dados reais.
+- Não é usada por nenhum fluxo em tempo real — existe para responder, depois, "por que
+  essa célula do tier R$1.000 liberou R$100 e não o valor nominal esperado" (disputa
+  de suporte, auditoria regulatória). Sem essa tabela, a resposta exigiria reconstruir
+  o estado histórico do `prize_pool` a partir do zero, o que não é possível porque ele
+  é mutável (só guarda o estado atual, não o histórico).
+- Nunca é editada nem apagada — mesmo princípio append-only do `cash_ledger` (seção
+  9.1).
+
+#### 8.2.6 Script de geração — o que muda em `generate-winning-positions.js`
+
+O script que gera `winning_positions` (seção 8.2.1) precisa, além de sortear os ids
+premiados, sortear **de qual tier** cada um é — respeitando as quantidades exatas por
+denominação definidas em `prize_pool` (não um sorteio livre por peso, que poderia
+gerar uma quantidade diferente da planejada para cada tier):
+
+```js
+// gera a lista de tier_id respeitando as quantidades EXATAS por tier,
+// depois embaralha essa lista e associa aos ids sorteados — garante que o
+// total de posições por tier bate exatamente com o que foi planejado
+function gerarAtribuicaoDeTiers(tiers) {
+  // tiers = [{ id: 1, quantidade: 50000 }, { id: 2, quantidade: 3000 }, ...]
+  const atribuicoes = [];
+  for (const tier of tiers) {
+    for (let i = 0; i < tier.quantidade; i++) {
+      atribuicoes.push(tier.id);
+    }
+  }
+  // Fisher-Yates — evita que tiers fiquem em blocos prévisíveis na lista
+  for (let i = atribuicoes.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(0, i + 1);
+    [atribuicoes[i], atribuicoes[j]] = [atribuicoes[j], atribuicoes[i]];
+  }
+  return atribuicoes;
+}
+```
+
+Cada `cell_id` sorteado (mesma lógica de amostragem única já usada na v3) recebe o
+`tier_id` correspondente dessa lista já embaralhada, e os dois são inseridos juntos em
+`winning_positions`. O hash de commit (seção 8.2.1) passa a ser calculado sobre a
+lista ordenada de pares `(cell_id, tier_id)`, não só sobre os `cell_id`s — garantindo
+que a atribuição de tier também fique travada pelo commit, não só quais posições são
+premiadas.
+
+### 8.3 `webhook_events` — auditoria de webhooks recebidos
+
+Não é estritamente necessária para o fluxo funcionar (a idempotência já é garantida
+por `payment_id UNIQUE` na própria `cells`, seção 4.4.3), mas é fortemente recomendada
+para debugging e resolução de disputas ("paguei e não recebi certificado").
+
+```sql
+CREATE TABLE webhook_events (
+  id BIGSERIAL PRIMARY KEY,
+  payment_id TEXT NOT NULL,
+  cell_id INT,
+  payload JSONB NOT NULL,        -- corpo bruto recebido, para auditoria
+  signature_valid BOOLEAN NOT NULL,
+  result TEXT NOT NULL,          -- processed | duplicate | invalid_signature | error
+  received_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_webhook_events_payment_id ON webhook_events (payment_id);
+```
+
+- Toda chamada recebida em `/webhook/payment-confirmed` (seção 7.5) grava uma linha
+  aqui, **mesmo quando rejeitada por assinatura inválida ou duplicata** — é esse
+  histórico que permite investigar "o provedor mandou o webhook e a gente ignorou por
+  quê" sem depender de log de aplicação, que costuma rotacionar/expirar.
+- Não faz parte da transação principal do pagamento (seção 4.4.3) — pode ser gravado
+  antes ou depois, é só auditoria, não deve bloquear nem falhar o processamento real.
+
+### 8.4 `payments` — detalhe financeiro, histórico de tentativas, antifraude e idempotência de checkout
+
+A `cells.payment_id` (seção 8.1) guarda só a referência ao pagamento **confirmado** —
+suficiente para o fluxo de reserva funcionar. Mas o checkout pode gerar múltiplas
+tentativas antes de confirmar, e dados financeiros/antifraude não pertencem
+naturalmente à tabela que representa o estado da célula. Por isso, uma tabela própria.
+
+⚠️ **Correção:** a coluna `checkout_url` foi adicionada para viabilizar a idempotência
+de `criarCheckout` (seção 4.3.1) — sem ela, não haveria como devolver a mesma URL numa
+segunda chamada sem re-consultar o provedor.
+
+```sql
+CREATE TABLE payments (
+  id BIGSERIAL PRIMARY KEY,
+  cell_id INT NOT NULL REFERENCES cells(id),
+  provider_payment_id TEXT NOT NULL UNIQUE,  -- id do pagamento no provedor
+  checkout_url TEXT NOT NULL,                -- reaproveitada em chamadas repetidas (seção 4.3.1)
+  amount_cents INT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'BRL',
+  status TEXT NOT NULL,           -- pending | confirmed | failed | refunded
+
+  -- antifraude: capturado no momento em que o checkout é criado
+  device_id TEXT,                 -- fingerprint gerado no front (ex: FingerprintJS) —
+                                   -- o mesmo device_id já deve ter sido enviado antes,
+                                   -- em POST /api/cells/reserve (seção 3.1 e 7.2)
+  ip_address INET NOT NULL,
+  user_agent TEXT,
+  geo_country TEXT,               -- derivado do IP, no servidor — nunca do cliente
+  geo_region TEXT,
+  geo_city TEXT,
+
+  created_at TIMESTAMP DEFAULT NOW(),
+  confirmed_at TIMESTAMP
+);
+
+CREATE INDEX idx_payments_cell_id ON payments (cell_id);
+CREATE INDEX idx_payments_ip_address ON payments (ip_address);
+CREATE INDEX idx_payments_device_id ON payments (device_id);
+-- índice parcial usado pela checagem de idempotência em criarCheckout (seção 4.3.1):
+CREATE INDEX idx_payments_cell_pending ON payments (cell_id) WHERE status = 'pending';
+```
+
+**Método fixo em Pix:** como o produto aceita só Pix, não existe coluna `method` — se
+algum dia for aceito outro meio de pagamento, aí sim vale adicionar a coluna de volta.
+
+**Por que a localização precisa ser derivada no servidor, não enviada pelo cliente:**
+qualquer coordenada de geolocalização que o front envie (`navigator.geolocation`, GPS do
+dispositivo) pode ser falsificada trivialmente antes de chegar na API. A forma confiável
+é o **servidor** pegar o `ip_address` da própria requisição HTTP e resolver
+país/região/cidade via um serviço de geolocalização por IP (ex: MaxMind, ipapi) — o
+cliente nunca é a fonte desse dado, só o transporte que carrega o IP até o back.
+
+⚠️ **Correção crítica:** `req.headers['x-forwarded-for']` **não é confiável por padrão**.
+Esse header é escrito pelo cliente na requisição original — se o proxy/load balancer
+da infraestrutura só **anexar** o IP real ao final da lista, em vez de **substituir**
+qualquer valor que já veio do cliente, um atacante pode mandar
+`X-Forwarded-For: 1.2.3.4` manualmente e o back lê `1.2.3.4` como se fosse o IP dele,
+já que o código pega o primeiro item da lista (`.split(',')[0]`). Isso não é uma falha
+teórica: se esse ponto não estiver fechado, todo o rate limit por IP da seção 3.1 —
+e a checagem de conflito de `ip_address` em `payments` — vira decorativo, porque cada
+requisição pode declarar o IP que quiser. Esse ponto sustenta a defesa inteira da
+seção 3.1, então precisa de tratamento explícito, não só o parsing ingênuo do header.
+
+A extração de IP confiável depende de **onde** o parsing acontece:
+
+- **Camada de infraestrutura (preferível):** configurar o proxy/load balancer (ex:
+  Nginx, Cloudflare, AWS ALB) para **sobrescrever** `X-Forwarded-For` com o IP real da
+  conexão TCP, descartando qualquer valor que o cliente tenha enviado antes de chegar
+  no proxy. Nesse cenário, o header que chega na aplicação já é confiável por
+  construção, e o back só precisa ler o **último** IP da cadeia (o mais próximo da
+  infraestrutura), não o primeiro — o primeiro item continua sendo o que o cliente
+  declarou.
+- **Camada de aplicação (se não houver controle sobre o proxy):** usar uma lib que
+  conheça a topologia de proxies confiáveis (ex: `app.set('trust proxy', N)` no
+  Express, configurando quantos hops de proxy confiável existem na cadeia) em vez de
+  pegar `.split(',')[0]` cegamente. Isso faz o framework descartar os IPs que vieram
+  antes dos proxies conhecidos e devolver só o IP que efetivamente bateu na borda da
+  infraestrutura.
+
+```js
+// no handler que cria o checkout, no back — nunca no front
+//
+// req.ip aqui assume que o framework já está configurado para confiar só nos
+// proxies conhecidos (ex: `app.set('trust proxy', 1)` para 1 hop de load balancer)
+// — não usar x-forwarded-for cru sem essa configuração.
+const ip = req.ip;
+const geo = await geolocationService.lookup(ip); // resolve no servidor
+
+await db.query(
+  `INSERT INTO payments (cell_id, provider_payment_id, checkout_url, amount_cents,
+                          status, device_id, ip_address, user_agent,
+                          geo_country, geo_region, geo_city)
+   VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10)`,
+  [cellId, providerPaymentId, checkoutUrl, amountCents, deviceId, ip,
+   req.headers['user-agent'], geo.country, geo.region, geo.city]
+);
+```
+
+- Toda tentativa de checkout (mesmo as que falham) gera uma linha aqui — não só a que
+  confirma. Isso dá visibilidade do funil e também um histórico útil pra investigar
+  padrões suspeitos (mesmo `device_id` ou `ip_address` tentando muitas reservas em
+  sequência, por exemplo).
+- **Idempotência de criação:** antes de inserir uma nova linha, `criarCheckout`
+  consulta se já existe uma linha `status = 'pending'` para aquele `cell_id` e, se
+  existir, devolve `checkout_url` dessa linha em vez de chamar o provedor de novo
+  (seção 4.3.1). O índice parcial `idx_payments_cell_pending` existe especificamente
+  para essa consulta.
+- Quando o webhook confirma um pagamento (seção 4.4.3), a transação atualiza tanto
+  `payments.status = 'confirmed'` quanto `cells.status = 'paid'` e `cells.payment_id`
+  — as duas tabelas ficam sincronizadas dentro da mesma transação.
+- `provider_payment_id UNIQUE` aqui reforça a mesma idempotência que já existe via
+  `cells.payment_id UNIQUE` — redundante de propósito, os dois lados protegem contra
+  duplicata.
+- Reembolso (`refunded`) e qualquer lógica de estorno ficam isolados nessa tabela, sem
+  precisar mexer no estado da célula (que continua `paid` — a célula já foi entregue,
+  o reembolso é uma questão financeira à parte).
+- **`device_id` é capturado já em `POST /api/cells/reserve`** (seção 7.2), antes mesmo
+  do checkout, e reutilizado aqui — isso alimenta diretamente o rate limit por
+  `device_id` da seção 3.1 com um dado mais estruturado do que só o IP da requisição,
+  e permite cruzar reservas e tentativas de pagamento do mesmo dispositivo mesmo
+  quando o IP muda entre uma etapa e outra.
+
+### 8.5 `cell_signatures` — assinatura pública opcional (rede social)
+
+Suporta a etapa opcional pós-pagamento da seção 4.7. Separada de `cells` de propósito
+(ver justificativa completa na seção 4.7): mistura dado privado (`email`) com dado
+público exibível (username de rede social) na mesma tabela seria fácil de vazar por
+`SELECT *` acidental, e a moderação desse conteúdo merece um eixo de estado próprio,
+independente do `status` de `cells`.
+
+```sql
+CREATE TABLE cell_signatures (
+  cell_id INT PRIMARY KEY REFERENCES cells(id),
+  platform TEXT NOT NULL,              -- 'instagram' | 'x'
+  handle TEXT NOT NULL,                -- sem @, normalizado no back (seção 4.7)
+  moderation_status TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | hidden
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- usado por GET /api/cells/:id (seção 7.4) para filtrar só assinaturas aprovadas
+CREATE INDEX idx_cell_signatures_moderation ON cell_signatures (moderation_status);
+```
+
+- **`cell_id` como chave primária**, não uma coluna `id` própria — a relação é 1:1 com
+  a célula (uma assinatura por célula), não há motivo para uma surrogate key.
+- **`moderation_status` nasce sempre `pending`** — nenhuma assinatura é exibida
+  publicamente antes de revisão humana (ou automatizada, se um filtro de
+  conteúdo/impersonation for adotado depois), independente do que o usuário digitou.
+- **Não há verificação de propriedade da conta** — `platform` + `handle` são só texto
+  livre. A tabela não tem nenhum campo de verificação (token OAuth, etc.) porque essa
+  verificação está fora de escopo (seção 6); se algum dia entrar, seria uma coluna
+  adicional aqui (ex: `verified_via_oauth BOOLEAN`), não uma tabela nova.
+- **Sem `ON CONFLICT DO UPDATE` — gravação única** (seção 4.7): a linha, uma vez
+  inserida, não é alterada pela API pública. A única forma de mudança é `DELETE`
+  executado manualmente pelo suporte (seção 4.7.1); não existe caminho de `UPDATE`
+  self-service. `updated_at` fica de fora do propósito original de "quando o usuário
+  editou" e passa a não ter uso prático nesse desenho — pode ser removido da tabela, a
+  menos que sirva para algo como registrar quando a moderação mudou o
+  `moderation_status` (ex: `pending → approved`).
+
+#### 8.5.1 `signature_deletion_log` — comprovação de exclusão sem reter o dado
+
+Tabela leve para o processo da seção 4.7.1: registra que um pedido de exclusão foi
+atendido, **sem guardar o dado que foi excluído** — do contrário, a exclusão não
+teria efeito real, só teria movido o `handle` de uma tabela pra outra.
+
+```sql
+CREATE TABLE signature_deletion_log (
+  id BIGSERIAL PRIMARY KEY,
+  cell_id INT NOT NULL,          -- não referencia cell_signatures — a linha original já não existe
+  deleted_at TIMESTAMP DEFAULT NOW(),
+  requested_via TEXT,            -- ex: 'email', 'formulário de suporte' — canal do pedido, não PII
+  deleted_by TEXT                -- identificador de quem no time executou (ex: e-mail interno da equipe)
+);
+```
+
+- **Não tem `platform` nem `handle`** — de propósito. O objetivo é só provar
+  operacionalmente "esse pedido foi atendido em tal data", não recriar um arquivo do
+  dado que deveria ter sido apagado.
+- **`cell_id` não é `REFERENCES cells(id)` com `ON DELETE CASCADE` nem nada que
+  dependa da linha de `cell_signatures` continuar existindo** — o log sobrevive
+  mesmo depois que a linha original foi apagada, que é exatamente o ponto.
+
+### 8.6 O que fica de fora do banco (de propósito)
+
+- **Rate limit de reservas** (seção 3.1) — não vira tabela SQL. Fica em cache
+  (Redis, com TTL) por natureza: é estado de curtíssimo prazo, de alta frequência de
+  escrita, e não precisa durabilidade além da janela de rate limit. Isso vale tanto
+  para os contadores por IP quanto por `device_id`, e para o flag de "exige CAPTCHA"
+  de um IP/device que acionou o limite repetidas vezes.
+- **Contagem de colunas lógicas** (`LOGICAL_COLUMNS`, seção 1.1) — é constante de
+  aplicação compartilhada entre front e back, não dado de banco.
+
+### 8.7 Resumo
+
+| Tabela | Propósito | Obrigatória? |
+|---|---|---|
+| `cells` | Estado de cada célula, reserva, pagamento, valor de prêmio liberado | Sim |
+| `winning_positions` | Quais células são premiadas, de qual tier — pré-gerado e commitado (hash) antes da 1ª venda (8.2.1) | Sim |
+| `prize_pool` | Estado por tier do caixa de prêmios (total/restante), trava a concorrência do cálculo (8.2.2) | Sim |
+| `prize_tier_batch` | Commit-reveal do lote inteiro de posições premiadas (8.2.2) | Sim |
+| `payout_safety_config` | Margem de segurança de liquidez — teto por pagamento como fração do caixa (8.2.3) | Sim |
+| `prize_calculation_log` | Auditoria de cada cálculo de valor liberado (8.2.5) | Recomendada, forte para disputas/auditoria |
+| `payments` | Histórico de tentativas, idempotência de checkout, antifraude | Recomendada, forte para idempotência |
+| `webhook_events` | Log de auditoria de webhooks recebidos | Recomendada, não bloqueante |
+| `cash_ledger` | Livro-razão de movimentações de caixa (receita, prêmios, reembolsos) | Sim, para monitoramento financeiro (seção 9) |
+| `cell_signatures` | Assinatura pública opcional com rede social, sujeita a moderação; gravação única, sem edição via API | Opcional, só se a feature de assinatura for adotada |
+| `signature_deletion_log` | Comprova exclusões atendidas pelo suporte, sem reter o dado excluído | Opcional, junto com `cell_signatures` |
+
+> `prizes` (catálogo com `weight`/`stock` da v2) foi **removida** — substituída pelo
+> par `winning_positions` + `prize_pool` (seção 8.2).
+
+---
+
+## 9. Monitoramento financeiro: caixa, receita e prêmios distribuídos
+
+O objetivo é responder três perguntas de forma confiável: quanto entrou (receita
+confirmada), quanto saiu em prêmios, e qual é o saldo de caixa atual. Nenhuma das
+tabelas existentes até aqui cobre isso sozinha: `payments` tem o valor recebido por
+tentativa, mas não distingue "confirmado" de "ainda pendente" numa view agregada
+pronta; `cells` tem o valor de prêmio liberado (`prize_value_cents`, seção 8.2), mas
+não separa isso de receita nem acumula saldo.
+
+> **Dependência circular aparente, resolvida:** o cálculo de `calcularPremio()` (seção
+> 8.2.3) usa `caixaDisponivelCents`, que é exatamente a consulta de "saldo de caixa
+> atual" desta seção (9.3) — chamada dentro da mesma transação, antes do `INSERT` de
+> `prize_payout` que o próprio cálculo vai gerar. Não é circular de fato: o saldo é
+> lido primeiro (via `cash_ledger` já commitado até ali), o valor liberado é
+> calculado a partir dele, e só depois o novo lançamento é inserido.
+
+### 9.1 Por que um ledger dedicado, e não só agregar `payments`/`cells`
+
+Seria possível calcular tudo isso com `SUM(amount_cents) FROM payments WHERE status =
+'confirmed'` e uma soma de `cells.prize_value_cents`. Isso funciona, mas tem duas
+limitações que crescem com o tempo:
+
+- **Fica caro conforme o volume cresce.** Toda consulta de saldo escaneia (ou agrega
+  via índice) a tabela inteira de pagamentos e a tabela inteira de células pagas. Um
+  ledger append-only já nasce no formato de "evento financeiro", então relatórios por
+  período (dia, semana, mês) são só um `WHERE created_at BETWEEN ...` sobre uma tabela
+  mais enxuta e já filtrada para eventos que de fato movimentam caixa.
+- **Não tem lugar natural para reembolsos e ajustes.** `payments.status = 'refunded'`
+  (seção 8.4) marca que um reembolso aconteceu, mas não registra isso como uma
+  movimentação de caixa própria — e ajustes manuais (ex: estorno parcial, correção de
+  um lançamento errado) não têm onde morar em `payments` ou `cells` sem forçar a
+  semântica dessas tabelas, que representam **estado**, não **histórico de
+  movimentação**.
+
+O `cash_ledger` separa essas duas responsabilidades: `cells`/`payments`/`winning_positions`/
+`prize_pool` continuam sendo a fonte de verdade sobre o **estado** de cada
+célula/pagamento/posição premiada; o
+ledger é a fonte de verdade sobre **o que efetivamente moveu o caixa**, como uma
+lista de lançamentos que nunca são alterados, só adicionados — o mesmo princípio de
+log append-only que você já usa no motor de precificação do P2P lending.
+
+### 9.2 Estrutura
+
+```sql
+CREATE TABLE cash_ledger (
+  id BIGSERIAL PRIMARY KEY,
+  entry_type TEXT NOT NULL,        -- 'revenue' | 'prize_payout' | 'refund'
+  cell_id INT NOT NULL REFERENCES cells(id),
+  amount_cents INT NOT NULL,       -- sempre positivo; entry_type define a direção
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- idempotência: no máximo um lançamento de cada tipo por célula.
+-- 'revenue' e 'prize_payout' são naturalmente 1-por-célula (preço fixo, um prêmio
+-- por célula). 'refund', se algum dia precisar ser parcial/múltiplo, exige revisar
+-- essa constraint (ver 9.4).
+CREATE UNIQUE INDEX idx_cash_ledger_dedup ON cash_ledger (entry_type, cell_id);
+
+-- usado pelos relatórios por período (9.3)
+CREATE INDEX idx_cash_ledger_type_created ON cash_ledger (entry_type, created_at);
+```
+
+- **`amount_cents` é sempre positivo** — a direção do movimento (entrada ou saída) vem
+  do `entry_type`, nunca do sinal do número. Isso evita o erro clássico de somar tudo
+  direto e obter um resultado errado se algum lançamento for gravado com o sinal
+  trocado por engano.
+- **Nunca existe `UPDATE` nem `DELETE` nessa tabela** — se um lançamento estiver
+  errado, a correção é um novo lançamento compensatório (ex: um `refund` que anula um
+  `revenue`), nunca editar a linha original. Isso preserva o histórico completo para
+  auditoria, igual ao princípio de log append-only já usado nas outras partes do
+  sistema.
+- **`ON CONFLICT DO NOTHING`** na escrita (seção 4.4.3) é a rede de segurança: mesmo
+  que o webhook seja reprocessado por algum motivo fora do fluxo normal de
+  idempotência já existente, o ledger nunca duplica um lançamento para a mesma célula.
+
+### 9.3 Consultas
+
+**Saldo de caixa atual:**
+
+```sql
+SELECT
+  COALESCE(SUM(amount_cents) FILTER (WHERE entry_type = 'revenue'), 0)
+  - COALESCE(SUM(amount_cents) FILTER (WHERE entry_type = 'prize_payout'), 0)
+  - COALESCE(SUM(amount_cents) FILTER (WHERE entry_type = 'refund'), 0)
+  AS saldo_caixa_cents
+FROM cash_ledger;
+```
+
+**Receita total confirmada:**
+
+```sql
+SELECT COALESCE(SUM(amount_cents), 0) AS receita_total_cents
+FROM cash_ledger
+WHERE entry_type = 'revenue';
+```
+
+**Total distribuído em prêmios:**
+
+```sql
+SELECT COALESCE(SUM(amount_cents), 0) AS premios_distribuidos_cents
+FROM cash_ledger
+WHERE entry_type = 'prize_payout';
+```
+
+**Qualquer um dos três por período** (dashboard diário/semanal/mensal), usando o
+índice `idx_cash_ledger_type_created`:
+
+```sql
+SELECT
+  date_trunc('day', created_at) AS dia,
+  entry_type,
+  SUM(amount_cents) AS total_cents
+FROM cash_ledger
+WHERE created_at >= NOW() - INTERVAL '30 days'
+GROUP BY 1, 2
+ORDER BY 1, 2;
+```
+
+Para volumes muito altos (dezenas de milhões de lançamentos), essas agregações podem
+ficar lentas mesmo com índice. Se isso acontecer na prática, o próximo passo natural é
+uma tabela de resumo diário (`cash_ledger_daily_summary`, uma linha por dia/tipo,
+atualizada por um job) — mas não vale adicionar essa complexidade agora, antes de o
+volume real justificar.
+
+### 9.4 Reembolsos — fora do escopo deste documento, mas o ledger já está pronto
+
+O fluxo de reembolso em si (quem aciona, se é automático ou manual, como o provedor
+Pix processa a devolução) não está definido em nenhuma seção anterior — `payments`
+seção 8.4 só prevê o status `refunded` como destino possível, sem processo descrito.
+Quando esse fluxo for desenhado, o ponto de integração com o caixa é direto: o mesmo
+handler que marcar `payments.status = 'refunded'` deve, na mesma transação, inserir um
+lançamento `entry_type = 'refund'` no `cash_ledger` com o valor devolvido — seguindo
+exatamente o padrão já estabelecido em 4.4.3 (estado e lançamento financeiro sempre
+gravados juntos, atomicamente).
+
+### 9.5 O que o ledger não substitui
+
+- **Não substitui `webhook_events`** (seção 8.3) — o ledger registra só o que
+  efetivamente moveu caixa; `webhook_events` registra toda tentativa de webhook,
+  incluindo as rejeitadas por assinatura inválida ou os conflitos de token (seção
+  4.4.4), que nunca geram lançamento financeiro.
+- **Não substitui reconciliação com o provedor Pix.** O `cash_ledger` reflete o que o
+  seu sistema *acredita* ter recebido/pago, com base nos webhooks processados. Uma
+  divergência real (ex: o provedor reporta um valor diferente do que o webhook
+  informou) só aparece comparando o ledger com o extrato do provedor — isso é
+  reconciliação financeira, um processo separado, não algo que a existência do ledger
+  resolve sozinha.

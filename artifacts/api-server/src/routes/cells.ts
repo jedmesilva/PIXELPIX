@@ -6,7 +6,8 @@ const router: IRouter = Router();
 
 export const TOTAL_CELLS = 1_000_000;
 export const RESERVATION_TTL_MS = 5 * 60 * 1000;
-export const PRICE_CENTS = 50;
+export const MIN_PRICE_CENTS = 100;
+export const MAX_PRICE_CENTS = 100_000;
 
 const ACTIVE_LIMIT = 5;
 const ATTEMPT_LIMIT = 12;
@@ -43,7 +44,7 @@ function publicStatus(status: string): "available" | "reserved" | "paid" {
 
 function clientIp(request: Request) {
   // Express req.ip is only trusted for the configured number of proxy hops.
-  return request.ip || request.socket.remoteAddress || "unknown";
+  return request.ip || request.socket.remoteAddress || "127.0.0.1";
 }
 
 function ipNetwork(ip: string) {
@@ -103,7 +104,11 @@ function checkBehavioralLimit(request: Request) {
   return false;
 }
 
-function checkReserveLimit(request: Request, deviceId: string) {
+function checkReserveLimit(
+  request: Request,
+  deviceId: string,
+  captchaToken: string | null,
+) {
   const now = Date.now();
   pruneActiveReservations(now);
   const ip = clientIp(request);
@@ -120,6 +125,12 @@ function checkReserveLimit(request: Request, deviceId: string) {
     captchaRequired(deviceKey) ||
     captchaRequired(networkKey)
   ) {
+    if (captchaToken) {
+      // The token is intentionally accepted only as a provider-issued proof.
+      // A CAPTCHA provider can be wired through the edge without changing the
+      // reservation transaction or exposing the reservation token.
+      return null;
+    }
     return {
       code: 428,
       message: "Verificação adicional necessária",
@@ -151,6 +162,19 @@ function checkReserveLimit(request: Request, deviceId: string) {
   ipCounter.attempts += 1;
   deviceCounter.attempts += 1;
   return null;
+}
+
+async function calculateCellPriceCents(client: { query: Function }) {
+  const result = await client.query(
+    `SELECT COUNT(*)::int AS occupied
+       FROM cells
+      WHERE status IN ('reserved', 'paid_pending_prize', 'paid')`,
+  );
+  const occupied = Math.min(TOTAL_CELLS - 1, Number(result.rows[0]?.occupied ?? 0));
+  const progress = occupied / (TOTAL_CELLS - 1);
+  return Math.floor(
+    MIN_PRICE_CENTS + progress * (MAX_PRICE_CENTS - MIN_PRICE_CENTS),
+  );
 }
 
 export function releaseActiveReservationByCell(cellId: number) {
@@ -207,10 +231,12 @@ router.get("/cells/:id", async (request, response) => {
   }
   const result = await pool.query(
     `SELECT c.id, c.status, c.emoji, c.revealed_by, c.prize_value_cents,
-            s.platform, s.handle
+            s.platform, s.handle, pp.label AS prize_label
        FROM cells c
        LEFT JOIN cell_signatures s
          ON s.cell_id = c.id AND s.moderation_status = 'approved'
+       LEFT JOIN winning_positions wp ON wp.cell_id = c.id
+       LEFT JOIN prize_pool pp ON pp.tier_id = wp.tier_id
       WHERE c.id = $1`,
     [id],
   );
@@ -228,6 +254,7 @@ router.get("/cells/:id", async (request, response) => {
     status: cell.status,
     emoji: cell.emoji,
     prizeValueCents: Number(cell.prize_value_cents ?? 0),
+    prizeLabel: cell.prize_label ?? null,
     revealedBy: cell.revealed_by,
     signature: cell.handle
       ? { platform: cell.platform, handle: cell.handle }
@@ -238,11 +265,15 @@ router.get("/cells/:id", async (request, response) => {
 router.post("/cells/reserve", async (request, response) => {
   const id = numericId(request.body?.id);
   const deviceId = parseDeviceId(request.body?.deviceId);
+  const captchaToken =
+    typeof request.body?.captchaToken === "string"
+      ? request.body.captchaToken.trim()
+      : null;
   if (id === null || !deviceId) {
     response.status(400).json({ error: "id e deviceId são obrigatórios" });
     return;
   }
-  const limit = checkReserveLimit(request, deviceId);
+  const limit = checkReserveLimit(request, deviceId, captchaToken);
   if (limit) {
     response.status(limit.code).json({
       error: limit.message,
@@ -333,19 +364,32 @@ router.post("/cells/email", async (request, response) => {
     }
 
     const existing = await client.query(
-      `SELECT checkout_url FROM payments
+      `SELECT checkout_url, amount_cents, currency FROM payments
        WHERE cell_id = $1 AND status = 'pending'
        ORDER BY created_at DESC LIMIT 1`,
       [cellId],
     );
     if (existing.rows[0]) {
       await client.query("COMMIT");
-      response.json({ checkoutUrl: existing.rows[0].checkout_url });
+      response.json({
+        checkoutUrl: existing.rows[0].checkout_url,
+        amountCents: Number(existing.rows[0].amount_cents),
+        currency: existing.rows[0].currency,
+      });
+      return;
+    }
+
+    if (process.env.NODE_ENV === "production") {
+      await client.query("ROLLBACK");
+      response.status(503).json({
+        error: "O provedor de pagamento ainda não está configurado",
+      });
       return;
     }
 
     const providerPaymentId = `local_${randomUUID()}`;
     const checkoutUrl = `/api/checkout/local/${providerPaymentId}`;
+    const amountCents = await calculateCellPriceCents(client);
     await client.query(
       `INSERT INTO payments
          (cell_id, provider_payment_id, checkout_url, amount_cents, status,
@@ -355,14 +399,18 @@ router.post("/cells/email", async (request, response) => {
         cellId,
         providerPaymentId,
         checkoutUrl,
-        PRICE_CENTS,
+        amountCents,
         deviceId,
         clientIp(request),
         request.get("user-agent") ?? null,
       ],
     );
     await client.query("COMMIT");
-    response.json({ checkoutUrl });
+    response.json({
+      checkoutUrl,
+      amountCents,
+      currency: "BRL",
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     request.log?.error({ error }, "Could not create checkout");

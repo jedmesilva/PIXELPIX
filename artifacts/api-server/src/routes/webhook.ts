@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { pool } from "@workspace/db";
-import { PRICE_CENTS, releaseActiveReservationByCell } from "./cells";
+import { releaseActiveReservationByCell } from "./cells";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 const MAX_DIRECT_ALERTS_PER_HOUR = 100;
@@ -27,13 +28,14 @@ function alertOperationsWithLimit(cellId: number, paymentId: string) {
   alertsThisHour += 1;
   // Replace this bounded hook with an authenticated operations connector when one
   // is selected. The audit row is always written independently of this alert.
-  console.warn(
-    JSON.stringify({
+  logger.warn(
+    {
       event: "stale_token_conflict",
       cellId,
       paymentId,
       alertSuppressedAfterHourlyLimit: false,
-    }),
+    },
+    "Payment requires manual review",
   );
 }
 
@@ -177,6 +179,13 @@ export async function processPaymentConfirmed(input: {
       );
       if (current.rows[0]?.payment_id === input.paymentId) {
         await client.query("ROLLBACK");
+        await recordWebhookEvent(
+          input.paymentId,
+          input.cellId,
+          input.payload,
+          true,
+          "duplicate",
+        );
         return { result: "duplicate" as const };
       }
       await client.query(
@@ -302,10 +311,25 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
       : "unknown";
 
   try {
-    const reference =
-      typeof request.body?.referenciaExterna === "string"
-        ? JSON.parse(request.body.referenciaExterna)
-        : request.body?.referenciaExterna ?? request.body?.reference;
+    let reference: Record<string, unknown> | null = null;
+    if (typeof request.body?.referenciaExterna === "string") {
+      try {
+        const parsed = JSON.parse(request.body.referenciaExterna);
+        reference =
+          parsed && typeof parsed === "object"
+            ? (parsed as Record<string, unknown>)
+            : null;
+      } catch {
+        reference = null;
+      }
+    } else if (
+      request.body?.referenciaExterna &&
+      typeof request.body.referenciaExterna === "object"
+    ) {
+      reference = request.body.referenciaExterna as Record<string, unknown>;
+    } else if (request.body?.reference && typeof request.body.reference === "object") {
+      reference = request.body.reference as Record<string, unknown>;
+    }
     const cellId = Number(reference?.cellId);
     const token = typeof reference?.token === "string" ? reference.token : "";
     if (!signatureOk) {
@@ -327,6 +351,13 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
       !paymentId ||
       paymentId === "unknown"
     ) {
+      await recordWebhookEvent(
+        paymentId,
+        Number.isInteger(cellId) ? cellId : null,
+        request.body,
+        true,
+        "invalid_reference",
+      );
       response.status(400).send("Referência externa inválida");
       return;
     }

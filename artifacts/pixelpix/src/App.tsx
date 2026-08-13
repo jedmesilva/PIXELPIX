@@ -24,7 +24,7 @@ const LOGICAL_COLUMNS = 1_000;
 const MIN_CELL_PX = 34;
 const BUFFER_ROWS = 4;
 const CHUNK_SIZE = 2_500;
-const PIXEL_PRICE = 0.5;
+const STARTING_PIXEL_PRICE = 1;
 const RECEIPT_EMAIL_STORAGE_KEY = "pixelpix-receipt-email";
 const SOCIAL_PROFILE_STORAGE_KEY = "pixelpix-social-profile";
 
@@ -35,6 +35,8 @@ type Pixel = {
   emoji: string | null;
   revealedBy: string | null;
   revealedAt: Date | null;
+  prizeValueCents: number;
+  prizeLabel: string | null;
   socialProfile: SocialProfile;
   status: "available" | "reserved" | "paid";
 };
@@ -81,6 +83,8 @@ function emptyPixel(id: number): Pixel {
     emoji: null,
     revealedBy: null,
     revealedAt: null,
+    prizeValueCents: 0,
+    prizeLabel: null,
     socialProfile: EMPTY_SOCIAL_PROFILE,
     status: "available",
   };
@@ -106,12 +110,20 @@ function getPixel(id: number) {
   return getChunk(Math.floor(id / CHUNK_SIZE)).get(id)!;
 }
 
-function revealPixelInCache(id: number, socialProfile: SocialProfile, revealedAt = new Date()) {
+function revealPixelInCache(
+  id: number,
+  socialProfile: SocialProfile,
+  prizeValueCents: number,
+  prizeLabel: string | null,
+  revealedAt = new Date(),
+) {
   const pixel = getPixel(id);
   pixel.revealed = true;
   pixel.emoji = pickEmoji(id);
   pixel.revealedBy = CURRENT_USER_NICKNAME;
   pixel.revealedAt = revealedAt;
+  pixel.prizeValueCents = prizeValueCents;
+  pixel.prizeLabel = prizeLabel;
   pixel.socialProfile = socialProfile;
   pixel.status = "paid";
   return pixel;
@@ -128,6 +140,8 @@ function applyCellStatus(
     pixel.emoji = null;
     pixel.revealedBy = null;
     pixel.revealedAt = null;
+    pixel.prizeValueCents = 0;
+    pixel.prizeLabel = null;
     pixel.socialProfile = EMPTY_SOCIAL_PROFILE;
   }
 }
@@ -158,13 +172,6 @@ function getDeviceId() {
     return created;
   } catch {
     return `device_${globalThis.crypto?.randomUUID?.() ?? "ephemeral"}`;
-  }
-}
-
-function updatePixelSocialProfile(pixelId: number, socialProfile: SocialProfile) {
-  const pixel = getPixel(pixelId);
-  if (pixel.revealedBy === CURRENT_USER_NICKNAME) {
-    pixel.socialProfile = socialProfile;
   }
 }
 
@@ -241,6 +248,8 @@ type ReceiptPayload = {
   revealedAt: string;
   value: number;
   emoji: string;
+  prizeValueCents: number;
+  prizeLabel: string | null;
   socialProfile: SocialProfile;
 };
 
@@ -319,6 +328,9 @@ function PixelSheet({
   const [reservationExpiresAt, setReservationExpiresAt] = useState<number | null>(null);
   const [signatureSubmitted, setSignatureSubmitted] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState("");
+  const [checkoutAmountCents, setCheckoutAmountCents] = useState(
+    STARTING_PIXEL_PRICE * 100,
+  );
   const checkoutReference = checkoutUrl || "checkout ainda não criado";
   const [secondsRemaining, setSecondsRemaining] = useState(300);
 
@@ -344,6 +356,7 @@ function PixelSheet({
     setReservationExpiresAt(null);
     setSignatureSubmitted(false);
     setCheckoutUrl("");
+    setCheckoutAmountCents(STARTING_PIXEL_PRICE * 100);
   }, [pixel.id]);
 
   useEffect(() => {
@@ -418,14 +431,18 @@ function PixelSheet({
         id: number;
         emoji: string | null;
         status: string;
+        prizeValueCents?: number;
+        prizeLabel?: string | null;
       }>(`/api/cells/${confirmation.cellId}`);
       const receipt: ReceiptPayload = {
         pixelId: confirmation.cellId,
         email: normalizedEmail,
         paymentId: "server-confirmed",
         revealedAt: new Date().toISOString(),
-        value: PIXEL_PRICE,
+        value: Number(detail.prizeValueCents ?? 0) / 100,
         emoji: detail.emoji ?? pickEmoji(confirmation.cellId),
+        prizeValueCents: Number(detail.prizeValueCents ?? 0),
+        prizeLabel: detail.prizeLabel ?? null,
         socialProfile: EMPTY_SOCIAL_PROFILE,
       };
       await onReveal(receipt);
@@ -453,7 +470,11 @@ function PixelSheet({
     void (async () => {
       setIsSubmittingReveal(true);
       try {
-        const result = await fetchJson<{ checkoutUrl: string }>("/api/cells/email", {
+        const result = await fetchJson<{
+          checkoutUrl: string;
+          amountCents: number;
+          currency: string;
+        }>("/api/cells/email", {
           method: "POST",
           body: JSON.stringify({
             cellId: pixel.id,
@@ -465,6 +486,7 @@ function PixelSheet({
         storeReceiptEmail(normalizedEmail);
         setReceiptEmail(normalizedEmail);
         setCheckoutUrl(result.checkoutUrl);
+        setCheckoutAmountCents(result.amountCents);
         setEmailPromptOpen(false);
         setCheckoutOpen(true);
       } catch (error) {
@@ -508,7 +530,9 @@ function PixelSheet({
 
             <div className="prototype-checkout-title">
               <div className="prototype-eyebrow">PAGAMENTO VIA PIX</div>
-              <div className="prototype-price">{formatBRL(PIXEL_PRICE)}</div>
+               <div className="prototype-price">
+                 {formatBRL(checkoutAmountCents / 100)}
+               </div>
                <div className="prototype-subtle">
                  Pixel #{pixel.id.toLocaleString("pt-BR")} · reserva expira em{" "}
                  {String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:
@@ -672,7 +696,8 @@ function PixelSheet({
                       </div>
                     )}
 
-                    {pixel.revealedBy === CURRENT_USER_NICKNAME &&
+                     {reservationToken &&
+                       pixel.revealedBy === CURRENT_USER_NICKNAME &&
                       !hasSignature &&
                       !signatureSubmitted && (
                       <button
@@ -794,10 +819,10 @@ function SignatureFormView({
         <h2>
           {isEditing ? "Editar sua assinatura" : "Assinar esse pixel publicamente"}
         </h2>
-        <p>
-          {isEditing
-            ? "Atualize a rede ou o @ que aparece nos pixels assinados por você."
-           : "Escolha uma rede e adicione seu @ para deixar sua assinatura pública neste pixel. Depois do envio, alterações ou remoções só podem ser solicitadas ao suporte."}
+          <p>
+           Escolha uma rede e adicione seu @ para deixar sua assinatura pública
+           neste pixel. A assinatura passa por moderação e, depois do envio,
+           alterações ou remoções só podem ser solicitadas ao suporte.
         </p>
       </div>
       <SocialProfileForm
@@ -992,6 +1017,7 @@ function PixelGrid() {
       emoji?: string | null;
       revealedBy?: string | null;
       prizeValueCents?: number;
+      prizeLabel?: string | null;
       signature?: { platform: SignatureNetwork; handle: string } | null;
     }>(`/api/cells/${selectedId}`)
       .then((detail) => {
@@ -1000,6 +1026,8 @@ function PixelGrid() {
         if (detail.status === "paid") {
           pixel.emoji = detail.emoji ?? null;
           pixel.revealedBy = detail.revealedBy ?? null;
+          pixel.prizeValueCents = Number(detail.prizeValueCents ?? 0);
+          pixel.prizeLabel = detail.prizeLabel ?? null;
           pixel.revealedAt = pixel.revealedAt ?? new Date();
           pixel.socialProfile = detail.signature
             ? { network: detail.signature.platform, handle: detail.signature.handle }
@@ -1027,6 +1055,8 @@ function PixelGrid() {
       revealPixelInCache(
         receipt.pixelId,
         receipt.socialProfile,
+        receipt.prizeValueCents,
+        receipt.prizeLabel,
         new Date(receipt.revealedAt),
       );
       setRevealVersion((version) => version + 1);
@@ -1043,8 +1073,6 @@ function PixelGrid() {
           handle: profile.handle,
         }),
       });
-      setSocialProfile(profile);
-      updatePixelSocialProfile(cellId, profile);
       setRevealVersion((version) => version + 1);
     },
     [],
