@@ -429,6 +429,9 @@ components:
         redeemedPrizeCents: { type: integer, minimum: 0 }
         totalPrizeToDistributeCents: { type: integer, minimum: 0 }
         pendingRedemptionCents: { type: integer, minimum: 0 }
+        grossRevenueCents: { type: integer, minimum: 0 }
+        refundsCents: { type: integer, minimum: 0 }
+        cashAvailableCents: { type: integer, minimum: 0 }
         availableCells: { type: integer, minimum: 0 }
         reservedCells: { type: integer, minimum: 0 }
         paidCells: { type: integer, minimum: 0 }
@@ -443,6 +446,9 @@ components:
         - redeemedPrizeCents
         - totalPrizeToDistributeCents
         - pendingRedemptionCents
+        - grossRevenueCents
+        - refundsCents
+        - cashAvailableCents
         - availableCells
         - reservedCells
         - paidCells

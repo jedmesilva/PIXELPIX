@@ -186,6 +186,12 @@ export const getAdminOverviewResponseTotalPrizeToDistributeCentsMin = 0;
 
 export const getAdminOverviewResponsePendingRedemptionCentsMin = 0;
 
+export const getAdminOverviewResponseGrossRevenueCentsMin = 0;
+
+export const getAdminOverviewResponseRefundsCentsMin = 0;
+
+export const getAdminOverviewResponseCashAvailableCentsMin = 0;
+
 export const getAdminOverviewResponseAvailableCellsMin = 0;
 
 export const getAdminOverviewResponseReservedCellsMin = 0;
@@ -204,6 +210,9 @@ export const GetAdminOverviewResponse = zod.object({
   "redeemedPrizeCents": zod.int().min(getAdminOverviewResponseRedeemedPrizeCentsMin),
   "totalPrizeToDistributeCents": zod.int().min(getAdminOverviewResponseTotalPrizeToDistributeCentsMin),
   "pendingRedemptionCents": zod.int().min(getAdminOverviewResponsePendingRedemptionCentsMin),
+  "grossRevenueCents": zod.int().min(getAdminOverviewResponseGrossRevenueCentsMin),
+  "refundsCents": zod.int().min(getAdminOverviewResponseRefundsCentsMin),
+  "cashAvailableCents": zod.int().min(getAdminOverviewResponseCashAvailableCentsMin),
   "availableCells": zod.int().min(getAdminOverviewResponseAvailableCellsMin),
   "reservedCells": zod.int().min(getAdminOverviewResponseReservedCellsMin),
   "paidCells": zod.int().min(getAdminOverviewResponsePaidCellsMin),

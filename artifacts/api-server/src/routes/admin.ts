@@ -82,6 +82,13 @@ router.get("/admin/overview", async (request, response): Promise<void> => {
       COALESCE((SELECT SUM(requested_amount_cents) FROM prize_redemption_requests WHERE status = 'paid'), 0) AS redeemed_prize_cents,
       COALESCE((SELECT SUM(total_value_cents) FROM prize_pool), 0) AS total_prize_to_distribute_cents,
       COALESCE((SELECT SUM(requested_amount_cents) FROM prize_redemption_requests WHERE status IN ('pending', 'approved')), 0) AS pending_redemption_cents,
+      COALESCE((SELECT SUM(amount_cents) FROM cash_ledger WHERE entry_type = 'revenue'), 0) AS gross_revenue_cents,
+      COALESCE((SELECT SUM(amount_cents) FROM cash_ledger WHERE entry_type = 'refund'), 0) AS refunds_cents,
+      GREATEST(
+        0,
+        COALESCE((SELECT SUM(amount_cents) FROM cash_ledger WHERE entry_type = 'revenue'), 0)
+        - COALESCE((SELECT SUM(amount_cents) FROM cash_ledger WHERE entry_type IN ('refund', 'prize_payout')), 0)
+      ) AS cash_available_cents,
       (SELECT COUNT(*) FROM cells WHERE status = 'available') AS available_cells,
       (SELECT COUNT(*) FROM cells WHERE status IN ('reserved', 'paid_pending_prize')) AS reserved_cells,
       (SELECT COUNT(*) FROM cells WHERE status = 'paid') AS paid_cells,
@@ -99,6 +106,9 @@ router.get("/admin/overview", async (request, response): Promise<void> => {
     redeemedPrizeCents: Number(row.redeemed_prize_cents),
     totalPrizeToDistributeCents: Number(row.total_prize_to_distribute_cents),
     pendingRedemptionCents: Number(row.pending_redemption_cents),
+    grossRevenueCents: Number(row.gross_revenue_cents),
+    refundsCents: Number(row.refunds_cents),
+    cashAvailableCents: Number(row.cash_available_cents),
     availableCells: Number(row.available_cells),
     reservedCells: Number(row.reserved_cells),
     paidCells: Number(row.paid_cells),

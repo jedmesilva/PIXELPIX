@@ -19,6 +19,12 @@ export interface AdminOverview {
   /** @minimum 0 */
   pendingRedemptionCents: number;
   /** @minimum 0 */
+  grossRevenueCents: number;
+  /** @minimum 0 */
+  refundsCents: number;
+  /** @minimum 0 */
+  cashAvailableCents: number;
+  /** @minimum 0 */
   availableCells: number;
   /** @minimum 0 */
   reservedCells: number;
