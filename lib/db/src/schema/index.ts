@@ -39,6 +39,10 @@ export const cells = pgTable(
     certificateLastError: text("certificate_last_error"),
   },
   (table) => ({
+    idRange: check(
+      "cells_id_range",
+      sql`${table.id} >= 0 AND ${table.id} < 1000000`,
+    ),
     statusReservedAt: index("idx_cells_status_reserved_at").on(
       table.status,
       table.reservedAt,

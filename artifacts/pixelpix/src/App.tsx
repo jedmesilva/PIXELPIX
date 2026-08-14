@@ -976,18 +976,19 @@ function PixelGrid() {
 
   const visiblePixels = useMemo(() => {
     const pixels: Array<{ id: number; row: number; col: number }> = [];
-    for (let row = startRow; row < endRow; row += 1) {
-      for (let col = 0; col < columns; col += 1) {
-        const visualIndex = row * columns + col;
-        // The visual grid may reflow at any width, but its traversal order is
-        // always mapped back to the fixed logical 1,000-column coordinate system.
-        // This keeps the server-owned cell id stable across viewport changes.
-        const logicalRow = Math.floor(visualIndex / LOGICAL_COLUMNS);
-        const logicalCol = visualIndex % LOGICAL_COLUMNS;
-        const id = logicalRow * LOGICAL_COLUMNS + logicalCol;
-        if (id >= TOTAL_PIXELS) break;
-        pixels.push({ id, row, col });
-      }
+    const firstVisibleId = startRow * columns;
+    const lastVisibleId = Math.min(TOTAL_PIXELS, endRow * columns);
+
+    // Cell identity comes from the logical, linear id space. The visual grid
+    // may reflow to a different number of columns, but it must only change
+    // where an existing id is painted, never which id the cell represents.
+    for (let id = firstVisibleId; id < lastVisibleId; id += 1) {
+      const logicalRow = Math.floor(id / LOGICAL_COLUMNS);
+      const logicalCol = id % LOGICAL_COLUMNS;
+      const stableId = logicalRow * LOGICAL_COLUMNS + logicalCol;
+      const visualRow = Math.floor(id / columns);
+      const visualCol = id % columns;
+      pixels.push({ id: stableId, row: visualRow, col: visualCol });
     }
     return pixels;
   }, [columns, endRow, startRow]);

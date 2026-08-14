@@ -8,32 +8,8 @@ export const TOTAL_CELLS = 1_000_000;
 export const RESERVATION_TTL_MS = 5 * 60 * 1000;
 export const MIN_PRICE_CENTS = 100;
 export const MAX_PRICE_CENTS = 100_000;
-const TOTAL_CELL_SEED = 1_000_000;
 const DEFAULT_CELL_BACKGROUND = "hsl(220, 8%, 18%)";
-const CELL_EMOJIS = [
-  "🌟",
-  "🔥",
-  "🌊",
-  "🍀",
-  "⚡",
-  "🎯",
-  "🪐",
-  "🌙",
-  "🦋",
-  "🍁",
-  "🌵",
-  "🐚",
-  "🍄",
-  "🎈",
-  "🧿",
-  "🪁",
-  "🌈",
-  "🍉",
-  "🦖",
-  "🎲",
-] as const;
-const DEFAULT_CELL_EMOJI = CELL_EMOJIS[0];
-const CELL_EMOJIS_SQL = `ARRAY[${CELL_EMOJIS.map((emoji) => `'${emoji}'`).join(", ")}]`;
+const DEFAULT_CELL_EMOJI = "🌟";
 
 const ACTIVE_LIMIT = 5;
 const ATTEMPT_LIMIT = 12;
@@ -75,46 +51,6 @@ function publicStatus(status: string): "available" | "reserved" | "paid" {
     return "reserved";
   }
   return "available";
-}
-
-export async function ensureCellRecords() {
-  await pool.query(`
-    INSERT INTO cells (id, status, emoji, background_color)
-    SELECT
-      generated.cell_id,
-      'available',
-      CASE
-        WHEN winning.cell_id IS NOT NULL THEN '💰'
-        ELSE (${CELL_EMOJIS_SQL})[
-          1 + mod(
-            mod(generated.cell_id::bigint * 1103515245 + 12345, 2147483647),
-            ${CELL_EMOJIS.length}
-          )
-        ]
-      END,
-      'hsl(220, 8%, ' ||
-        to_char(
-          14 + (
-            mod(
-              mod(generated.cell_id::bigint * 2654435761, 4294967296),
-              1000
-            ) / 100.0
-          ),
-          'FM990.###'
-        ) ||
-      '%)'
-    FROM generate_series(0, ${TOTAL_CELL_SEED - 1}) AS generated(cell_id)
-    LEFT JOIN winning_positions AS winning ON winning.cell_id = generated.cell_id
-    ON CONFLICT (id) DO UPDATE
-      SET emoji = CASE
-        WHEN EXISTS (
-          SELECT 1 FROM winning_positions
-          WHERE winning_positions.cell_id = cells.id
-        ) THEN '💰'
-        ELSE COALESCE(cells.emoji, EXCLUDED.emoji)
-      END,
-      background_color = COALESCE(cells.background_color, EXCLUDED.background_color)
-  `);
 }
 
 function clientIp(request: Request) {
