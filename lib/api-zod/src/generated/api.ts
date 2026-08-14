@@ -173,3 +173,219 @@ export const PaymentConfirmedWebhookBody = zod.object({
 export const PaymentConfirmedWebhookResponse = zod.unknown()
 
 
+/**
+ * @summary Read the prize operation overview
+ */
+export const getAdminOverviewResponseAvailablePrizeBalanceCentsMin = 0;
+
+export const getAdminOverviewResponseDistributedPrizeCentsMin = 0;
+
+export const getAdminOverviewResponseRedeemedPrizeCentsMin = 0;
+
+export const getAdminOverviewResponseTotalPrizeToDistributeCentsMin = 0;
+
+export const getAdminOverviewResponsePendingRedemptionCentsMin = 0;
+
+export const getAdminOverviewResponseAvailableCellsMin = 0;
+
+export const getAdminOverviewResponseReservedCellsMin = 0;
+
+export const getAdminOverviewResponsePaidCellsMin = 0;
+
+export const getAdminOverviewResponseWinnersCountMin = 0;
+
+export const getAdminOverviewResponseRedemptionCountsMinOne = 0;
+
+
+
+export const GetAdminOverviewResponse = zod.object({
+  "availablePrizeBalanceCents": zod.int().min(getAdminOverviewResponseAvailablePrizeBalanceCentsMin),
+  "distributedPrizeCents": zod.int().min(getAdminOverviewResponseDistributedPrizeCentsMin),
+  "redeemedPrizeCents": zod.int().min(getAdminOverviewResponseRedeemedPrizeCentsMin),
+  "totalPrizeToDistributeCents": zod.int().min(getAdminOverviewResponseTotalPrizeToDistributeCentsMin),
+  "pendingRedemptionCents": zod.int().min(getAdminOverviewResponsePendingRedemptionCentsMin),
+  "availableCells": zod.int().min(getAdminOverviewResponseAvailableCellsMin),
+  "reservedCells": zod.int().min(getAdminOverviewResponseReservedCellsMin),
+  "paidCells": zod.int().min(getAdminOverviewResponsePaidCellsMin),
+  "winnersCount": zod.int().min(getAdminOverviewResponseWinnersCountMin),
+  "redemptionCounts": zod.record(zod.string(), zod.int().min(getAdminOverviewResponseRedemptionCountsMinOne)),
+  "generatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List prize redemption requests
+ */
+export const listAdminRedemptionsQueryStatusDefault = `all`;
+export const listAdminRedemptionsQuerySearchMax = 120;
+
+export const listAdminRedemptionsQueryLimitDefault = 50;
+export const listAdminRedemptionsQueryLimitMax = 100;
+
+export const listAdminRedemptionsQueryOffsetDefault = 0;
+export const listAdminRedemptionsQueryOffsetMin = 0;
+
+
+
+export const ListAdminRedemptionsQueryParams = zod.object({
+  "status": zod.enum(['pending', 'approved', 'paid', 'rejected', 'all']).default(listAdminRedemptionsQueryStatusDefault),
+  "search": zod.coerce.string().max(listAdminRedemptionsQuerySearchMax).optional(),
+  "limit": zod.coerce.number().int().min(1).max(listAdminRedemptionsQueryLimitMax).default(listAdminRedemptionsQueryLimitDefault),
+  "offset": zod.coerce.number().int().min(listAdminRedemptionsQueryOffsetMin).default(listAdminRedemptionsQueryOffsetDefault)
+})
+
+
+export const listAdminRedemptionsResponseItemsItemCellIdMin = 0;
+export const listAdminRedemptionsResponseItemsItemCellIdMax = 999999;
+
+export const listAdminRedemptionsResponseItemsItemRequestedAmountCentsMin = 0;
+
+export const listAdminRedemptionsResponseItemsItemPrizeValueCentsMin = 0;
+
+export const listAdminRedemptionsResponseTotalMin = 0;
+
+
+
+export const ListAdminRedemptionsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.int().min(1),
+  "cellId": zod.int().min(listAdminRedemptionsResponseItemsItemCellIdMin).max(listAdminRedemptionsResponseItemsItemCellIdMax),
+  "email": zod.email(),
+  "pixKey": zod.string(),
+  "certificateCode": zod.string(),
+  "requestedAmountCents": zod.int().min(listAdminRedemptionsResponseItemsItemRequestedAmountCentsMin),
+  "prizeValueCents": zod.int().min(listAdminRedemptionsResponseItemsItemPrizeValueCentsMin),
+  "wonAt": zod.coerce.date(),
+  "status": zod.enum(['pending', 'approved', 'paid', 'rejected']),
+  "requestedAt": zod.coerce.date(),
+  "processedAt": zod.coerce.date().nullable(),
+  "processedBy": zod.string().nullable(),
+  "rejectionReason": zod.string().nullable(),
+  "cellStatus": zod.string().nullable(),
+  "paymentStatus": zod.string().nullable()
+})),
+  "total": zod.int().min(listAdminRedemptionsResponseTotalMin)
+})
+
+
+/**
+ * @summary Read one redemption request with its cell and payment context
+ */
+
+
+
+export const GetAdminRedemptionParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+export const getAdminRedemptionResponseCellIdMin = 0;
+export const getAdminRedemptionResponseCellIdMax = 999999;
+
+export const getAdminRedemptionResponseRequestedAmountCentsMin = 0;
+
+export const getAdminRedemptionResponsePrizeValueCentsMin = 0;
+
+
+
+export const GetAdminRedemptionResponse = zod.object({
+  "id": zod.int().min(1),
+  "cellId": zod.int().min(getAdminRedemptionResponseCellIdMin).max(getAdminRedemptionResponseCellIdMax),
+  "email": zod.email(),
+  "pixKey": zod.string(),
+  "certificateCode": zod.string(),
+  "requestedAmountCents": zod.int().min(getAdminRedemptionResponseRequestedAmountCentsMin),
+  "prizeValueCents": zod.int().min(getAdminRedemptionResponsePrizeValueCentsMin),
+  "wonAt": zod.coerce.date(),
+  "status": zod.enum(['pending', 'approved', 'paid', 'rejected']),
+  "requestedAt": zod.coerce.date(),
+  "processedAt": zod.coerce.date().nullable(),
+  "processedBy": zod.string().nullable(),
+  "rejectionReason": zod.string().nullable(),
+  "cellStatus": zod.string().nullable(),
+  "paymentStatus": zod.string().nullable()
+})
+
+
+/**
+ * @summary Update the status of a redemption request
+ */
+
+
+
+export const UpdateAdminRedemptionParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const updateAdminRedemptionBodyRejectionReasonMax = 500;
+
+
+
+export const UpdateAdminRedemptionBody = zod.object({
+  "status": zod.enum(['approved', 'paid', 'rejected']),
+  "rejectionReason": zod.string().max(updateAdminRedemptionBodyRejectionReasonMax).optional()
+})
+
+
+export const updateAdminRedemptionResponseCellIdMin = 0;
+export const updateAdminRedemptionResponseCellIdMax = 999999;
+
+export const updateAdminRedemptionResponseRequestedAmountCentsMin = 0;
+
+export const updateAdminRedemptionResponsePrizeValueCentsMin = 0;
+
+
+
+export const UpdateAdminRedemptionResponse = zod.object({
+  "id": zod.int().min(1),
+  "cellId": zod.int().min(updateAdminRedemptionResponseCellIdMin).max(updateAdminRedemptionResponseCellIdMax),
+  "email": zod.email(),
+  "pixKey": zod.string(),
+  "certificateCode": zod.string(),
+  "requestedAmountCents": zod.int().min(updateAdminRedemptionResponseRequestedAmountCentsMin),
+  "prizeValueCents": zod.int().min(updateAdminRedemptionResponsePrizeValueCentsMin),
+  "wonAt": zod.coerce.date(),
+  "status": zod.enum(['pending', 'approved', 'paid', 'rejected']),
+  "requestedAt": zod.coerce.date(),
+  "processedAt": zod.coerce.date().nullable(),
+  "processedBy": zod.string().nullable(),
+  "rejectionReason": zod.string().nullable(),
+  "cellStatus": zod.string().nullable(),
+  "paymentStatus": zod.string().nullable()
+})
+
+
+/**
+ * @summary Read prize pool tiers and immutable batch metadata
+ */
+export const getAdminPrizePoolResponseTiersItemNominalValueCentsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemTotalValueCentsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemTotalPositionsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemRemainingValueCentsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemRemainingPositionsMin = 0;
+
+export const getAdminPrizePoolResponseSafetyMarginBpsMin = 0;
+
+
+
+export const GetAdminPrizePoolResponse = zod.object({
+  "tiers": zod.array(zod.object({
+  "tierId": zod.int(),
+  "label": zod.string(),
+  "nominalValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemNominalValueCentsMin),
+  "totalValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemTotalValueCentsMin),
+  "totalPositions": zod.int().min(getAdminPrizePoolResponseTiersItemTotalPositionsMin),
+  "remainingValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemRemainingValueCentsMin),
+  "remainingPositions": zod.int().min(getAdminPrizePoolResponseTiersItemRemainingPositionsMin)
+})),
+  "commitHash": zod.string().nullable(),
+  "batchCreatedAt": zod.coerce.date().nullable(),
+  "batchRevealedAt": zod.coerce.date().nullable(),
+  "safetyMarginBps": zod.int().min(getAdminPrizePoolResponseSafetyMarginBpsMin).nullable()
+})
+
+

@@ -208,6 +208,44 @@ export const cashLedger = pgTable(
   }),
 );
 
+export const prizeRedemptionRequests = pgTable(
+  "prize_redemption_requests",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    cellId: integer("cell_id").notNull().references(() => cells.id),
+    email: text("email").notNull(),
+    pixKey: text("pix_key").notNull(),
+    certificateCode: text("certificate_code").notNull().unique(),
+    requestedAmountCents: integer("requested_amount_cents").notNull(),
+    prizeValueCents: integer("prize_value_cents").notNull(),
+    wonAt: timestamp("won_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("pending"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    processedBy: text("processed_by"),
+    rejectionReason: text("rejection_reason"),
+  },
+  (table) => ({
+    cellId: index("idx_prize_redemptions_cell_id").on(table.cellId),
+    statusRequested: index("idx_prize_redemptions_status_requested_at").on(
+      table.status,
+      table.requestedAt,
+    ),
+    statusValues: check(
+      "prize_redemptions_status_values",
+      sql`${table.status} IN ('pending', 'approved', 'paid', 'rejected')`,
+    ),
+    requestedAmountNonNegative: check(
+      "prize_redemptions_requested_amount_non_negative",
+      sql`${table.requestedAmountCents} >= 0`,
+    ),
+    prizeValueNonNegative: check(
+      "prize_redemptions_prize_value_non_negative",
+      sql`${table.prizeValueCents} >= 0`,
+    ),
+  }),
+);
+
 export const cellSignatures = pgTable(
   "cell_signatures",
   {

@@ -20,6 +20,11 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AdminOverview,
+  AdminPrizePool,
+  AdminRedemption,
+  AdminRedemptionList,
+  AdminRedemptionUpdate,
   CaptchaRequiredResponse,
   CellDetail,
   CellEmailInput,
@@ -30,6 +35,7 @@ import type {
   CheckoutResponse,
   ErrorResponse,
   HealthStatus,
+  ListAdminRedemptionsParams,
   ListCellsParams,
   PaymentWebhook,
   SignatureResponse
@@ -584,4 +590,391 @@ export const usePaymentConfirmedWebhook = <TError = ErrorType<ErrorResponse | vo
       > => {
       return useMutation(getPaymentConfirmedWebhookMutationOptions(options));
     }
+
+export const getGetAdminOverviewUrl = () => {
+
+
+
+
+  return `/api/admin/overview`
+}
+
+/**
+ * @summary Read the prize operation overview
+ */
+export const getAdminOverview = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminOverview> => {
+
+  return customFetch<AdminOverview>(getGetAdminOverviewUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminOverviewQueryKey = () => {
+    return [
+    `/api/admin/overview`
+    ] as const;
+    }
+
+
+export const getGetAdminOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminOverview>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminOverviewQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminOverview>>> = ({ signal }) => getAdminOverview({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminOverview>>>
+export type GetAdminOverviewQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the prize operation overview
+ */
+
+export function useGetAdminOverview<TData = Awaited<ReturnType<typeof getAdminOverview>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListAdminRedemptionsUrl = (params?: ListAdminRedemptionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/redemptions?${stringifiedParams}` : `/api/admin/redemptions`
+}
+
+/**
+ * @summary List prize redemption requests
+ */
+export const listAdminRedemptions = async (params?: ListAdminRedemptionsParams, options?: Parameters<typeof customFetch>[1]): Promise<AdminRedemptionList> => {
+
+  return customFetch<AdminRedemptionList>(getListAdminRedemptionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminRedemptionsQueryKey = (params?: ListAdminRedemptionsParams,) => {
+    return [
+    `/api/admin/redemptions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAdminRedemptionsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminRedemptions>>, TError = ErrorType<ErrorResponse>>(params?: ListAdminRedemptionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminRedemptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminRedemptionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminRedemptions>>> = ({ signal }) => listAdminRedemptions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminRedemptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminRedemptionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminRedemptions>>>
+export type ListAdminRedemptionsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List prize redemption requests
+ */
+
+export function useListAdminRedemptions<TData = Awaited<ReturnType<typeof listAdminRedemptions>>, TError = ErrorType<ErrorResponse>>(
+ params?: ListAdminRedemptionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminRedemptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminRedemptionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminRedemptionUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/redemptions/${id}`
+}
+
+/**
+ * @summary Read one redemption request with its cell and payment context
+ */
+export const getAdminRedemption = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<AdminRedemption> => {
+
+  return customFetch<AdminRedemption>(getGetAdminRedemptionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminRedemptionQueryKey = (id: number,) => {
+    return [
+    `/api/admin/redemptions/${id}`
+    ] as const;
+    }
+
+
+export const getGetAdminRedemptionQueryOptions = <TData = Awaited<ReturnType<typeof getAdminRedemption>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminRedemption>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminRedemptionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRedemption>>> = ({ signal }) => getAdminRedemption(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminRedemption>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminRedemptionQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminRedemption>>>
+export type GetAdminRedemptionQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read one redemption request with its cell and payment context
+ */
+
+export function useGetAdminRedemption<TData = Awaited<ReturnType<typeof getAdminRedemption>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminRedemption>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminRedemptionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAdminRedemptionUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/redemptions/${id}`
+}
+
+/**
+ * @summary Update the status of a redemption request
+ */
+export const updateAdminRedemption = async (id: number,
+    adminRedemptionUpdate: AdminRedemptionUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AdminRedemption> => {
+
+  return customFetch<AdminRedemption>(getUpdateAdminRedemptionUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRedemptionUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminRedemptionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminRedemption>>, TError,{id: number;data: BodyType<AdminRedemptionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminRedemption>>, TError,{id: number;data: BodyType<AdminRedemptionUpdate>}, TContext> => {
+
+const mutationKey = ['updateAdminRedemption'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminRedemption>>, {id: number;data: BodyType<AdminRedemptionUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAdminRedemption(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminRedemptionMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminRedemption>>>
+    export type UpdateAdminRedemptionMutationBody = BodyType<AdminRedemptionUpdate>
+    export type UpdateAdminRedemptionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update the status of a redemption request
+ */
+export const useUpdateAdminRedemption = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminRedemption>>, TError,{id: number;data: BodyType<AdminRedemptionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminRedemption>>,
+        TError,
+        {id: number;data: BodyType<AdminRedemptionUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminRedemptionMutationOptions(options));
+    }
+
+export const getGetAdminPrizePoolUrl = () => {
+
+
+
+
+  return `/api/admin/prize-pool`
+}
+
+/**
+ * @summary Read prize pool tiers and immutable batch metadata
+ */
+export const getAdminPrizePool = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminPrizePool> => {
+
+  return customFetch<AdminPrizePool>(getGetAdminPrizePoolUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminPrizePoolQueryKey = () => {
+    return [
+    `/api/admin/prize-pool`
+    ] as const;
+    }
+
+
+export const getGetAdminPrizePoolQueryOptions = <TData = Awaited<ReturnType<typeof getAdminPrizePool>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminPrizePool>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminPrizePoolQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminPrizePool>>> = ({ signal }) => getAdminPrizePool({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminPrizePool>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminPrizePoolQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminPrizePool>>>
+export type GetAdminPrizePoolQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read prize pool tiers and immutable batch metadata
+ */
+
+export function useGetAdminPrizePool<TData = Awaited<ReturnType<typeof getAdminPrizePool>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminPrizePool>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminPrizePoolQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 

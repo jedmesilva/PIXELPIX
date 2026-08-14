@@ -14,6 +14,8 @@ tags:
     description: Sparse one-million-cell grid and reservation flow
   - name: payments
     description: Provider payment webhook
+  - name: admin
+    description: Administrative prize operations and redemption monitoring
 paths:
   /healthz:
     get:
@@ -183,6 +185,135 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         "401": { description: Invalid HMAC signature }
         "500": { description: Provider should retry after an internal error }
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      summary: Read the prize operation overview
+      responses:
+        "200":
+          description: Current balances, cell counts, and redemption counts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminOverview" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/redemptions:
+    get:
+      operationId: listAdminRedemptions
+      tags: [admin]
+      summary: List prize redemption requests
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, paid, rejected, all]
+            default: all
+        - name: search
+          in: query
+          required: false
+          schema: { type: string, maxLength: 120 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: Redemption request page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRedemptionList" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/redemptions/{id}:
+    get:
+      operationId: getAdminRedemption
+      tags: [admin]
+      summary: Read one redemption request with its cell and payment context
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Redemption request detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRedemption" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Redemption request not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    patch:
+      operationId: updateAdminRedemption
+      tags: [admin]
+      summary: Update the status of a redemption request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminRedemptionUpdate" }
+      responses:
+        "200":
+          description: Updated redemption request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminRedemption" }
+        "400":
+          description: Invalid status transition or request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Redemption request not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/prize-pool:
+    get:
+      operationId: getAdminPrizePool
+      tags: [admin]
+      summary: Read prize pool tiers and immutable batch metadata
+      responses:
+        "200":
+          description: Prize pool detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPrizePool" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 components:
   schemas:
     HealthStatus:
@@ -290,4 +421,113 @@ components:
           type: object
           additionalProperties: true
       required: [paymentId]
+    AdminOverview:
+      type: object
+      properties:
+        availablePrizeBalanceCents: { type: integer, minimum: 0 }
+        distributedPrizeCents: { type: integer, minimum: 0 }
+        redeemedPrizeCents: { type: integer, minimum: 0 }
+        totalPrizeToDistributeCents: { type: integer, minimum: 0 }
+        pendingRedemptionCents: { type: integer, minimum: 0 }
+        availableCells: { type: integer, minimum: 0 }
+        reservedCells: { type: integer, minimum: 0 }
+        paidCells: { type: integer, minimum: 0 }
+        winnersCount: { type: integer, minimum: 0 }
+        redemptionCounts:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        generatedAt: { type: string, format: date-time }
+      required:
+        - availablePrizeBalanceCents
+        - distributedPrizeCents
+        - redeemedPrizeCents
+        - totalPrizeToDistributeCents
+        - pendingRedemptionCents
+        - availableCells
+        - reservedCells
+        - paidCells
+        - winnersCount
+        - redemptionCounts
+        - generatedAt
+    AdminRedemption:
+      type: object
+      properties:
+        id: { type: integer, minimum: 1 }
+        cellId: { type: integer, minimum: 0, maximum: 999999 }
+        email: { type: string, format: email }
+        pixKey: { type: string }
+        certificateCode: { type: string }
+        requestedAmountCents: { type: integer, minimum: 0 }
+        prizeValueCents: { type: integer, minimum: 0 }
+        wonAt: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [pending, approved, paid, rejected]
+        requestedAt: { type: string, format: date-time }
+        processedAt: { type: ["string", "null"], format: date-time }
+        processedBy: { type: ["string", "null"] }
+        rejectionReason: { type: ["string", "null"] }
+        cellStatus: { type: ["string", "null"] }
+        paymentStatus: { type: ["string", "null"] }
+      required:
+        - id
+        - cellId
+        - email
+        - pixKey
+        - certificateCode
+        - requestedAmountCents
+        - prizeValueCents
+        - wonAt
+        - status
+        - requestedAt
+        - processedAt
+        - processedBy
+        - rejectionReason
+        - cellStatus
+        - paymentStatus
+    AdminRedemptionList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminRedemption" }
+        total: { type: integer, minimum: 0 }
+      required: [items, total]
+    AdminRedemptionUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, paid, rejected]
+        rejectionReason: { type: string, maxLength: 500 }
+      required: [status]
+    AdminPrizeTier:
+      type: object
+      properties:
+        tierId: { type: integer }
+        label: { type: string }
+        nominalValueCents: { type: integer, minimum: 0 }
+        totalValueCents: { type: integer, minimum: 0 }
+        totalPositions: { type: integer, minimum: 0 }
+        remainingValueCents: { type: integer, minimum: 0 }
+        remainingPositions: { type: integer, minimum: 0 }
+      required:
+        - tierId
+        - label
+        - nominalValueCents
+        - totalValueCents
+        - totalPositions
+        - remainingValueCents
+        - remainingPositions
+    AdminPrizePool:
+      type: object
+      properties:
+        tiers:
+          type: array
+          items: { $ref: "#/components/schemas/AdminPrizeTier" }
+        commitHash: { type: ["string", "null"] }
+        batchCreatedAt: { type: ["string", "null"], format: date-time }
+        batchRevealedAt: { type: ["string", "null"], format: date-time }
+        safetyMarginBps: { type: ["integer", "null"], minimum: 0 }
+      required: [tiers, commitHash, batchCreatedAt, batchRevealedAt, safetyMarginBps]
 

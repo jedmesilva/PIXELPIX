@@ -168,6 +168,122 @@ export interface PaymentWebhook {
   reference?: PaymentWebhookReference;
 }
 
+export type AdminOverviewRedemptionCounts = {[key: string]: number};
+
+export interface AdminOverview {
+  /** @minimum 0 */
+  availablePrizeBalanceCents: number;
+  /** @minimum 0 */
+  distributedPrizeCents: number;
+  /** @minimum 0 */
+  redeemedPrizeCents: number;
+  /** @minimum 0 */
+  totalPrizeToDistributeCents: number;
+  /** @minimum 0 */
+  pendingRedemptionCents: number;
+  /** @minimum 0 */
+  availableCells: number;
+  /** @minimum 0 */
+  reservedCells: number;
+  /** @minimum 0 */
+  paidCells: number;
+  /** @minimum 0 */
+  winnersCount: number;
+  redemptionCounts: AdminOverviewRedemptionCounts;
+  generatedAt: string;
+}
+
+export type AdminRedemptionStatus = typeof AdminRedemptionStatus[keyof typeof AdminRedemptionStatus];
+
+
+export const AdminRedemptionStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  paid: 'paid',
+  rejected: 'rejected',
+} as const;
+
+export interface AdminRedemption {
+  /** @minimum 1 */
+  id: number;
+  /**
+     * @minimum 0
+     * @maximum 999999
+     */
+  cellId: number;
+  email: string;
+  pixKey: string;
+  certificateCode: string;
+  /** @minimum 0 */
+  requestedAmountCents: number;
+  /** @minimum 0 */
+  prizeValueCents: number;
+  wonAt: string;
+  status: AdminRedemptionStatus;
+  requestedAt: string;
+  /** @nullable */
+  processedAt: string | null;
+  /** @nullable */
+  processedBy: string | null;
+  /** @nullable */
+  rejectionReason: string | null;
+  /** @nullable */
+  cellStatus: string | null;
+  /** @nullable */
+  paymentStatus: string | null;
+}
+
+export interface AdminRedemptionList {
+  items: AdminRedemption[];
+  /** @minimum 0 */
+  total: number;
+}
+
+export type AdminRedemptionUpdateStatus = typeof AdminRedemptionUpdateStatus[keyof typeof AdminRedemptionUpdateStatus];
+
+
+export const AdminRedemptionUpdateStatus = {
+  approved: 'approved',
+  paid: 'paid',
+  rejected: 'rejected',
+} as const;
+
+export interface AdminRedemptionUpdate {
+  status: AdminRedemptionUpdateStatus;
+  /** @maxLength 500 */
+  rejectionReason?: string;
+}
+
+export interface AdminPrizeTier {
+  tierId: number;
+  label: string;
+  /** @minimum 0 */
+  nominalValueCents: number;
+  /** @minimum 0 */
+  totalValueCents: number;
+  /** @minimum 0 */
+  totalPositions: number;
+  /** @minimum 0 */
+  remainingValueCents: number;
+  /** @minimum 0 */
+  remainingPositions: number;
+}
+
+export interface AdminPrizePool {
+  tiers: AdminPrizeTier[];
+  /** @nullable */
+  commitHash: string | null;
+  /** @nullable */
+  batchCreatedAt: string | null;
+  /** @nullable */
+  batchRevealedAt: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  safetyMarginBps: number | null;
+}
+
 export type ListCellsParams = {
 /**
  * @minimum 0
@@ -180,4 +296,32 @@ from: number;
  */
 to: number;
 };
+
+export type ListAdminRedemptionsParams = {
+status?: ListAdminRedemptionsStatus;
+/**
+ * @maxLength 120
+ */
+search?: string;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
+};
+
+export type ListAdminRedemptionsStatus = typeof ListAdminRedemptionsStatus[keyof typeof ListAdminRedemptionsStatus];
+
+
+export const ListAdminRedemptionsStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  paid: 'paid',
+  rejected: 'rejected',
+  all: 'all',
+} as const;
 

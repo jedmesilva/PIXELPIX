@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/admin/"
+title = "PIXELPIX Admin"
+description = "A separate administrative console for monitoring PIXELPIX prize balances, winner activity, payout redemptions, certificates, and operational status using the shared API and database."
+version = "1.0.0"
+id = "artifacts/pixelpix-admin"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/admin/" ]
+localPort = 20368
+
+[services.development]
+run = "pnpm --filter @workspace/pixelpix-admin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pixelpix-admin", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pixelpix-admin/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20368"
+BASE_PATH = "/admin/"
