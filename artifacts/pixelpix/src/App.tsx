@@ -31,7 +31,7 @@ const CURRENT_USER_NICKNAME = "você";
 
 type Pixel = {
   id: number;
-  color: string | null;
+  backgroundColor: string | null;
   revealed: boolean;
   emoji: string | null;
   revealedBy: string | null;
@@ -56,7 +56,7 @@ const chunkCache = new Map<number, Map<number, Pixel>>();
 function emptyPixel(id: number): Pixel {
   return {
     id,
-    color: null,
+    backgroundColor: null,
     revealed: false,
     emoji: null,
     revealedBy: null,
@@ -91,7 +91,7 @@ function getPixel(id: number) {
 function revealPixelInCache(
   id: number,
   emoji: string,
-  color: string,
+  backgroundColor: string,
   revealedBy: string | null,
   socialProfile: SocialProfile,
   prizeValueCents: number,
@@ -101,7 +101,7 @@ function revealPixelInCache(
   const pixel = getPixel(id);
   pixel.revealed = true;
   pixel.emoji = emoji;
-  pixel.color = color;
+  pixel.backgroundColor = backgroundColor;
   pixel.revealedBy = revealedBy;
   pixel.revealedAt = revealedAt;
   pixel.prizeValueCents = prizeValueCents;
@@ -121,7 +121,7 @@ function applyCellStatus(
 ) {
   const pixel = getPixel(id);
   if (visual?.backgroundColor !== undefined) {
-    pixel.color = visual.backgroundColor;
+    pixel.backgroundColor = visual.backgroundColor;
   }
   if (visual?.emoji !== undefined) {
     pixel.emoji = visual.emoji;
@@ -422,7 +422,7 @@ function PixelSheet({
       );
       const detail = await fetchJson<{
         id: number;
-        emoji: string | null;
+        emoji: string;
         backgroundColor: string;
         status: string;
         revealedAt: string | null;
@@ -436,7 +436,7 @@ function PixelSheet({
         paymentId: "server-confirmed",
         revealedAt: detail.revealedAt,
         value: Number(detail.prizeValueCents ?? 0) / 100,
-        emoji: detail.emoji ?? "",
+        emoji: detail.emoji,
         backgroundColor: detail.backgroundColor,
         revealedBy: detail.revealedBy,
         prizeValueCents: Number(detail.prizeValueCents ?? 0),
@@ -629,7 +629,7 @@ function PixelSheet({
             <div className="prototype-detail-layout">
               <div
                 className="prototype-pixel-hero"
-                style={{ background: pixel.color ?? undefined }}
+                style={{ background: pixel.backgroundColor ?? undefined }}
               >
                 {pixel.revealed ? (
                   <span className="prototype-hero-emoji">{pixel.emoji}</span>
@@ -1003,8 +1003,8 @@ function PixelGrid() {
       Array<{
         id: number;
         status: "available" | "reserved" | "paid";
-        emoji: string | null;
-        backgroundColor: string | null;
+        emoji: string;
+        backgroundColor: string;
       }>
     >(`/api/cells?from=${from}&to=${to}`)
       .then((cells) => {
@@ -1026,8 +1026,8 @@ function PixelGrid() {
     void fetchJson<{
       id: number;
       status: "available" | "reserved" | "paid";
-      emoji?: string | null;
-      backgroundColor?: string | null;
+      emoji: string;
+      backgroundColor: string;
       revealedBy?: string | null;
       revealedAt?: string | null;
       prizeValueCents?: number;
@@ -1125,9 +1125,9 @@ function PixelGrid() {
                 width: cellSize,
                 height: cellSize,
                 background: pixel.revealed
-                  ? pixel.color ?? undefined
-                  : pixel.color
-                    ? `repeating-linear-gradient(45deg, ${pixel.color}, ${pixel.color} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
+                  ? pixel.backgroundColor ?? undefined
+                  : pixel.backgroundColor
+                    ? `repeating-linear-gradient(45deg, ${pixel.backgroundColor}, ${pixel.backgroundColor} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
                     : undefined,
               }}
               onClick={() => setSelectedId(id)}

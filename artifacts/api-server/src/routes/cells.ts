@@ -8,8 +8,30 @@ export const TOTAL_CELLS = 1_000_000;
 export const RESERVATION_TTL_MS = 5 * 60 * 1000;
 export const MIN_PRICE_CENTS = 100;
 export const MAX_PRICE_CENTS = 100_000;
-const DEFAULT_CELL_BACKGROUND = "hsl(220, 8%, 18%)";
-const DEFAULT_CELL_EMOJI = "🌟";
+const TOTAL_CELL_SEED = 1_000_000;
+const CELL_EMOJIS = [
+  "🌟",
+  "🔥",
+  "🌊",
+  "🍀",
+  "⚡",
+  "🎯",
+  "🪐",
+  "🌙",
+  "🦋",
+  "🍁",
+  "🌵",
+  "🐚",
+  "🍄",
+  "🎈",
+  "🧿",
+  "🪁",
+  "🌈",
+  "🍉",
+  "🦖",
+  "🎲",
+] as const;
+const CELL_EMOJIS_SQL = `ARRAY[${CELL_EMOJIS.map((emoji) => `'${emoji}'`).join(", ")}]`;
 
 const ACTIVE_LIMIT = 5;
 const ATTEMPT_LIMIT = 12;
@@ -51,6 +73,56 @@ function publicStatus(status: string): "available" | "reserved" | "paid" {
     return "reserved";
   }
   return "available";
+}
+
+function generatedCellEmojiSql(cellIdExpression: string) {
+  return `CASE
+    WHEN EXISTS (
+      SELECT 1 FROM winning_positions
+      WHERE winning_positions.cell_id = ${cellIdExpression}
+    ) THEN '💰'
+    ELSE (${CELL_EMOJIS_SQL})[
+      1 + mod(
+        mod(${cellIdExpression}::bigint * 1103515245 + 12345, 2147483647),
+        ${CELL_EMOJIS.length}
+      )
+    ]
+  END`;
+}
+
+function generatedCellBackgroundSql(cellIdExpression: string) {
+  return `'hsl(220, 8%, ' ||
+    to_char(
+      14 + (
+        mod(
+          mod(${cellIdExpression}::bigint * 2654435761, 4294967296),
+          1000
+        ) / 100.0
+      ),
+      'FM990.###'
+    ) ||
+  '%)'`;
+}
+
+export async function ensureCellRecords() {
+  await pool.query(`
+    INSERT INTO cells (id, status, emoji, background_color)
+    SELECT
+      generated.cell_id,
+      'available',
+      ${generatedCellEmojiSql("generated.cell_id")},
+      ${generatedCellBackgroundSql("generated.cell_id")}
+    FROM generate_series(0, ${TOTAL_CELL_SEED - 1}) AS generated(cell_id)
+    ON CONFLICT (id) DO UPDATE
+      SET emoji = CASE
+        WHEN EXISTS (
+          SELECT 1 FROM winning_positions
+          WHERE winning_positions.cell_id = cells.id
+        ) THEN '💰'
+        ELSE COALESCE(cells.emoji, EXCLUDED.emoji)
+      END,
+      background_color = COALESCE(cells.background_color, EXCLUDED.background_color)
+  `);
 }
 
 function clientIp(request: Request) {
@@ -262,39 +334,33 @@ router.get("/cells", async (request, response) => {
       WHERE id BETWEEN $1 AND $2`,
     [from, to],
   );
-  const existing = new Map(
-    rows.rows.map(
-      (row: {
-        id: number;
-        status: string;
-        emoji: string | null;
-        background_color: string;
-      }) => [
-        row.id,
-        {
-          status: publicStatus(row.status),
-           emoji: row.emoji ?? DEFAULT_CELL_EMOJI,
-          backgroundColor: row.background_color,
-        },
-      ],
-    ),
-  );
+  const expectedCellCount = to - from + 1;
+  if (rows.rows.length !== expectedCellCount) {
+    request.log?.error(
+      { from, to, expectedCellCount, actualCellCount: rows.rows.length },
+      "Cell visual data is incomplete",
+    );
+    response.status(503).json({ error: "Dados visuais das células indisponíveis" });
+    return;
+  }
   response.setHeader(
     "Cache-Control",
     "public, max-age=0, s-maxage=3, stale-while-revalidate=5",
   );
   response.json(
-    Array.from({ length: to - from + 1 }, (_, index) => {
-      const id = from + index;
-      return {
-        id,
-        ...(existing.get(id) ?? {
-           status: "available" as const,
-           emoji: DEFAULT_CELL_EMOJI,
-           backgroundColor: DEFAULT_CELL_BACKGROUND,
-        }),
-      };
-    }),
+    rows.rows.map(
+      (row: {
+        id: number;
+        status: string;
+        emoji: string;
+        background_color: string;
+      }) => ({
+        id: row.id,
+        status: publicStatus(row.status),
+        emoji: row.emoji,
+        backgroundColor: row.background_color,
+      }),
+    ),
   );
 });
 
@@ -317,12 +383,16 @@ router.get("/cells/:id", async (request, response) => {
     [id],
   );
   const cell = result.rows[0];
-  if (!cell || cell.status === "expired") {
+  if (!cell) {
+    response.status(503).json({ error: "Dados da célula indisponíveis" });
+    return;
+  }
+  if (cell.status === "expired") {
     response.json({
       id,
       status: "available",
-      emoji: cell?.emoji ?? DEFAULT_CELL_EMOJI,
-      backgroundColor: cell?.background_color ?? DEFAULT_CELL_BACKGROUND,
+      emoji: cell.emoji,
+      backgroundColor: cell.background_color,
     });
     return;
   }
@@ -330,8 +400,8 @@ router.get("/cells/:id", async (request, response) => {
     response.json({
       id,
       status: publicStatus(cell.status),
-      emoji: cell.emoji ?? DEFAULT_CELL_EMOJI,
-      backgroundColor: cell.background_color ?? DEFAULT_CELL_BACKGROUND,
+      emoji: cell.emoji,
+      backgroundColor: cell.background_color,
     });
     return;
   }
@@ -381,8 +451,10 @@ router.post("/cells/reserve", async (request, response) => {
   const ip = clientIp(request);
   try {
     const result = await pool.query(
-      `INSERT INTO cells (id, status)
-       VALUES ($1, 'reserved')
+      `INSERT INTO cells (id, status, emoji, background_color)
+       SELECT $1, 'reserved',
+              ${generatedCellEmojiSql("$1")},
+              ${generatedCellBackgroundSql("$1")}
        ON CONFLICT (id) DO UPDATE
          SET reservation_token = gen_random_uuid(),
              email = NULL,
