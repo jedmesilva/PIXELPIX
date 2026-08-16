@@ -76,7 +76,7 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow: s
   return <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><div className="mb-2 flex items-center gap-2 font-mono-ui text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground"><Activity size={13} className="text-[#789a31]" />{eyebrow}</div><h1 className="text-3xl font-bold tracking-[-0.045em] text-foreground sm:text-[38px]">{title}</h1>{description && <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{description}</p>}</div>{action}</div>;
 }
 
-export function MetricCard({ label, value, note, tone = 'ink', icon: Icon }: { label: string; value: string; note: string; tone?: 'ink' | 'lime' | 'coral' | 'blue'; icon: React.ComponentType<{ size?: number; strokeWidth?: number }> }) {
+export function MetricCard({ label, value, note, tone = 'ink', icon: Icon }: { label: string; value: string; note: string; tone?: 'ink' | 'lime' | 'coral' | 'blue'; icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }> }) {
   const backgrounds = { ink: 'bg-[#202a2f] text-[#f4f2e9]', lime: 'bg-[#d9f77a] text-[#202a2f]', coral: 'bg-[#ffad94] text-[#202a2f]', blue: 'bg-[#c7e8ea] text-[#202a2f]' };
   return <div className={`fade-up rounded-2xl p-5 ${backgrounds[tone]}`} data-testid={`metric-${label.toLowerCase().replaceAll(' ', '-')}`}><div className="flex items-start justify-between"><span className="text-xs font-semibold opacity-70">{label}</span><Icon size={18} strokeWidth={1.8} className="opacity-65" /></div><div className="mt-7 font-mono-ui text-[26px] font-bold tracking-[-0.06em]">{value}</div><div className="mt-1 text-[11px] opacity-65">{note}</div></div>;
 }

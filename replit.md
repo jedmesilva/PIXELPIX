@@ -5,6 +5,7 @@ PIXELPIX is an interactive grid of one million stable cells that users can reser
 ## Run & Operate
 
 - `pnpm --filter @workspace/pixelpix run dev` — run the PIXELPIX frontend
+- `PORT=20368 BASE_PATH=/admin/ pnpm --filter @workspace/pixelpix-admin run dev` — run the separate PIXELPIX Admin console
 - `pnpm --filter @workspace/api-server run dev` — run the API server
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
@@ -13,6 +14,7 @@ PIXELPIX is an interactive grid of one million stable cells that users can reser
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required runtime: Replit's managed PostgreSQL database (`DATABASE_URL`)
 - Optional webhook secret: `WEBHOOK_SECRET` for signed payment webhooks
+- Admin access: set `ADMIN_ACCESS_KEY` for production requests to `/api/admin/*`; development permits local access without a key
 
 ## Stack
 
@@ -26,6 +28,7 @@ PIXELPIX is an interactive grid of one million stable cells that users can reser
 ## Where things live
 
 - `artifacts/pixelpix` — responsive virtualized grid and reveal/payment flow
+- `artifacts/pixelpix-admin` — separately hosted operations console for prize balances, cash movement, prize-pool integrity, and redemption processing
 - `artifacts/api-server` — cell range, reservation, checkout, webhook, and expiration endpoints
 - `lib/db/src/schema/index.ts` — sparse cell, prize-tier, payment, webhook audit, and cash-ledger schema
 - `scripts/src/generate-winning-positions.ts` — one-time cryptographic prize-position generator

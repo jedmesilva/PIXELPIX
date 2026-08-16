@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import { timingSafeEqual } from "node:crypto";
 import {
   GetAdminPrizePoolResponse,
@@ -24,7 +24,7 @@ function sameSecret(actual: string, expected: string) {
   );
 }
 
-function requireAdmin(request: Parameters<IRouter["get"]>[1], response: Parameters<IRouter["get"]>[2], next: Parameters<IRouter["get"]>[3]) {
+const requireAdmin: RequestHandler = (request, response, next) => {
   const configuredKey = process.env.ADMIN_ACCESS_KEY;
   if (!configuredKey && process.env.NODE_ENV !== "production") {
     next();
@@ -43,11 +43,13 @@ function requireAdmin(request: Parameters<IRouter["get"]>[1], response: Paramete
   }
 
   next();
-}
+};
 
-function iso(value: Date | string | null | undefined) {
+function iso(value: unknown) {
   if (!value) return null;
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+  return value instanceof Date
+    ? value.toISOString()
+    : new Date(value as string | number).toISOString();
 }
 
 function mapRedemption(row: Record<string, unknown>) {
@@ -192,10 +194,12 @@ router.get("/admin/redemptions/:id", async (request, response): Promise<void> =>
 router.patch("/admin/redemptions/:id", async (request, response): Promise<void> => {
   const params = UpdateAdminRedemptionParams.safeParse(request.params);
   const body = UpdateAdminRedemptionBody.safeParse(request.body);
-  if (!params.success || !body.success) {
-    response.status(400).json({
-      error: !params.success ? params.error.message : body.error.message,
-    });
+  if (!params.success) {
+    response.status(400).json({ error: params.error.message });
+    return;
+  }
+  if (!body.success) {
+    response.status(400).json({ error: body.error.message });
     return;
   }
 
