@@ -11,8 +11,9 @@ PIXELPIX is an interactive grid of one million stable cells that users can reser
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/scripts run generate-winning-positions` — generate the immutable, committed prize-tier positions once
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required runtime: Replit's managed PostgreSQL database (`DATABASE_URL`)
+- `pnpm --filter @workspace/db run push` — sync the Drizzle schema to the configured Supabase database
+- Required runtime: Supabase PostgreSQL via the configured `DATABASE_URL`
+- Supabase project credentials are configured as `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`
 - Optional webhook secret: `WEBHOOK_SECRET` for signed payment webhooks
 - Admin access: set `ADMIN_ACCESS_KEY` for production requests to `/api/admin/*`; development permits local access without a key
 
