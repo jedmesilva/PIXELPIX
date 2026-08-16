@@ -373,9 +373,25 @@ export const getAdminPrizePoolResponseTiersItemTotalValueCentsMin = 0;
 
 export const getAdminPrizePoolResponseTiersItemTotalPositionsMin = 0;
 
+export const getAdminPrizePoolResponseTiersItemFoundPositionsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemFoundValueCentsMin = 0;
+
 export const getAdminPrizePoolResponseTiersItemRemainingValueCentsMin = 0;
 
 export const getAdminPrizePoolResponseTiersItemRemainingPositionsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemRedeemedPositionsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemRedeemedValueCentsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemPendingRedemptionPositionsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemPendingRedemptionValueCentsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemRejectedPositionsMin = 0;
+
+export const getAdminPrizePoolResponseTiersItemRejectedValueCentsMin = 0;
 
 export const getAdminPrizePoolResponseSafetyMarginBpsMin = 0;
 
@@ -388,8 +404,16 @@ export const GetAdminPrizePoolResponse = zod.object({
   "nominalValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemNominalValueCentsMin),
   "totalValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemTotalValueCentsMin),
   "totalPositions": zod.int().min(getAdminPrizePoolResponseTiersItemTotalPositionsMin),
+  "foundPositions": zod.int().min(getAdminPrizePoolResponseTiersItemFoundPositionsMin),
+  "foundValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemFoundValueCentsMin),
   "remainingValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemRemainingValueCentsMin),
-  "remainingPositions": zod.int().min(getAdminPrizePoolResponseTiersItemRemainingPositionsMin)
+  "remainingPositions": zod.int().min(getAdminPrizePoolResponseTiersItemRemainingPositionsMin),
+  "redeemedPositions": zod.int().min(getAdminPrizePoolResponseTiersItemRedeemedPositionsMin),
+  "redeemedValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemRedeemedValueCentsMin),
+  "pendingRedemptionPositions": zod.int().min(getAdminPrizePoolResponseTiersItemPendingRedemptionPositionsMin),
+  "pendingRedemptionValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemPendingRedemptionValueCentsMin),
+  "rejectedPositions": zod.int().min(getAdminPrizePoolResponseTiersItemRejectedPositionsMin),
+  "rejectedValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemRejectedValueCentsMin)
 })),
   "commitHash": zod.string().nullable(),
   "batchCreatedAt": zod.coerce.date().nullable(),

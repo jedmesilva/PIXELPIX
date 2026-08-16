@@ -16,7 +16,23 @@ export interface AdminPrizeTier {
   /** @minimum 0 */
   totalPositions: number;
   /** @minimum 0 */
+  foundPositions: number;
+  /** @minimum 0 */
+  foundValueCents: number;
+  /** @minimum 0 */
   remainingValueCents: number;
   /** @minimum 0 */
   remainingPositions: number;
+  /** @minimum 0 */
+  redeemedPositions: number;
+  /** @minimum 0 */
+  redeemedValueCents: number;
+  /** @minimum 0 */
+  pendingRedemptionPositions: number;
+  /** @minimum 0 */
+  pendingRedemptionValueCents: number;
+  /** @minimum 0 */
+  rejectedPositions: number;
+  /** @minimum 0 */
+  rejectedValueCents: number;
 }

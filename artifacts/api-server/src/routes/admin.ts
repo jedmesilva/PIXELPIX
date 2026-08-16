@@ -267,9 +267,46 @@ router.patch("/admin/redemptions/:id", async (request, response): Promise<void> 
 router.get("/admin/prize-pool", async (_request, response): Promise<void> => {
   const [tiers, batch, safety] = await Promise.all([
     pool.query(
-      `SELECT tier_id, label, nominal_value_cents, total_value_cents,
-              total_positions, remaining_value_cents, remaining_positions
-       FROM prize_pool ORDER BY nominal_value_cents DESC`,
+      `SELECT
+         pp.tier_id,
+         pp.label,
+         pp.nominal_value_cents,
+         pp.total_value_cents,
+         pp.total_positions,
+         pp.remaining_value_cents,
+         pp.remaining_positions,
+         COALESCE(found.found_positions, 0) AS found_positions,
+         COALESCE(found.found_value_cents, 0) AS found_value_cents,
+         COALESCE(redemptions.redeemed_positions, 0) AS redeemed_positions,
+         COALESCE(redemptions.redeemed_value_cents, 0) AS redeemed_value_cents,
+         COALESCE(redemptions.pending_redemption_positions, 0) AS pending_redemption_positions,
+         COALESCE(redemptions.pending_redemption_value_cents, 0) AS pending_redemption_value_cents,
+         COALESCE(redemptions.rejected_positions, 0) AS rejected_positions,
+         COALESCE(redemptions.rejected_value_cents, 0) AS rejected_value_cents
+       FROM prize_pool pp
+       LEFT JOIN (
+         SELECT
+           wp.tier_id,
+           COUNT(*) FILTER (WHERE wp.claimed = true)::int AS found_positions,
+           COALESCE(SUM(c.prize_value_cents) FILTER (WHERE wp.claimed = true), 0)::int AS found_value_cents
+         FROM winning_positions wp
+         LEFT JOIN cells c ON c.id = wp.cell_id
+         GROUP BY wp.tier_id
+       ) found ON found.tier_id = pp.tier_id
+       LEFT JOIN (
+         SELECT
+           wp.tier_id,
+           COUNT(*) FILTER (WHERE r.status = 'paid')::int AS redeemed_positions,
+           COALESCE(SUM(r.prize_value_cents) FILTER (WHERE r.status = 'paid'), 0)::int AS redeemed_value_cents,
+           COUNT(*) FILTER (WHERE r.status IN ('pending', 'approved'))::int AS pending_redemption_positions,
+           COALESCE(SUM(r.prize_value_cents) FILTER (WHERE r.status IN ('pending', 'approved')), 0)::int AS pending_redemption_value_cents,
+           COUNT(*) FILTER (WHERE r.status = 'rejected')::int AS rejected_positions,
+           COALESCE(SUM(r.prize_value_cents) FILTER (WHERE r.status = 'rejected'), 0)::int AS rejected_value_cents
+         FROM prize_redemption_requests r
+         INNER JOIN winning_positions wp ON wp.cell_id = r.cell_id
+         GROUP BY wp.tier_id
+       ) redemptions ON redemptions.tier_id = pp.tier_id
+       ORDER BY pp.nominal_value_cents DESC`,
     ),
     pool.query(
       `SELECT commit_hash, created_at, revealed_at
@@ -288,8 +325,16 @@ router.get("/admin/prize-pool", async (_request, response): Promise<void> => {
         nominalValueCents: Number(row.nominal_value_cents),
         totalValueCents: Number(row.total_value_cents),
         totalPositions: Number(row.total_positions),
+        foundPositions: Number(row.found_positions),
+        foundValueCents: Number(row.found_value_cents),
         remainingValueCents: Number(row.remaining_value_cents),
         remainingPositions: Number(row.remaining_positions),
+        redeemedPositions: Number(row.redeemed_positions),
+        redeemedValueCents: Number(row.redeemed_value_cents),
+        pendingRedemptionPositions: Number(row.pending_redemption_positions),
+        pendingRedemptionValueCents: Number(row.pending_redemption_value_cents),
+        rejectedPositions: Number(row.rejected_positions),
+        rejectedValueCents: Number(row.rejected_value_cents),
       })),
       commitHash: batchRow?.commit_hash ?? null,
       batchCreatedAt: iso(batchRow?.created_at),

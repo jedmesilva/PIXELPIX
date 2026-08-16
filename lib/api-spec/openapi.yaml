@@ -515,16 +515,32 @@ components:
         nominalValueCents: { type: integer, minimum: 0 }
         totalValueCents: { type: integer, minimum: 0 }
         totalPositions: { type: integer, minimum: 0 }
+        foundPositions: { type: integer, minimum: 0 }
+        foundValueCents: { type: integer, minimum: 0 }
         remainingValueCents: { type: integer, minimum: 0 }
         remainingPositions: { type: integer, minimum: 0 }
+        redeemedPositions: { type: integer, minimum: 0 }
+        redeemedValueCents: { type: integer, minimum: 0 }
+        pendingRedemptionPositions: { type: integer, minimum: 0 }
+        pendingRedemptionValueCents: { type: integer, minimum: 0 }
+        rejectedPositions: { type: integer, minimum: 0 }
+        rejectedValueCents: { type: integer, minimum: 0 }
       required:
         - tierId
         - label
         - nominalValueCents
         - totalValueCents
         - totalPositions
+        - foundPositions
+        - foundValueCents
         - remainingValueCents
         - remainingPositions
+        - redeemedPositions
+        - redeemedValueCents
+        - pendingRedemptionPositions
+        - pendingRedemptionValueCents
+        - rejectedPositions
+        - rejectedValueCents
     AdminPrizePool:
       type: object
       properties:
