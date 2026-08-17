@@ -1,2 +1,3 @@
 - [PIXELPIX source of truth](pixelpix-source-of-truth.md) — Treat the uploaded prototype as the visual and interaction baseline; do not reinterpret its design without explicit approval.
+- [PIXELPIX grid performance](pixelpix-grid-performance.md) — Paint stable available cells locally and fetch only occupied cells in large prefetched chunks.
 - [Supabase connection verification](supabase-connection.md) — Drizzle uses Supabase PostgreSQL and the API fails closed if the configured project or schema cannot be verified.

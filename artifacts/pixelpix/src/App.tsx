@@ -25,7 +25,9 @@ const apiBaseUrl = (import.meta.env.VITE_API_URL ?? "")
 const TOTAL_PIXELS = 1_000_000;
 const LOGICAL_COLUMNS = 1_000;
 const MIN_CELL_PX = 34;
-const CHUNK_SIZE = 600;
+// A chunk of 10k cells keeps the request count low while remaining small
+// enough for a quick sparse response. Available cells are rendered locally.
+const CHUNK_SIZE = 10_000;
 const STARTING_PIXEL_PRICE = 1;
 const RECEIPT_EMAIL_STORAGE_KEY = "pixelpix-receipt-email";
 const SOCIAL_PROFILE_STORAGE_KEY = "pixelpix-social-profile";
@@ -59,7 +61,7 @@ type ChunkStatus = "loading" | "loaded" | "error";
 function emptyPixel(id: number): Pixel {
   return {
     id,
-    backgroundColor: null,
+    backgroundColor: generatedCellBackground(id),
     revealed: false,
     emoji: null,
     revealedBy: null,
@@ -71,24 +73,30 @@ function emptyPixel(id: number): Pixel {
   };
 }
 
+function generatedCellBackground(id: number) {
+  // This mirrors the server's stable visual seed. Keeping it local means the
+  // million-cell canvas never needs a million-row response just to paint locks.
+  const hash = (id * 2_654_435_761) % 4_294_967_296;
+  const lightness = 14 + (hash % 1_000) / 100;
+  return `hsl(220, 8%, ${lightness}%)`;
+}
+
 function getChunk(chunkId: number) {
   const cached = chunkCache.get(chunkId);
   if (cached) return cached;
 
-  const start = chunkId * CHUNK_SIZE;
-  const end = Math.min(start + CHUNK_SIZE, TOTAL_PIXELS);
   const chunk = new Map<number, Pixel>();
-
-  for (let id = start; id < end; id += 1) {
-    chunk.set(id, emptyPixel(id));
-  }
-
   chunkCache.set(chunkId, chunk);
   return chunk;
 }
 
 function getPixel(id: number) {
-  return getChunk(Math.floor(id / CHUNK_SIZE)).get(id)!;
+  const chunk = getChunk(Math.floor(id / CHUNK_SIZE));
+  const pixel = chunk.get(id);
+  if (pixel) return pixel;
+  const created = emptyPixel(id);
+  chunk.set(id, created);
+  return created;
 }
 
 function revealPixelInCache(
@@ -924,7 +932,7 @@ function SocialProfileForm({
 function PixelGrid() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [scrollTop, setScrollTop] = useState(0);
+  const [scrollTopRow, setScrollTopRow] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [, setRevealVersion] = useState(0);
@@ -932,6 +940,10 @@ function PixelGrid() {
     () => new Map(),
   );
   const loadingChunksRef = useRef(new Set<number>());
+  const chunkStatesRef = useRef(new Map<number, ChunkStatus>());
+  const scrollFrameRef = useRef<number | null>(null);
+  const latestScrollTopRef = useRef(0);
+  const cellSizeRef = useRef(0);
   const [socialProfile, setSocialProfile] = useState<SocialProfile>(() => {
     try {
       const saved = window.localStorage.getItem(SOCIAL_PROFILE_STORAGE_KEY);
@@ -967,8 +979,24 @@ function PixelGrid() {
     return { columns, cellSize, totalRows, totalHeight: totalRows * cellSize };
   }, [containerSize.width]);
 
-  const { startRow, endRow } = useMemo(() => {
-    if (!cellSize) return { startRow: 0, endRow: 0 };
+  cellSizeRef.current = cellSize;
+
+  const {
+    viewportStartRow,
+    viewportEndRow,
+    viewportRows,
+    startRow,
+    endRow,
+  } = useMemo(() => {
+    if (!cellSize) {
+      return {
+        viewportStartRow: 0,
+        viewportEndRow: 0,
+        viewportRows: 0,
+        startRow: 0,
+        endRow: 0,
+      };
+    }
 
     const viewportRows = Math.max(
       1,
@@ -976,11 +1004,11 @@ function PixelGrid() {
     );
     const viewportStartRow = Math.max(
       0,
-      Math.floor(scrollTop / cellSize),
+      scrollTopRow,
     );
     const viewportEndRow = Math.min(
       totalRows,
-      Math.ceil((scrollTop + containerSize.height) / cellSize),
+      viewportStartRow + viewportRows + 1,
     );
 
     // Keep one complete viewport of loaded space on each side.
@@ -988,8 +1016,14 @@ function PixelGrid() {
     const startRow = Math.max(0, viewportStartRow - viewportRows);
     const endRow = Math.min(totalRows, viewportEndRow + viewportRows);
 
-    return { startRow, endRow };
-  }, [cellSize, containerSize.height, scrollTop, totalRows]);
+    return {
+      viewportStartRow,
+      viewportEndRow,
+      viewportRows,
+      startRow,
+      endRow,
+    };
+  }, [cellSize, containerSize.height, scrollTopRow, totalRows]);
 
   const visiblePixels = useMemo(() => {
     const pixels: Array<{ id: number; row: number; col: number }> = [];
@@ -1012,31 +1046,59 @@ function PixelGrid() {
 
   const selected = selectedId === null ? null : getPixel(selectedId);
 
-  const visibleChunkIds = useMemo(() => {
-    if (!cellSize || startRow >= endRow) return [];
+  const getChunkIdsForRows = useCallback(
+    (firstRow: number, lastRow: number) => {
+      if (!cellSize || firstRow >= lastRow) return [];
 
-    const firstId = startRow * columns;
-    const lastId = Math.min(TOTAL_PIXELS - 1, endRow * columns - 1);
-    const firstChunk = Math.floor(firstId / CHUNK_SIZE);
-    const lastChunk = Math.floor(lastId / CHUNK_SIZE);
+      const firstId = firstRow * columns;
+      const lastId = Math.min(TOTAL_PIXELS - 1, lastRow * columns - 1);
+      const firstChunk = Math.floor(firstId / CHUNK_SIZE);
+      const lastChunk = Math.floor(lastId / CHUNK_SIZE);
 
-    return Array.from(
-      { length: lastChunk - firstChunk + 1 },
-      (_, index) => firstChunk + index,
-    );
-  }, [cellSize, columns, endRow, startRow]);
+      return Array.from(
+        { length: lastChunk - firstChunk + 1 },
+        (_, index) => firstChunk + index,
+      );
+    },
+    [cellSize, columns],
+  );
+
+  const viewportChunkIds = useMemo(
+    () => getChunkIdsForRows(viewportStartRow, viewportEndRow),
+    [getChunkIdsForRows, viewportEndRow, viewportStartRow],
+  );
+
+  const prefetchChunkIds = useMemo(() => {
+    const prefetchStartRow = Math.max(0, viewportStartRow - viewportRows);
+    const prefetchEndRow = Math.min(totalRows, viewportEndRow + viewportRows);
+    return getChunkIdsForRows(prefetchStartRow, prefetchEndRow);
+  }, [
+    getChunkIdsForRows,
+    totalRows,
+    viewportEndRow,
+    viewportRows,
+    viewportStartRow,
+  ]);
+
+  const updateChunkState = useCallback(
+    (chunkId: number, status: ChunkStatus) => {
+      chunkStatesRef.current.set(chunkId, status);
+      setChunkStates((states) => {
+        const next = new Map(states);
+        next.set(chunkId, status);
+        return next;
+      });
+    },
+    [],
+  );
 
   const requestChunk = useCallback(
     (chunkId: number) => {
       if (loadingChunksRef.current.has(chunkId)) return;
-      if (chunkStates.get(chunkId) === "loaded") return;
+      if (chunkStatesRef.current.get(chunkId) === "loaded") return;
 
       loadingChunksRef.current.add(chunkId);
-      setChunkStates((states) => {
-        const next = new Map(states);
-        next.set(chunkId, "loading");
-        return next;
-      });
+      updateChunkState(chunkId, "loading");
 
       const from = chunkId * CHUNK_SIZE;
       const to = Math.min(TOTAL_PIXELS - 1, from + CHUNK_SIZE - 1);
@@ -1056,51 +1118,70 @@ function PixelGrid() {
               emoji: cell.emoji,
             }),
           );
-          setChunkStates((states) => {
-            const next = new Map(states);
-            next.set(chunkId, "loaded");
-            return next;
-          });
+          updateChunkState(chunkId, "loaded");
           setRevealVersion((version) => version + 1);
         })
         .catch(() => {
-          setChunkStates((states) => {
-            const next = new Map(states);
-            next.set(chunkId, "error");
-            return next;
-          });
+          updateChunkState(chunkId, "error");
         })
         .finally(() => {
           loadingChunksRef.current.delete(chunkId);
         });
     },
-    [chunkStates],
+    [updateChunkState],
   );
 
   useEffect(() => {
     if (!containerSize.width || !cellSize || startRow >= endRow) return;
-    visibleChunkIds.forEach((chunkId) => requestChunk(chunkId));
+    // Prefetching is intentionally decoupled from the visible loading state.
+    // A slow background request must never turn the whole viewport into a
+    // skeleton or block scrolling.
+    prefetchChunkIds.forEach((chunkId) => requestChunk(chunkId));
   }, [
     cellSize,
     containerSize.width,
     endRow,
+    prefetchChunkIds,
     requestChunk,
     startRow,
-    visibleChunkIds,
   ]);
 
-  const loadingVisibleChunks = visibleChunkIds.filter(
+  const loadingVisibleChunks = viewportChunkIds.filter(
     (chunkId) => chunkStates.get(chunkId) !== "loaded",
   );
-  const failedVisibleChunks = visibleChunkIds.filter(
+  const failedVisibleChunks = viewportChunkIds.filter(
     (chunkId) => chunkStates.get(chunkId) === "error",
   );
-  const isLoadingVisibleChunks =
-    loadingVisibleChunks.length > 0 && failedVisibleChunks.length === 0;
+  const isInitialLoading =
+    loadingVisibleChunks.length > 0 &&
+    chunkStates.size === 0 &&
+    failedVisibleChunks.length === 0;
 
   const retryVisibleChunks = useCallback(() => {
     failedVisibleChunks.forEach((chunkId) => requestChunk(chunkId));
   }, [failedVisibleChunks, requestChunk]);
+
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    latestScrollTopRef.current = event.currentTarget.scrollTop;
+    if (scrollFrameRef.current !== null) return;
+
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      const row = Math.floor(
+        latestScrollTopRef.current / Math.max(1, cellSizeRef.current),
+      );
+      setScrollTopRow((current) => (current === row ? current : row));
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -1184,13 +1265,13 @@ function PixelGrid() {
     <div
       ref={containerRef}
       className="prototype-scroll-area"
-      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
-      aria-busy={isLoadingVisibleChunks}
+      onScroll={handleScroll}
+      aria-busy={isInitialLoading}
     >
-      {isLoadingVisibleChunks && (
+      {isInitialLoading && (
         <div className="prototype-load-status" role="status" aria-live="polite">
           <Loader2 size={14} className="prototype-spinner" />
-          Carregando células…
+          Sincronizando dados…
         </div>
       )}
 
@@ -1210,7 +1291,6 @@ function PixelGrid() {
         {visiblePixels.map(({ id, row, col }) => {
           const pixel = getPixel(id);
           const chunkStatus = chunkStates.get(Math.floor(id / CHUNK_SIZE));
-          const isLoading = chunkStatus !== "loaded";
           const isChunkFailed = chunkStatus === "error";
           const selected = id === selectedId;
           const iconSize = Math.min(cellSize * 0.42, 16);
@@ -1222,7 +1302,6 @@ function PixelGrid() {
               className={[
                 "prototype-cell",
                 selected ? "is-selected" : "",
-                isLoading ? "is-loading" : "",
                 isChunkFailed ? "is-error" : "",
               ]
                 .filter(Boolean)
@@ -1239,24 +1318,20 @@ function PixelGrid() {
                     : undefined,
               }}
               onClick={() => {
-                if (!isLoading) setSelectedId(id);
+                setSelectedId(id);
               }}
               onMouseEnter={() => setHoveredId(id)}
               onMouseLeave={() =>
                 setHoveredId((current) => (current === id ? null : current))
               }
-              disabled={isLoading}
+              disabled={false}
               aria-label={
-                isLoading
-                  ? `Pixel ${id}, carregando`
-                  : pixel.revealed
+                pixel.revealed
                   ? `Pixel ${id}, revelado, ${pixel.emoji}`
                   : `Pixel ${id}, não revelado`
               }
             >
-              {isLoading ? (
-                <span className="prototype-cell-skeleton" aria-hidden="true" />
-              ) : pixel.revealed || pixel.emoji === "💰" ? (
+              {pixel.revealed || pixel.emoji === "💰" ? (
                 <span style={{ fontSize: emojiSize }}>{pixel.emoji}</span>
               ) : (
                 <Lock size={iconSize} color="rgba(255,255,255,.75)" />

@@ -46,7 +46,7 @@ paths:
           schema: { type: integer, minimum: 0, maximum: 999999 }
       responses:
         "200":
-          description: Full range, with sparse cells normalized to available
+          description: Non-default cells in the range; cells omitted from this response are available and rendered from their stable visual seed
           content:
             application/json:
               schema:

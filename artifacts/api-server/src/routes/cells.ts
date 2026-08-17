@@ -105,6 +105,12 @@ function generatedCellBackgroundSql(cellIdExpression: string) {
 }
 
 export async function ensureCellRecords() {
+  // Seeding is only needed on the first deployment. Running a million-row
+  // upsert on every API restart blocks the server before it can serve the
+  // public grid.
+  const existing = await pool.query("SELECT 1 FROM cells LIMIT 1");
+  if (existing.rows.length > 0) return;
+
   await pool.query(`
     INSERT INTO cells (id, status, emoji, background_color)
     SELECT
@@ -331,21 +337,14 @@ router.get("/cells", async (request, response) => {
   const rows = await pool.query(
     `SELECT id, status, emoji, background_color
        FROM cells
-      WHERE id BETWEEN $1 AND $2`,
+       WHERE id BETWEEN $1 AND $2
+         AND (status <> 'available' OR emoji = '💰')
+       ORDER BY id`,
     [from, to],
   );
-  const expectedCellCount = to - from + 1;
-  if (rows.rows.length !== expectedCellCount) {
-    request.log?.error(
-      { from, to, expectedCellCount, actualCellCount: rows.rows.length },
-      "Cell visual data is incomplete",
-    );
-    response.status(503).json({ error: "Dados visuais das células indisponíveis" });
-    return;
-  }
   response.setHeader(
     "Cache-Control",
-    "public, max-age=0, s-maxage=3, stale-while-revalidate=5",
+    "public, max-age=2, s-maxage=5, stale-while-revalidate=30",
   );
   response.json(
     rows.rows.map(
