@@ -1,1 +1,2 @@
 - [PIXELPIX source of truth](pixelpix-source-of-truth.md) — Treat the uploaded prototype as the visual and interaction baseline; do not reinterpret its design without explicit approval.
+- [Supabase connection verification](supabase-connection.md) — Drizzle uses Supabase PostgreSQL and the API fails closed if the configured project or schema cannot be verified.

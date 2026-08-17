@@ -2,7 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureCellRecords, expireReservations } from "./routes/cells";
 import { processPendingCertificates } from "./routes/webhook";
-import { pool } from "@workspace/db";
+import { pool, verifySupabaseConnection } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -19,6 +19,15 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function start() {
+  const supabaseStatus = await verifySupabaseConnection(pool);
+  logger.info(
+    {
+      provider: supabaseStatus.provider,
+      projectRef: supabaseStatus.projectRef,
+      verifiedTableCount: supabaseStatus.verifiedTableCount,
+    },
+    "Supabase database verified",
+  );
   await ensureCellRecords();
   await pool.query(`
     INSERT INTO payout_safety_config (id, safety_margin_bps, updated_by)
