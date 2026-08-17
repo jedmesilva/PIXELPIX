@@ -65,7 +65,8 @@ workspace layout:
 - **Vercel / consumer frontend**: use the repository root, install with
   `pnpm install --frozen-lockfile`, build with
   `pnpm --filter @workspace/pixelpix run build`, and publish
-  `artifacts/pixelpix/dist/public`.
+  `artifacts/pixelpix/dist/public`. These settings are versioned in the root
+  `vercel.json`.
 - **Vercel / admin frontend**: use the repository root, install with
   `pnpm install --frozen-lockfile`, build with
   `pnpm --filter @workspace/pixelpix-admin run build`, and publish
