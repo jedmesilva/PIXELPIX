@@ -190,6 +190,8 @@ paths:
       operationId: getAdminOverview
       tags: [admin]
       summary: Read the prize operation overview
+      security:
+        - AdminAccessKey: []
       responses:
         "200":
           description: Current balances, cell counts, and redemption counts
@@ -206,6 +208,8 @@ paths:
       operationId: listAdminRedemptions
       tags: [admin]
       summary: List prize redemption requests
+      security:
+        - AdminAccessKey: []
       parameters:
         - name: status
           in: query
@@ -242,6 +246,8 @@ paths:
       operationId: getAdminRedemption
       tags: [admin]
       summary: Read one redemption request with its cell and payment context
+      security:
+        - AdminAccessKey: []
       parameters:
         - name: id
           in: path
@@ -267,6 +273,8 @@ paths:
       operationId: updateAdminRedemption
       tags: [admin]
       summary: Update the status of a redemption request
+      security:
+        - AdminAccessKey: []
       parameters:
         - name: id
           in: path
@@ -303,6 +311,8 @@ paths:
       operationId: getAdminPrizePool
       tags: [admin]
       summary: Read prize pool tiers and immutable batch metadata
+      security:
+        - AdminAccessKey: []
       responses:
         "200":
           description: Prize pool detail
@@ -315,6 +325,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
 components:
+  securitySchemes:
+    AdminAccessKey:
+      type: apiKey
+      in: header
+      name: x-admin-access-key
   schemas:
     HealthStatus:
       type: object

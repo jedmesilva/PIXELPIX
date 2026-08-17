@@ -1,5 +1,4 @@
-import { Router, type IRouter, type RequestHandler } from "express";
-import { timingSafeEqual } from "node:crypto";
+import { Router, type IRouter } from "express";
 import {
   GetAdminPrizePoolResponse,
   GetAdminRedemptionParams,
@@ -12,38 +11,9 @@ import {
   UpdateAdminRedemptionResponse,
 } from "@workspace/api-zod";
 import { pool } from "@workspace/db";
+import { requireAdminAccess } from "../middlewares/require-admin-access";
 
 const router: IRouter = Router();
-
-function sameSecret(actual: string, expected: string) {
-  const actualBuffer = Buffer.from(actual);
-  const expectedBuffer = Buffer.from(expected);
-  return (
-    actualBuffer.length === expectedBuffer.length &&
-    timingSafeEqual(actualBuffer, expectedBuffer)
-  );
-}
-
-const requireAdmin: RequestHandler = (request, response, next) => {
-  const configuredKey = process.env.ADMIN_ACCESS_KEY;
-  if (!configuredKey && process.env.NODE_ENV !== "production") {
-    next();
-    return;
-  }
-
-  if (!configuredKey) {
-    response.status(503).json({ error: "Admin access is not configured" });
-    return;
-  }
-
-  const providedKey = request.header("x-admin-access-key") ?? "";
-  if (!sameSecret(providedKey, configuredKey)) {
-    response.status(401).json({ error: "Admin access key is invalid" });
-    return;
-  }
-
-  next();
-};
 
 function iso(value: unknown) {
   if (!value) return null;
@@ -74,7 +44,7 @@ function mapRedemption(row: Record<string, unknown>) {
   };
 }
 
-router.use(requireAdmin);
+router.use("/admin", requireAdminAccess);
 
 router.get("/admin/overview", async (request, response): Promise<void> => {
   const result = await pool.query(`
