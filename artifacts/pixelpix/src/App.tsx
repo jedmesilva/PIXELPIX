@@ -55,6 +55,7 @@ type SocialProfile = {
 const EMPTY_SOCIAL_PROFILE: SocialProfile = { network: "instagram", handle: "" };
 
 const chunkCache = new Map<number, Map<number, Pixel>>();
+type ChunkStatus = "loading" | "loaded" | "error";
 
 function emptyPixel(id: number): Pixel {
   return {
@@ -928,6 +929,10 @@ function PixelGrid() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [, setRevealVersion] = useState(0);
+  const [chunkStates, setChunkStates] = useState<Map<number, ChunkStatus>>(
+    () => new Map(),
+  );
+  const loadingChunksRef = useRef(new Set<number>());
   const [socialProfile, setSocialProfile] = useState<SocialProfile>(() => {
     try {
       const saved = window.localStorage.getItem(SOCIAL_PROFILE_STORAGE_KEY);
@@ -998,31 +1003,95 @@ function PixelGrid() {
 
   const selected = selectedId === null ? null : getPixel(selectedId);
 
+  const visibleChunkIds = useMemo(() => {
+    if (!cellSize || startRow >= endRow) return [];
+
+    const firstId = startRow * columns;
+    const lastId = Math.min(TOTAL_PIXELS - 1, endRow * columns - 1);
+    const firstChunk = Math.floor(firstId / CHUNK_SIZE);
+    const lastChunk = Math.floor(lastId / CHUNK_SIZE);
+
+    return Array.from(
+      { length: lastChunk - firstChunk + 1 },
+      (_, index) => firstChunk + index,
+    );
+  }, [cellSize, columns, endRow, startRow]);
+
+  const requestChunk = useCallback(
+    (chunkId: number) => {
+      if (loadingChunksRef.current.has(chunkId)) return;
+      if (chunkStates.get(chunkId) === "loaded") return;
+
+      loadingChunksRef.current.add(chunkId);
+      setChunkStates((states) => {
+        const next = new Map(states);
+        next.set(chunkId, "loading");
+        return next;
+      });
+
+      const from = chunkId * CHUNK_SIZE;
+      const to = Math.min(TOTAL_PIXELS - 1, from + CHUNK_SIZE - 1);
+
+      void fetchJson<
+        Array<{
+          id: number;
+          status: "available" | "reserved" | "paid";
+          emoji: string;
+          backgroundColor: string;
+        }>
+      >(`/api/cells?from=${from}&to=${to}`)
+        .then((cells) => {
+          cells.forEach((cell) =>
+            applyCellStatus(cell.id, cell.status, {
+              backgroundColor: cell.backgroundColor,
+              emoji: cell.emoji,
+            }),
+          );
+          setChunkStates((states) => {
+            const next = new Map(states);
+            next.set(chunkId, "loaded");
+            return next;
+          });
+          setRevealVersion((version) => version + 1);
+        })
+        .catch(() => {
+          setChunkStates((states) => {
+            const next = new Map(states);
+            next.set(chunkId, "error");
+            return next;
+          });
+        })
+        .finally(() => {
+          loadingChunksRef.current.delete(chunkId);
+        });
+    },
+    [chunkStates],
+  );
+
   useEffect(() => {
     if (!containerSize.width || !cellSize || startRow >= endRow) return;
-    const from = startRow * columns;
-    const to = Math.min(TOTAL_PIXELS - 1, endRow * columns - 1);
-    void fetchJson<
-      Array<{
-        id: number;
-        status: "available" | "reserved" | "paid";
-        emoji: string;
-        backgroundColor: string;
-      }>
-    >(`/api/cells?from=${from}&to=${to}`)
-      .then((cells) => {
-        cells.forEach((cell) =>
-          applyCellStatus(cell.id, cell.status, {
-            backgroundColor: cell.backgroundColor,
-            emoji: cell.emoji,
-          }),
-        );
-        setRevealVersion((version) => version + 1);
-      })
-      .catch(() => {
-        // The visual grid remains usable while the API is temporarily unavailable.
-      });
-  }, [cellSize, columns, containerSize.width, endRow, startRow]);
+    visibleChunkIds.forEach((chunkId) => requestChunk(chunkId));
+  }, [
+    cellSize,
+    containerSize.width,
+    endRow,
+    requestChunk,
+    startRow,
+    visibleChunkIds,
+  ]);
+
+  const loadingVisibleChunks = visibleChunkIds.filter(
+    (chunkId) => chunkStates.get(chunkId) !== "loaded",
+  );
+  const failedVisibleChunks = visibleChunkIds.filter(
+    (chunkId) => chunkStates.get(chunkId) === "error",
+  );
+  const isLoadingVisibleChunks =
+    loadingVisibleChunks.length > 0 && failedVisibleChunks.length === 0;
+
+  const retryVisibleChunks = useCallback(() => {
+    failedVisibleChunks.forEach((chunkId) => requestChunk(chunkId));
+  }, [failedVisibleChunks, requestChunk]);
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -1107,13 +1176,33 @@ function PixelGrid() {
       ref={containerRef}
       className="prototype-scroll-area"
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      aria-busy={isLoadingVisibleChunks}
     >
+      {isLoadingVisibleChunks && (
+        <div className="prototype-load-status" role="status" aria-live="polite">
+          <Loader2 size={14} className="prototype-spinner" />
+          Carregando células…
+        </div>
+      )}
+
+      {failedVisibleChunks.length > 0 && (
+        <div className="prototype-load-error" role="alert">
+          <span>Não foi possível carregar esta área.</span>
+          <button type="button" onClick={retryVisibleChunks}>
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
       <div
         className="prototype-grid-canvas"
         style={{ height: totalHeight }}
       >
         {visiblePixels.map(({ id, row, col }) => {
           const pixel = getPixel(id);
+          const chunkStatus = chunkStates.get(Math.floor(id / CHUNK_SIZE));
+          const isLoading = chunkStatus !== "loaded";
+          const isChunkFailed = chunkStatus === "error";
           const selected = id === selectedId;
           const iconSize = Math.min(cellSize * 0.42, 16);
           const emojiSize = Math.min(cellSize * 0.55, 20);
@@ -1121,7 +1210,14 @@ function PixelGrid() {
           return (
             <button
               key={id}
-              className={`prototype-cell${selected ? " is-selected" : ""}`}
+              className={[
+                "prototype-cell",
+                selected ? "is-selected" : "",
+                isLoading ? "is-loading" : "",
+                isChunkFailed ? "is-error" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               style={{
                 top: row * cellSize,
                 left: col * cellSize,
@@ -1133,18 +1229,25 @@ function PixelGrid() {
                     ? `repeating-linear-gradient(45deg, ${pixel.backgroundColor}, ${pixel.backgroundColor} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
                     : undefined,
               }}
-              onClick={() => setSelectedId(id)}
+              onClick={() => {
+                if (!isLoading) setSelectedId(id);
+              }}
               onMouseEnter={() => setHoveredId(id)}
               onMouseLeave={() =>
                 setHoveredId((current) => (current === id ? null : current))
               }
+              disabled={isLoading}
               aria-label={
-                pixel.revealed
+                isLoading
+                  ? `Pixel ${id}, carregando`
+                  : pixel.revealed
                   ? `Pixel ${id}, revelado, ${pixel.emoji}`
                   : `Pixel ${id}, não revelado`
               }
             >
-              {pixel.revealed || pixel.emoji === "💰" ? (
+              {isLoading ? (
+                <span className="prototype-cell-skeleton" aria-hidden="true" />
+              ) : pixel.revealed || pixel.emoji === "💰" ? (
                 <span style={{ fontSize: emojiSize }}>{pixel.emoji}</span>
               ) : (
                 <Lock size={iconSize} color="rgba(255,255,255,.75)" />

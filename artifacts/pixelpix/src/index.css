@@ -39,6 +39,11 @@ button:focus-visible {
   to { transform: rotate(360deg); }
 }
 
+@keyframes prototype-shimmer {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(120%); }
+}
+
 .prototype-page {
   display: flex;
   flex-direction: column;
@@ -103,6 +108,82 @@ button:focus-visible {
   color: #fff;
   cursor: pointer;
   transition: border-color 120ms ease, filter 120ms ease;
+}
+
+.prototype-cell.is-loading {
+  overflow: hidden;
+  cursor: progress;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #171b20;
+}
+
+.prototype-cell.is-loading::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(125, 211, 252, 0.09) 48%,
+    transparent 66%
+  );
+  animation: prototype-shimmer 1.35s ease-in-out infinite;
+}
+
+.prototype-cell-skeleton {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 28%;
+  height: 28%;
+  border-radius: 999px;
+  background: rgba(139, 147, 161, 0.28);
+}
+
+.prototype-cell.is-error {
+  background: #1d1719;
+}
+
+.prototype-load-status,
+.prototype-load-error {
+  position: sticky;
+  top: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin: 12px auto -42px;
+  padding: 8px 12px;
+  border: 1px solid #27313b;
+  border-radius: 999px;
+  color: #b8c2cf;
+  background: rgba(20, 23, 27, 0.92);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.prototype-load-error {
+  border-color: rgba(248, 113, 113, 0.38);
+  color: #fecaca;
+  pointer-events: auto;
+}
+
+.prototype-load-error button {
+  padding: 0;
+  border: 0;
+  color: #7dd3fc;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.prototype-load-error button:hover {
+  color: #bae6fd;
 }
 
 .prototype-cell:hover {
