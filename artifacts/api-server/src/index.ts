@@ -55,6 +55,8 @@ async function start() {
 }
 
 void start().catch((error) => {
-  logger.error({ error }, "Server startup failed");
+  // Pino serializes Error instances through the `err` key. Using `error`
+  // produces an empty object and hides the actual startup failure.
+  logger.error({ err: error }, "Server startup failed");
   process.exit(1);
 });

@@ -44,9 +44,12 @@ function mapRedemption(row: Record<string, unknown>) {
   };
 }
 
-router.use("/admin", requireAdminAccess);
+// This router is mounted at /api/admin by routes/index.ts. Keeping the
+// authentication boundary here means every administrative endpoint is
+// protected before it reaches a handler.
+router.use(requireAdminAccess);
 
-router.get("/admin/overview", async (request, response): Promise<void> => {
+router.get("/overview", async (_request, response): Promise<void> => {
   const result = await pool.query(`
     SELECT
       COALESCE((SELECT SUM(remaining_value_cents) FROM prize_pool), 0) AS available_prize_balance_cents,
@@ -95,7 +98,7 @@ router.get("/admin/overview", async (request, response): Promise<void> => {
   response.json(GetAdminOverviewResponse.parse(data));
 });
 
-router.get("/admin/redemptions", async (request, response): Promise<void> => {
+router.get("/redemptions", async (request, response): Promise<void> => {
   const parsed = ListAdminRedemptionsQueryParams.safeParse(request.query);
   if (!parsed.success) {
     response.status(400).json({ error: parsed.error.message });
@@ -139,7 +142,7 @@ router.get("/admin/redemptions", async (request, response): Promise<void> => {
   );
 });
 
-router.get("/admin/redemptions/:id", async (request, response): Promise<void> => {
+router.get("/redemptions/:id", async (request, response): Promise<void> => {
   const parsed = GetAdminRedemptionParams.safeParse(request.params);
   if (!parsed.success) {
     response.status(400).json({ error: parsed.error.message });
@@ -161,7 +164,7 @@ router.get("/admin/redemptions/:id", async (request, response): Promise<void> =>
   response.json(GetAdminRedemptionResponse.parse(mapRedemption(row)));
 });
 
-router.patch("/admin/redemptions/:id", async (request, response): Promise<void> => {
+router.patch("/redemptions/:id", async (request, response): Promise<void> => {
   const params = UpdateAdminRedemptionParams.safeParse(request.params);
   const body = UpdateAdminRedemptionBody.safeParse(request.body);
   if (!params.success) {
@@ -197,7 +200,11 @@ router.patch("/admin/redemptions/:id", async (request, response): Promise<void> 
       return;
     }
 
-    const processedBy = request.header("x-admin-actor") ?? "admin";
+    // The access-key flow has one server-side identity. Never trust a
+    // browser-supplied actor header for the financial audit trail. A future
+    // session-based admin auth flow can replace this with the authenticated
+    // principal from the middleware.
+    const processedBy = "admin-access-key";
     const updated = await client.query(
       `UPDATE prize_redemption_requests
        SET status = $1,
@@ -234,7 +241,7 @@ router.patch("/admin/redemptions/:id", async (request, response): Promise<void> 
   }
 });
 
-router.get("/admin/prize-pool", async (_request, response): Promise<void> => {
+router.get("/prize-pool", async (_request, response): Promise<void> => {
   const [tiers, batch, safety] = await Promise.all([
     pool.query(
       `SELECT

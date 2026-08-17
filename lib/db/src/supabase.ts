@@ -16,6 +16,8 @@ const EXPECTED_TABLES = [
 ] as const;
 
 const SUPABASE_REQUEST_TIMEOUT_MS = 10_000;
+const SUPABASE_VERIFICATION_ATTEMPTS = 3;
+const SUPABASE_RETRY_DELAY_MS = 1_000;
 
 export type SupabaseConnectionStatus = {
   provider: "supabase";
@@ -111,22 +113,46 @@ async function verifySupabaseRestApi(
 ) {
   const endpoint = new URL("/rest/v1/cells", supabaseUrl);
   endpoint.searchParams.set("select", "id");
-  endpoint.searchParams.set("limit", "0");
+  // This request verifies REST access and project identity; it must not scan
+  // the million-cell table just to count rows during every server startup.
+  endpoint.searchParams.set("limit", "1");
 
-  const response = await fetch(endpoint, {
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      Prefer: "count=exact",
-    },
-    signal: AbortSignal.timeout(SUPABASE_REQUEST_TIMEOUT_MS),
-  });
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= SUPABASE_VERIFICATION_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(endpoint, {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        signal: AbortSignal.timeout(SUPABASE_REQUEST_TIMEOUT_MS),
+      });
 
-  if (!response.ok) {
-    throw new Error(
-      `Supabase REST verification failed with HTTP ${response.status}.`,
+      if (response.ok) return;
+
+      // Authentication and schema errors are deterministic and should fail
+      // immediately. Only retry transient upstream failures.
+      if (response.status < 500 || attempt === SUPABASE_VERIFICATION_ATTEMPTS) {
+        throw new Error(
+          `Supabase REST verification failed with HTTP ${response.status}.`,
+        );
+      }
+      lastError = new Error(
+        `Supabase REST verification failed with HTTP ${response.status}.`,
+      );
+    } catch (error) {
+      lastError = error;
+      if (attempt === SUPABASE_VERIFICATION_ATTEMPTS) throw error;
+    }
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, SUPABASE_RETRY_DELAY_MS * attempt),
     );
   }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Supabase REST verification failed.");
 }
 
 async function verifyPostgresSchema(pool: Pool) {

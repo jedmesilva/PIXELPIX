@@ -15,7 +15,7 @@ PIXELPIX is an interactive grid of one million stable cells that users can reser
 - Required runtime: Supabase PostgreSQL via the configured `DATABASE_URL`
 - Supabase project credentials are configured as `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`
 - Optional webhook secret: `WEBHOOK_SECRET` for signed payment webhooks
-- Admin access: set `ADMIN_ACCESS_KEY` for production requests to `/api/admin/*`; development permits local access without a key
+- Admin access: the separate `/admin/` console calls `/api/admin/*`, and every administrative request requires `ADMIN_ACCESS_KEY`. The current access-key flow is a bootstrap protection for the operations console, not a replacement for per-user admin authentication.
 
 ## Stack
 
@@ -42,6 +42,8 @@ PIXELPIX is an interactive grid of one million stable cells that users can reser
 - Reservation tokens stay in POST bodies and are the temporary proof of ownership without requiring accounts.
 - Prize positions are generated once, committed with a SHA-256 hash, and consumed transactionally on confirmed payment.
 - Cash movements use an append-only ledger with idempotent revenue and prize-payout entries.
+- The public consumer API and admin API may run in the same API service because they share the same transactional database, but they remain separate contracts and route namespaces. The generated client can contain both contracts; that is a code-reuse choice, not an authorization boundary.
+- Admin handlers are mounted beneath `/api/admin` and protected before the handler layer. Administrative mutations must derive audit identity on the server; browser-supplied actor headers are not trusted.
 
 ## Product
 

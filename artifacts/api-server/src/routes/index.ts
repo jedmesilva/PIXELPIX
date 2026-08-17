@@ -9,6 +9,9 @@ const router: IRouter = Router();
 router.use(healthRouter);
 router.use(cellsRouter);
 router.use(webhookRouter);
-router.use(adminRouter);
+// Keep administrative capabilities behind their own namespace and middleware.
+// The admin router only defines paths relative to /admin, so a new admin route
+// cannot accidentally become part of the public API by omitting the prefix.
+router.use("/admin", adminRouter);
 
 export default router;
