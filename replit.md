@@ -73,17 +73,23 @@ workspace layout:
   `pnpm install --frozen-lockfile`, builds with
   `pnpm --filter @workspace/pixelpix-admin run build`, publishes
   `dist/public`, and rewrites SPA routes to `/index.html`.
-- **Railway / API**: use the repository root, build with
+- **Railway / API**: use the repository root as the service root. The versioned
+  `railway.json` configures Nixpacks to build with
   `pnpm --filter @workspace/api-server run build`, start with
   `pnpm --filter @workspace/api-server run start`, and use `/api/healthz` as
-  the health check.
+  the health check. Railway provides `PORT` automatically; do not replace it
+  with a fixed port.
 
 Set `VITE_API_URL` in both Vercel projects to the Railway API origin
 (for example, `https://api.example.com`; a value ending in `/api` is also
 accepted). Railway provides `PORT`; configure `NODE_ENV=production`,
-`DATABASE_URL`, and `ADMIN_ACCESS_KEY` there. `WEBHOOK_SECRET`, CAPTCHA, and
+`DATABASE_URL`, and `ADMIN_ACCESS_KEY` there. The full backend variable list is
+in `artifacts/api-server/.env.example`. `WEBHOOK_SECRET`, CAPTCHA, and
 certificate-delivery variables are optional and only needed for those
 integrations. Replit secrets are not copied automatically to Vercel or Railway.
+Before the first deploy, apply the Drizzle schema to the target Supabase
+database with `pnpm --filter @workspace/db run push`; the Railway start command
+does not run schema changes automatically.
 
 ## Pointers
 

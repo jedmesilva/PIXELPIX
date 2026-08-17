@@ -1,0 +1,12 @@
+.git
+.github
+.cache
+.local
+.agents
+attached_assets
+artifacts/mockup-sandbox
+artifacts/pixelpix
+artifacts/pixelpix-admin
+**/node_modules
+**/dist
+*.log
