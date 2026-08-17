@@ -25,8 +25,9 @@ const apiBaseUrl = (import.meta.env.VITE_API_URL ?? "")
 const TOTAL_PIXELS = 1_000_000;
 const LOGICAL_COLUMNS = 1_000;
 const MIN_CELL_PX = 34;
-const BUFFER_ROWS = 4;
-const CHUNK_SIZE = 2_500;
+const BUFFER_ROWS = 8;
+const CHUNK_SIZE = 600;
+const PREFETCH_CHUNKS = 2;
 const STARTING_PIXEL_PRICE = 1;
 const RECEIPT_EMAIL_STORAGE_KEY = "pixelpix-receipt-email";
 const SOCIAL_PROFILE_STORAGE_KEY = "pixelpix-social-profile";
@@ -1017,6 +1018,24 @@ function PixelGrid() {
     );
   }, [cellSize, columns, endRow, startRow]);
 
+  const prefetchChunkIds = useMemo(() => {
+    if (visibleChunkIds.length === 0) return [];
+
+    const firstVisibleChunk = visibleChunkIds[0];
+    const lastVisibleChunk = visibleChunkIds[visibleChunkIds.length - 1];
+    const lastChunk = Math.ceil(TOTAL_PIXELS / CHUNK_SIZE) - 1;
+    const firstChunk = Math.max(0, firstVisibleChunk - PREFETCH_CHUNKS);
+    const lastPrefetchChunk = Math.min(
+      lastChunk,
+      lastVisibleChunk + PREFETCH_CHUNKS,
+    );
+
+    return Array.from(
+      { length: lastPrefetchChunk - firstChunk + 1 },
+      (_, index) => firstChunk + index,
+    );
+  }, [visibleChunkIds]);
+
   const requestChunk = useCallback(
     (chunkId: number) => {
       if (loadingChunksRef.current.has(chunkId)) return;
@@ -1071,10 +1090,14 @@ function PixelGrid() {
   useEffect(() => {
     if (!containerSize.width || !cellSize || startRow >= endRow) return;
     visibleChunkIds.forEach((chunkId) => requestChunk(chunkId));
+    prefetchChunkIds
+      .filter((chunkId) => !visibleChunkIds.includes(chunkId))
+      .forEach((chunkId) => requestChunk(chunkId));
   }, [
     cellSize,
     containerSize.width,
     endRow,
+    prefetchChunkIds,
     requestChunk,
     startRow,
     visibleChunkIds,
