@@ -25,9 +25,7 @@ const apiBaseUrl = (import.meta.env.VITE_API_URL ?? "")
 const TOTAL_PIXELS = 1_000_000;
 const LOGICAL_COLUMNS = 1_000;
 const MIN_CELL_PX = 34;
-const BUFFER_ROWS = 8;
 const CHUNK_SIZE = 600;
-const PREFETCH_CHUNKS = 2;
 const STARTING_PIXEL_PRICE = 1;
 const RECEIPT_EMAIL_STORAGE_KEY = "pixelpix-receipt-email";
 const SOCIAL_PROFILE_STORAGE_KEY = "pixelpix-social-profile";
@@ -971,15 +969,25 @@ function PixelGrid() {
 
   const { startRow, endRow } = useMemo(() => {
     if (!cellSize) return { startRow: 0, endRow: 0 };
-    const visibleRows = Math.ceil(containerSize.height / cellSize) + 1;
-    const startRow = Math.max(
+
+    const viewportRows = Math.max(
+      1,
+      Math.ceil(containerSize.height / cellSize),
+    );
+    const viewportStartRow = Math.max(
       0,
-      Math.floor(scrollTop / cellSize) - BUFFER_ROWS,
+      Math.floor(scrollTop / cellSize),
     );
-    const endRow = Math.min(
+    const viewportEndRow = Math.min(
       totalRows,
-      startRow + visibleRows + BUFFER_ROWS * 2,
+      Math.ceil((scrollTop + containerSize.height) / cellSize),
     );
+
+    // Keep one complete viewport of loaded space on each side.
+    // The bounds naturally clamp at the beginning and end of the grid.
+    const startRow = Math.max(0, viewportStartRow - viewportRows);
+    const endRow = Math.min(totalRows, viewportEndRow + viewportRows);
+
     return { startRow, endRow };
   }, [cellSize, containerSize.height, scrollTop, totalRows]);
 
@@ -1017,24 +1025,6 @@ function PixelGrid() {
       (_, index) => firstChunk + index,
     );
   }, [cellSize, columns, endRow, startRow]);
-
-  const prefetchChunkIds = useMemo(() => {
-    if (visibleChunkIds.length === 0) return [];
-
-    const firstVisibleChunk = visibleChunkIds[0];
-    const lastVisibleChunk = visibleChunkIds[visibleChunkIds.length - 1];
-    const lastChunk = Math.ceil(TOTAL_PIXELS / CHUNK_SIZE) - 1;
-    const firstChunk = Math.max(0, firstVisibleChunk - PREFETCH_CHUNKS);
-    const lastPrefetchChunk = Math.min(
-      lastChunk,
-      lastVisibleChunk + PREFETCH_CHUNKS,
-    );
-
-    return Array.from(
-      { length: lastPrefetchChunk - firstChunk + 1 },
-      (_, index) => firstChunk + index,
-    );
-  }, [visibleChunkIds]);
 
   const requestChunk = useCallback(
     (chunkId: number) => {
@@ -1090,14 +1080,10 @@ function PixelGrid() {
   useEffect(() => {
     if (!containerSize.width || !cellSize || startRow >= endRow) return;
     visibleChunkIds.forEach((chunkId) => requestChunk(chunkId));
-    prefetchChunkIds
-      .filter((chunkId) => !visibleChunkIds.includes(chunkId))
-      .forEach((chunkId) => requestChunk(chunkId));
   }, [
     cellSize,
     containerSize.width,
     endRow,
-    prefetchChunkIds,
     requestChunk,
     startRow,
     visibleChunkIds,
