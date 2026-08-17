@@ -57,6 +57,31 @@ _Populate as you build — explicit user instructions worth remembering across s
 - The generator validates that tier quantities fit the grid and that the configured pool closes exactly at its fixed ceiling before writing.
 - The API workflow requires the managed database to be available; the local checkout simulator is disabled in production.
 
+## External deployment
+
+The repository is ready to be split into three external projects without changing the
+workspace layout:
+
+- **Vercel / consumer frontend**: use the repository root, install with
+  `pnpm install --frozen-lockfile`, build with
+  `pnpm --filter @workspace/pixelpix run build`, and publish
+  `artifacts/pixelpix/dist/public`.
+- **Vercel / admin frontend**: use the repository root, install with
+  `pnpm install --frozen-lockfile`, build with
+  `pnpm --filter @workspace/pixelpix-admin run build`, and publish
+  `artifacts/pixelpix-admin/dist/public`.
+- **Railway / API**: use the repository root, build with
+  `pnpm --filter @workspace/api-server run build`, start with
+  `pnpm --filter @workspace/api-server run start`, and use `/api/healthz` as
+  the health check.
+
+Set `VITE_API_URL` in both Vercel projects to the Railway API origin
+(for example, `https://api.example.com`; a value ending in `/api` is also
+accepted). Railway provides `PORT`; configure `NODE_ENV=production`,
+`DATABASE_URL`, and `ADMIN_ACCESS_KEY` there. `WEBHOOK_SECRET`, CAPTCHA, and
+certificate-delivery variables are optional and only needed for those
+integrations. Replit secrets are not copied automatically to Vercel or Railway.
+
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details

@@ -18,6 +18,9 @@ import NotFound from "@/pages/not-found";
 import { Route, Router as WouterRouter, Switch, useLocation } from "wouter";
 
 const queryClient = new QueryClient();
+const apiBaseUrl = (import.meta.env.VITE_API_URL ?? "")
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
 
 const TOTAL_PIXELS = 1_000_000;
 const LOGICAL_COLUMNS = 1_000;
@@ -138,7 +141,7 @@ function applyCellStatus(
 }
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
