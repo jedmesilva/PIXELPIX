@@ -62,15 +62,17 @@ _Populate as you build — explicit user instructions worth remembering across s
 The repository is ready to be split into three external projects without changing the
 workspace layout:
 
-- **Vercel / consumer frontend**: use the repository root, install with
-  `pnpm install --frozen-lockfile`, build with
+- **Vercel / consumer frontend**: create a project with repository root
+  `/`, install with `pnpm install --frozen-lockfile`, build with
   `pnpm --filter @workspace/pixelpix run build`, and publish
   `artifacts/pixelpix/dist/public`. These settings are versioned in the root
   `vercel.json`.
-- **Vercel / admin frontend**: use the repository root, install with
-  `pnpm install --frozen-lockfile`, build with
-  `pnpm --filter @workspace/pixelpix-admin run build`, and publish
-  `artifacts/pixelpix-admin/dist/public`.
+- **Vercel / admin frontend**: create a second project from the same repository
+  with Root Directory `artifacts/pixelpix-admin`. Its versioned
+  `artifacts/pixelpix-admin/vercel.json` installs with
+  `pnpm install --frozen-lockfile`, builds with
+  `pnpm --filter @workspace/pixelpix-admin run build`, publishes
+  `dist/public`, and rewrites SPA routes to `/index.html`.
 - **Railway / API**: use the repository root, build with
   `pnpm --filter @workspace/api-server run build`, start with
   `pnpm --filter @workspace/api-server run start`, and use `/api/healthz` as
