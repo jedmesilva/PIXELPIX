@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import {
   GetAdminPrizePoolResponse,
+  ListAdminPrizePositionsQueryParams,
+  ListAdminPrizePositionsResponse,
   GetAdminRedemptionParams,
   GetAdminRedemptionResponse,
   GetAdminOverviewResponse,
@@ -106,7 +108,7 @@ router.get("/redemptions", async (request, response): Promise<void> => {
   }
 
   const { status, search, limit, offset } = parsed.data;
-  const params: Array<string | number> = [];
+  const params: Array<string | number | boolean> = [];
   const conditions: string[] = [];
   if (status && status !== "all") {
     params.push(status);
@@ -320,6 +322,86 @@ router.get("/prize-pool", async (_request, response): Promise<void> => {
         safety.rows[0]?.safety_margin_bps == null
           ? null
           : Number(safety.rows[0].safety_margin_bps),
+    }),
+  );
+});
+
+router.get("/prize-positions", async (request, response): Promise<void> => {
+  const parsed = ListAdminPrizePositionsQueryParams.safeParse(request.query);
+  if (!parsed.success) {
+    response.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const { status, tierId, search, limit, offset } = parsed.data;
+  const params: Array<string | number | boolean> = [];
+  const conditions: string[] = [];
+
+  if (status && status !== "all") {
+    params.push(status === "found");
+    conditions.push(`wp.claimed = $${params.length}`);
+  }
+  if (tierId !== undefined) {
+    params.push(tierId);
+    conditions.push(`wp.tier_id = $${params.length}`);
+  }
+  if (search) {
+    params.push(search);
+    conditions.push(`CAST(wp.cell_id AS text) = $${params.length}`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const countParams = [...params];
+  const [count, rows] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(*)::int AS total
+         FROM winning_positions wp
+         INNER JOIN prize_pool pp ON pp.tier_id = wp.tier_id
+         LEFT JOIN cells c ON c.id = wp.cell_id
+         ${where}`,
+      countParams,
+    ),
+    pool.query(
+      `SELECT
+         wp.cell_id,
+         wp.tier_id,
+         pp.label AS tier_label,
+         pp.nominal_value_cents,
+         CASE WHEN wp.claimed THEN c.prize_value_cents ELSE NULL END AS distributed_prize_value_cents,
+         CASE WHEN wp.claimed THEN 'found' ELSE 'available' END AS position_status,
+         c.status AS cell_status,
+         wp.claimed_at,
+         c.revealed_at,
+         c.revealed_by
+       FROM winning_positions wp
+       INNER JOIN prize_pool pp ON pp.tier_id = wp.tier_id
+       LEFT JOIN cells c ON c.id = wp.cell_id
+       ${where}
+       ORDER BY wp.cell_id
+       LIMIT $${params.length + 1}
+       OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
+    ),
+  ]);
+
+  response.json(
+    ListAdminPrizePositionsResponse.parse({
+      items: rows.rows.map((row) => ({
+        cellId: Number(row.cell_id),
+        tierId: Number(row.tier_id),
+        tierLabel: String(row.tier_label),
+        plannedPrizeValueCents: Number(row.nominal_value_cents),
+        distributedPrizeValueCents:
+          row.distributed_prize_value_cents == null
+            ? null
+            : Number(row.distributed_prize_value_cents),
+        positionStatus: String(row.position_status),
+        cellStatus: row.cell_status ? String(row.cell_status) : null,
+        claimedAt: iso(row.claimed_at),
+        revealedAt: iso(row.revealed_at),
+        revealedBy: row.revealed_by ? String(row.revealed_by) : null,
+      })),
+      total: Number(count.rows[0]?.total ?? 0),
     }),
   );
 });

@@ -324,6 +324,48 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/prize-positions:
+    get:
+      operationId: listAdminPrizePositions
+      tags: [admin]
+      summary: List awarded positions with planned and distributed prize values
+      security:
+        - AdminAccessKey: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [available, found, all]
+            default: all
+        - name: tierId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: search
+          in: query
+          required: false
+          schema: { type: string, maxLength: 20 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: Paginated list of awarded positions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPrizePositionList" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 components:
   securitySchemes:
     AdminAccessKey:
@@ -567,4 +609,40 @@ components:
         batchRevealedAt: { type: ["string", "null"], format: date-time }
         safetyMarginBps: { type: ["integer", "null"], minimum: 0 }
       required: [tiers, commitHash, batchCreatedAt, batchRevealedAt, safetyMarginBps]
+    AdminPrizePosition:
+      type: object
+      properties:
+        cellId: { type: integer, minimum: 0, maximum: 999999 }
+        tierId: { type: integer, minimum: 1 }
+        tierLabel: { type: string }
+        plannedPrizeValueCents: { type: integer, minimum: 0 }
+        distributedPrizeValueCents: { type: ["integer", "null"], minimum: 0 }
+        positionStatus:
+          type: string
+          enum: [available, found]
+        cellStatus:
+          type: ["string", "null"]
+          enum: [available, reserved, paid_pending_prize, paid, expired, null]
+        claimedAt: { type: ["string", "null"], format: date-time }
+        revealedAt: { type: ["string", "null"], format: date-time }
+        revealedBy: { type: ["string", "null"] }
+      required:
+        - cellId
+        - tierId
+        - tierLabel
+        - plannedPrizeValueCents
+        - distributedPrizeValueCents
+        - positionStatus
+        - cellStatus
+        - claimedAt
+        - revealedAt
+        - revealedBy
+    AdminPrizePositionList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminPrizePosition" }
+        total: { type: integer, minimum: 0 }
+      required: [items, total]
 

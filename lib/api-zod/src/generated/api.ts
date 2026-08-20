@@ -422,3 +422,54 @@ export const GetAdminPrizePoolResponse = zod.object({
 })
 
 
+/**
+ * @summary List awarded positions with planned and distributed prize values
+ */
+export const listAdminPrizePositionsQueryStatusDefault = `all`;
+export const listAdminPrizePositionsQuerySearchMax = 20;
+
+export const listAdminPrizePositionsQueryLimitDefault = 50;
+export const listAdminPrizePositionsQueryLimitMax = 100;
+
+export const listAdminPrizePositionsQueryOffsetDefault = 0;
+export const listAdminPrizePositionsQueryOffsetMin = 0;
+
+
+
+export const ListAdminPrizePositionsQueryParams = zod.object({
+  "status": zod.enum(['available', 'found', 'all']).default(listAdminPrizePositionsQueryStatusDefault),
+  "tierId": zod.coerce.number().int().min(1).optional(),
+  "search": zod.coerce.string().max(listAdminPrizePositionsQuerySearchMax).optional(),
+  "limit": zod.coerce.number().int().min(1).max(listAdminPrizePositionsQueryLimitMax).default(listAdminPrizePositionsQueryLimitDefault),
+  "offset": zod.coerce.number().int().min(listAdminPrizePositionsQueryOffsetMin).default(listAdminPrizePositionsQueryOffsetDefault)
+})
+
+export const listAdminPrizePositionsResponseItemsItemCellIdMin = 0;
+export const listAdminPrizePositionsResponseItemsItemCellIdMax = 999999;
+
+
+export const listAdminPrizePositionsResponseItemsItemPlannedPrizeValueCentsMin = 0;
+
+export const listAdminPrizePositionsResponseItemsItemDistributedPrizeValueCentsMin = 0;
+
+export const listAdminPrizePositionsResponseTotalMin = 0;
+
+
+
+export const ListAdminPrizePositionsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "cellId": zod.int().min(listAdminPrizePositionsResponseItemsItemCellIdMin).max(listAdminPrizePositionsResponseItemsItemCellIdMax),
+  "tierId": zod.int().min(1),
+  "tierLabel": zod.string(),
+  "plannedPrizeValueCents": zod.int().min(listAdminPrizePositionsResponseItemsItemPlannedPrizeValueCentsMin),
+  "distributedPrizeValueCents": zod.int().min(listAdminPrizePositionsResponseItemsItemDistributedPrizeValueCentsMin).nullable(),
+  "positionStatus": zod.enum(['available', 'found']),
+  "cellStatus": zod.union([zod.literal('available'),zod.literal('reserved'),zod.literal('paid_pending_prize'),zod.literal('paid'),zod.literal('expired'),zod.literal(null)]).nullable(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "revealedAt": zod.coerce.date().nullable(),
+  "revealedBy": zod.string().nullable()
+})),
+  "total": zod.int().min(listAdminPrizePositionsResponseTotalMin)
+})
+
+

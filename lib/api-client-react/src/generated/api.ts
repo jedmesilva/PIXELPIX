@@ -22,6 +22,7 @@ import type {
 import type {
   AdminOverview,
   AdminPrizePool,
+  AdminPrizePositionList,
   AdminRedemption,
   AdminRedemptionList,
   AdminRedemptionUpdate,
@@ -35,6 +36,7 @@ import type {
   CheckoutResponse,
   ErrorResponse,
   HealthStatus,
+  ListAdminPrizePositionsParams,
   ListAdminRedemptionsParams,
   ListCellsParams,
   PaymentWebhook,
@@ -966,6 +968,90 @@ export function useGetAdminPrizePool<TData = Awaited<ReturnType<typeof getAdminP
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetAdminPrizePoolQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListAdminPrizePositionsUrl = (params?: ListAdminPrizePositionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/prize-positions?${stringifiedParams}` : `/api/admin/prize-positions`
+}
+
+/**
+ * @summary List awarded positions with planned and distributed prize values
+ */
+export const listAdminPrizePositions = async (params?: ListAdminPrizePositionsParams, options?: Parameters<typeof customFetch>[1]): Promise<AdminPrizePositionList> => {
+
+  return customFetch<AdminPrizePositionList>(getListAdminPrizePositionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminPrizePositionsQueryKey = (params?: ListAdminPrizePositionsParams,) => {
+    return [
+    `/api/admin/prize-positions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAdminPrizePositionsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminPrizePositions>>, TError = ErrorType<ErrorResponse>>(params?: ListAdminPrizePositionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminPrizePositions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminPrizePositionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminPrizePositions>>> = ({ signal }) => listAdminPrizePositions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminPrizePositions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminPrizePositionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminPrizePositions>>>
+export type ListAdminPrizePositionsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List awarded positions with planned and distributed prize values
+ */
+
+export function useListAdminPrizePositions<TData = Awaited<ReturnType<typeof listAdminPrizePositions>>, TError = ErrorType<ErrorResponse>>(
+ params?: ListAdminPrizePositionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminPrizePositions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminPrizePositionsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

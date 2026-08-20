@@ -25,7 +25,9 @@ function Router() {
         <Route path="/" component={AdminOverview} />
         <Route path="/admin" component={AdminOverview} />
         <Route path="/admin/" component={AdminOverview} />
+        <Route path="/redemptions" component={AdminRedemptions} />
         <Route path="/admin/redemptions" component={AdminRedemptions} />
+        <Route path="/prize-pool" component={AdminPrizePool} />
         <Route path="/admin/prize-pool" component={AdminPrizePool} />
         <Route component={NotFound} />
       </Switch>

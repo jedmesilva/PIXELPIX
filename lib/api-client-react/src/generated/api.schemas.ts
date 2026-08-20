@@ -306,6 +306,61 @@ export interface AdminPrizePool {
   safetyMarginBps: number | null;
 }
 
+export type AdminPrizePositionPositionStatus = typeof AdminPrizePositionPositionStatus[keyof typeof AdminPrizePositionPositionStatus];
+
+
+export const AdminPrizePositionPositionStatus = {
+  available: 'available',
+  found: 'found',
+} as const;
+
+/**
+ * @nullable
+ */
+export type AdminPrizePositionCellStatus = typeof AdminPrizePositionCellStatus[keyof typeof AdminPrizePositionCellStatus] | null;
+
+
+export const AdminPrizePositionCellStatus = {
+  available: 'available',
+  reserved: 'reserved',
+  paid_pending_prize: 'paid_pending_prize',
+  paid: 'paid',
+  expired: 'expired',
+} as const;
+
+export interface AdminPrizePosition {
+  /**
+     * @minimum 0
+     * @maximum 999999
+     */
+  cellId: number;
+  /** @minimum 1 */
+  tierId: number;
+  tierLabel: string;
+  /** @minimum 0 */
+  plannedPrizeValueCents: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  distributedPrizeValueCents: number | null;
+  positionStatus: AdminPrizePositionPositionStatus;
+  /** @nullable */
+  cellStatus: AdminPrizePositionCellStatus;
+  /** @nullable */
+  claimedAt: string | null;
+  /** @nullable */
+  revealedAt: string | null;
+  /** @nullable */
+  revealedBy: string | null;
+}
+
+export interface AdminPrizePositionList {
+  items: AdminPrizePosition[];
+  /** @minimum 0 */
+  total: number;
+}
+
 export type ListCellsParams = {
 /**
  * @minimum 0
@@ -344,6 +399,36 @@ export const ListAdminRedemptionsStatus = {
   approved: 'approved',
   paid: 'paid',
   rejected: 'rejected',
+  all: 'all',
+} as const;
+
+export type ListAdminPrizePositionsParams = {
+status?: ListAdminPrizePositionsStatus;
+/**
+ * @minimum 1
+ */
+tierId?: number;
+/**
+ * @maxLength 20
+ */
+search?: string;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
+};
+
+export type ListAdminPrizePositionsStatus = typeof ListAdminPrizePositionsStatus[keyof typeof ListAdminPrizePositionsStatus];
+
+
+export const ListAdminPrizePositionsStatus = {
+  available: 'available',
+  found: 'found',
   all: 'all',
 } as const;
 
