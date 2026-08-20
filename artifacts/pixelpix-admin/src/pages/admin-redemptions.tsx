@@ -20,9 +20,10 @@ import {
   StatusBadge,
   formatBRL,
   formatDate,
-  getAdminAccessKey,
   isAccessError,
   SavingIndicator,
+  useAdminAccess,
+  withAdminAuthRevision,
 } from '@/components/admin-ui';
 
 const statusOptions = [
@@ -36,18 +37,20 @@ const statusOptions = [
 function RedemptionDetail({
   id,
   accessKey,
+  authRevision,
   onClose,
   onUpdated,
 }: {
   id: number;
   accessKey: string;
+  authRevision: number;
   onClose: () => void;
   onUpdated: () => void;
 }) {
   const queryClient = useQueryClient();
   const detail = useGetAdminRedemption(id, {
     request: { headers: { 'x-admin-access-key': accessKey } },
-    query: { enabled: Boolean(id), queryKey: getGetAdminRedemptionQueryKey(id) },
+    query: { enabled: Boolean(id && accessKey), queryKey: withAdminAuthRevision(getGetAdminRedemptionQueryKey(id), authRevision) },
   });
   const update = useUpdateAdminRedemption({
     request: { headers: { 'x-admin-access-key': accessKey } },
@@ -365,7 +368,7 @@ function RedemptionCard({
 }
 
 function RedemptionsContent() {
-  const [accessKey, setAccessKey] = useState(getAdminAccessKey);
+  const { accessKey, authRevision, saveAccessKey } = useAdminAccess();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -383,14 +386,32 @@ function RedemptionsContent() {
   );
   const list = useListAdminRedemptions(params, {
     request: { headers: { 'x-admin-access-key': accessKey } },
-    query: { queryKey: getListAdminRedemptionsQueryKey(params), staleTime: 10_000 },
+    query: { enabled: Boolean(accessKey), queryKey: withAdminAuthRevision(getListAdminRedemptionsQueryKey(params), authRevision), staleTime: 10_000 },
   });
 
   useEffect(() => {
+    if (!accessKey) return;
     const timer = window.setTimeout(() => list.refetch(), 250);
     return () => window.clearTimeout(timer);
-  }, [search, status]);
+  }, [accessKey, authRevision, search, status]);
 
+  if (!accessKey) {
+    return (
+      <>
+        <PageHeader
+          eyebrow="Operações / fila financeira"
+          title="Resgates"
+          description="Analise e processe solicitações de pagamento Pix."
+        />
+        <AccessKeyPrompt
+          onSaved={(key) => {
+            saveAccessKey(key);
+            setShowKey(false);
+          }}
+        />
+      </>
+    );
+  }
   if (list.isLoading) {
     return (
       <>
@@ -403,7 +424,7 @@ function RedemptionsContent() {
       </>
     );
   }
-  if (list.isError && (isAccessError(list.error) || !accessKey)) {
+  if (list.isError && isAccessError(list.error)) {
     return (
       <>
         <PageHeader
@@ -414,7 +435,7 @@ function RedemptionsContent() {
         {showKey || !accessKey ? (
           <AccessKeyPrompt
             onSaved={(key) => {
-              setAccessKey(key);
+              saveAccessKey(key);
               setShowKey(false);
             }}
           />
@@ -599,6 +620,7 @@ function RedemptionsContent() {
         <RedemptionDetail
           id={selectedId}
           accessKey={accessKey}
+          authRevision={authRevision}
           onClose={() => setSelectedId(null)}
           onUpdated={() => list.refetch()}
         />

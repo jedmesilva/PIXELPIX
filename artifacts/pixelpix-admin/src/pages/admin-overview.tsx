@@ -2,18 +2,19 @@ import { ArrowDownToLine, ArrowUpFromLine, CircleDollarSign, Grid3X3, RefreshCw,
 import { useState } from 'react';
 import { useGetAdminOverview, useListAdminRedemptions, getGetAdminOverviewQueryKey, getListAdminRedemptionsQueryKey } from '@workspace/api-client-react';
 import { AdminShell, MetricCard, PageHeader } from '@/components/admin-shell';
-import { AccessKeyPrompt, ErrorState, EmptyState, LoadingPanel, StatusBadge, formatBRL, formatCompact, formatDate, getAdminAccessKey, isAccessError, SectionHeading } from '@/components/admin-ui';
+import { AccessKeyPrompt, ErrorState, EmptyState, LoadingPanel, StatusBadge, formatBRL, formatCompact, formatDate, isAccessError, SectionHeading, useAdminAccess, withAdminAuthRevision } from '@/components/admin-ui';
 
 function OverviewContent() {
-  const [accessKey, setAccessKey] = useState(getAdminAccessKey);
-  const overview = useGetAdminOverview({ request: { headers: { 'x-admin-access-key': accessKey } }, query: { queryKey: getGetAdminOverviewQueryKey(), staleTime: 30_000 } });
-  const recent = useListAdminRedemptions({ limit: 5, offset: 0 }, { request: { headers: { 'x-admin-access-key': accessKey } }, query: { queryKey: getListAdminRedemptionsQueryKey({ limit: 5, offset: 0 }), staleTime: 30_000 } });
+  const { accessKey, authRevision, saveAccessKey } = useAdminAccess();
   const [showKey, setShowKey] = useState(false);
+  const overview = useGetAdminOverview({ request: { headers: { 'x-admin-access-key': accessKey } }, query: { enabled: Boolean(accessKey), queryKey: withAdminAuthRevision(getGetAdminOverviewQueryKey(), authRevision), staleTime: 30_000 } });
+  const recent = useListAdminRedemptions({ limit: 5, offset: 0 }, { request: { headers: { 'x-admin-access-key': accessKey } }, query: { enabled: Boolean(accessKey), queryKey: withAdminAuthRevision(getListAdminRedemptionsQueryKey({ limit: 5, offset: 0 }), authRevision), staleTime: 30_000 } });
   const data = overview.data;
 
+  if (!accessKey) return <><PageHeader eyebrow="Operações / visão geral" title="Bom dia, equipe." description="Acompanhe dinheiro, integridade do pool e resgates em uma única bancada." /><AccessKeyPrompt onSaved={(key) => { saveAccessKey(key); setShowKey(false); }} /></>;
   if (overview.isLoading || recent.isLoading) return <><PageHeader eyebrow="Operações / visão geral" title="Bom dia, equipe." description="Acompanhe dinheiro, integridade do pool e resgates em uma única bancada." /><LoadingPanel rows={5} /></>;
-  if ((overview.isError || recent.isError) && (isAccessError(overview.error) || isAccessError(recent.error) || !accessKey)) {
-    return <><PageHeader eyebrow="Operações / visão geral" title="Bom dia, equipe." description="Acompanhe dinheiro, integridade do pool e resgates em uma única bancada." />{showKey || !accessKey ? <AccessKeyPrompt onSaved={(key) => { setAccessKey(key); setShowKey(false); }} /> : <ErrorState accessRequired onRetry={() => setShowKey(true)} />}</>;
+  if ((overview.isError || recent.isError) && (isAccessError(overview.error) || isAccessError(recent.error))) {
+    return <><PageHeader eyebrow="Operações / visão geral" title="Bom dia, equipe." description="Acompanhe dinheiro, integridade do pool e resgates em uma única bancada." />{showKey ? <AccessKeyPrompt onSaved={(key) => { saveAccessKey(key); setShowKey(false); }} /> : <ErrorState accessRequired onRetry={() => setShowKey(true)} />}</>;
   }
   if (overview.isError || !data) return <><PageHeader eyebrow="Operações / visão geral" title="Bom dia, equipe." /><ErrorState onRetry={() => overview.refetch()} /></>;
 

@@ -10,6 +10,26 @@ export const saveAdminAccessKey = (key: string) => {
   if (typeof window !== 'undefined') window.sessionStorage.setItem('pixelpix-admin-access-key', key);
 };
 
+export function useAdminAccess() {
+  const [accessKey, setAccessKey] = useState(getAdminAccessKey);
+  const [authRevision, setAuthRevision] = useState(0);
+
+  const saveAccessKey = (key: string) => {
+    const normalizedKey = key.trim();
+    saveAdminAccessKey(normalizedKey);
+    setAccessKey(normalizedKey);
+    setAuthRevision((revision) => revision + 1);
+  };
+
+  return { accessKey, authRevision, saveAccessKey };
+}
+
+export const withAdminAuthRevision = (queryKey: readonly unknown[], authRevision: number) => [
+  ...queryKey,
+  'admin-auth',
+  authRevision,
+];
+
 export const isAccessError = (error: unknown) => {
   const status = (error as { status?: number; response?: { status?: number } })?.status ?? (error as { response?: { status?: number } })?.response?.status;
   return status === 401 || status === 503;

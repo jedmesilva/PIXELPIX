@@ -2,14 +2,15 @@ import { BadgeCheck, Database, Fingerprint, LockKeyhole, RefreshCw, ShieldCheck 
 import { useState } from 'react';
 import { useGetAdminPrizePool, getGetAdminPrizePoolQueryKey } from '@workspace/api-client-react';
 import { AdminShell, PageHeader } from '@/components/admin-shell';
-import { AccessKeyPrompt, EmptyState, ErrorState, LoadingPanel, SectionHeading, formatBRL, formatDate, getAdminAccessKey, isAccessError } from '@/components/admin-ui';
+import { AccessKeyPrompt, EmptyState, ErrorState, LoadingPanel, SectionHeading, formatBRL, formatDate, isAccessError, useAdminAccess, withAdminAuthRevision } from '@/components/admin-ui';
 
 function PrizePoolContent() {
-  const [accessKey, setAccessKey] = useState(getAdminAccessKey);
+  const { accessKey, authRevision, saveAccessKey } = useAdminAccess();
   const [showKey, setShowKey] = useState(false);
-  const pool = useGetAdminPrizePool({ request: { headers: { 'x-admin-access-key': accessKey } }, query: { queryKey: getGetAdminPrizePoolQueryKey(), staleTime: 30_000 } });
+  const pool = useGetAdminPrizePool({ request: { headers: { 'x-admin-access-key': accessKey } }, query: { enabled: Boolean(accessKey), queryKey: withAdminAuthRevision(getGetAdminPrizePoolQueryKey(), authRevision), staleTime: 30_000 } });
+  if (!accessKey) return <><PageHeader eyebrow="Operações / integridade" title="Prize pool" description="Distribuição, posições e provas de integridade do lote." /><AccessKeyPrompt onSaved={(key) => { saveAccessKey(key); setShowKey(false); }} /></>;
   if (pool.isLoading) return <><PageHeader eyebrow="Operações / integridade" title="Prize pool" description="Distribuição, posições e provas de integridade do lote." /><LoadingPanel rows={6} /></>;
-  if (pool.isError && (isAccessError(pool.error) || !accessKey)) return <><PageHeader eyebrow="Operações / integridade" title="Prize pool" description="Distribuição, posições e provas de integridade do lote." />{showKey || !accessKey ? <AccessKeyPrompt onSaved={(key) => { setAccessKey(key); setShowKey(false); }} /> : <ErrorState accessRequired onRetry={() => setShowKey(true)} />}</>;
+  if (pool.isError && isAccessError(pool.error)) return <><PageHeader eyebrow="Operações / integridade" title="Prize pool" description="Distribuição, posições e provas de integridade do lote." />{showKey ? <AccessKeyPrompt onSaved={(key) => { saveAccessKey(key); setShowKey(false); }} /> : <ErrorState accessRequired onRetry={() => setShowKey(true)} />}</>;
   if (pool.isError || !pool.data) return <><PageHeader eyebrow="Operações / integridade" title="Prize pool" /><ErrorState onRetry={() => pool.refetch()} /></>;
   const data = pool.data;
   const totalPositions = data.tiers.reduce((sum, tier) => sum + tier.totalPositions, 0);
