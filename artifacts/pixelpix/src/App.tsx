@@ -25,7 +25,6 @@ const apiBaseUrl = (import.meta.env.VITE_API_URL ?? "")
 const TOTAL_PIXELS = 1_000_000;
 const LOGICAL_COLUMNS = 1_000;
 const MIN_CELL_PX = 44;
-const AVAILABLE_CELL_BACKGROUND = "hsl(220, 8%, 19%)";
 // A chunk of 10k cells keeps the request count low while remaining small
 // enough for a quick sparse response. Available cells are rendered locally.
 const CHUNK_SIZE = 10_000;
@@ -65,7 +64,7 @@ type ChunkStatus = "loading" | "loaded" | "error";
 function emptyPixel(id: number): Pixel {
   return {
     id,
-    backgroundColor: generatedCellBackground(id),
+    backgroundColor: null,
     revealed: false,
     emoji: null,
     revealedBy: null,
@@ -77,13 +76,6 @@ function emptyPixel(id: number): Pixel {
     socialProfile: EMPTY_SOCIAL_PROFILE,
     status: "available",
   };
-}
-
-function generatedCellBackground(id: number) {
-  // This mirrors the server's stable visual seed. Keeping it local means the
-  // million-cell canvas never needs a million-row response just to paint locks.
-  void id;
-  return AVAILABLE_CELL_BACKGROUND;
 }
 
 function pixelSurfaceBackground(pixel: Pixel) {
@@ -147,10 +139,8 @@ function applyCellStatus(
   },
 ) {
   const pixel = getPixel(id);
-  if (status === "paid" && visual?.backgroundColor !== undefined) {
+  if (visual?.backgroundColor !== undefined) {
     pixel.backgroundColor = visual.backgroundColor;
-  } else if (status !== "paid") {
-    pixel.backgroundColor = generatedCellBackground(id);
   }
   if (visual?.emoji !== undefined) {
     pixel.emoji = visual.emoji;

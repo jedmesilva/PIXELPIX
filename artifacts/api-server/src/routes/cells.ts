@@ -333,7 +333,6 @@ router.get("/cells", async (request, response) => {
     `SELECT id, status, emoji, background_color, reserved_at
        FROM cells
        WHERE id BETWEEN $1 AND $2
-         AND (status <> 'available' OR emoji = '💰')
        ORDER BY id`,
     [from, to],
   );
