@@ -1,6 +1,10 @@
 import { Router, type IRouter, type Request } from "express";
 import { randomUUID } from "node:crypto";
 import { pool } from "@workspace/db";
+import {
+  broadcastCellUpdate,
+  subscribeToCellEvents,
+} from "../lib/cell-events";
 
 const router: IRouter = Router();
 
@@ -354,6 +358,10 @@ router.get("/cells", async (request, response) => {
   );
 });
 
+router.get("/cells/events", (_request, response) => {
+  subscribeToCellEvents(response);
+});
+
 router.get("/cells/:id", async (request, response) => {
   const id = numericId(request.params.id);
   if (id === null) {
@@ -473,6 +481,11 @@ router.post("/cells/reserve", async (request, response) => {
       ip,
       deviceId,
       expiresAt: Date.now() + RESERVATION_TTL_MS,
+    });
+    broadcastCellUpdate({
+      type: "cell.updated",
+      cellId: result.rows[0].id,
+      status: "reserved",
     });
     response.json({
       cellId: result.rows[0].id,
@@ -695,10 +708,16 @@ export async function expireReservations() {
     `UPDATE cells SET status = 'expired'
      WHERE status = 'reserved'
        AND reserved_at < NOW() - INTERVAL '5 minutes'
-     RETURNING id`,
+       RETURNING id`,
   );
   for (const row of expired.rows) {
-    releaseActiveReservationByCell(Number(row.id));
+    const cellId = Number(row.id);
+    releaseActiveReservationByCell(cellId);
+    broadcastCellUpdate({
+      type: "cell.updated",
+      cellId,
+      status: "available",
+    });
   }
   pruneActiveReservations(Date.now());
 }

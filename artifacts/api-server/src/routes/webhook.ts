@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { pool } from "@workspace/db";
 import { releaseActiveReservationByCell } from "./cells";
 import { logger } from "../lib/logger";
+import { broadcastCellUpdate } from "../lib/cell-events";
 
 const router: IRouter = Router();
 const MAX_DIRECT_ALERTS_PER_HOUR = 100;
@@ -369,6 +370,26 @@ export async function processPaymentConfirmed(input: {
     }
     await client.query("COMMIT");
     releaseActiveReservationByCell(input.cellId);
+    const updatedCell = await pool.query(
+      `SELECT emoji, background_color, revealed_by, revealed_at,
+              prize_value_cents
+         FROM cells
+        WHERE id = $1`,
+      [input.cellId],
+    );
+    const cell = updatedCell.rows[0];
+    broadcastCellUpdate({
+      type: "cell.updated",
+      cellId: input.cellId,
+      status: "paid",
+      emoji: String(cell?.emoji ?? "💰"),
+      backgroundColor: String(cell?.background_color ?? "hsl(220, 8%, 19%)"),
+      revealedBy: cell?.revealed_by ? String(cell.revealed_by) : null,
+      revealedAt: cell?.revealed_at
+        ? new Date(cell.revealed_at).toISOString()
+        : null,
+      prizeValueCents: Number(cell?.prize_value_cents ?? 0),
+    });
     await safeRecordWebhookEvent(
       input.paymentId,
       input.cellId,

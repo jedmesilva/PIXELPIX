@@ -419,6 +419,7 @@ function PixelSheet({
 
   const displayedSignature = pixel.socialProfile;
   const hasSignature = Boolean(displayedSignature.handle);
+  const isReserved = pixel.status === "reserved";
 
   const confirmDemoPayment = async () => {
     const normalizedEmail = normalizeEmail(receiptEmail);
@@ -652,7 +653,14 @@ function PixelSheet({
               </div>
 
               <div className="prototype-detail-actions">
-                {!pixel.revealed && (
+                {!pixel.revealed && isReserved && (
+                  <div className="prototype-reserved-message" role="status">
+                    <strong>Esta célula está reservada temporariamente</strong>
+                    <span>Outra pessoa está concluindo a revelação.</span>
+                  </div>
+                )}
+
+                {!pixel.revealed && !isReserved && (
                   <button
                     className="prototype-reveal-button"
                     disabled={isSubmittingReveal}
@@ -971,6 +979,50 @@ function PixelGrid() {
     });
     observer.observe(element);
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (typeof EventSource === "undefined") return;
+
+    const events = new EventSource(`${apiBaseUrl}/api/cells/events`);
+    const handleCellUpdate = (event: Event) => {
+      try {
+        const update = JSON.parse((event as MessageEvent<string>).data) as {
+          cellId: number;
+          status: "available" | "reserved" | "paid";
+          emoji?: string;
+          backgroundColor?: string;
+          revealedBy?: string | null;
+          revealedAt?: string | null;
+          prizeValueCents?: number;
+          prizeLabel?: string | null;
+        };
+        if (!Number.isInteger(update.cellId)) return;
+
+        const pixel = getPixel(update.cellId);
+        applyCellStatus(update.cellId, update.status, {
+          backgroundColor: update.backgroundColor,
+          emoji: update.emoji,
+        });
+        if (update.status === "paid") {
+          pixel.revealedBy = update.revealedBy ?? null;
+          pixel.revealedAt = update.revealedAt
+            ? new Date(update.revealedAt)
+            : null;
+          pixel.prizeValueCents = Number(update.prizeValueCents ?? 0);
+          pixel.prizeLabel = update.prizeLabel ?? null;
+        }
+        setRevealVersion((version) => version + 1);
+      } catch {
+        // The next reconnect or detail fetch repairs malformed event data.
+      }
+    };
+
+    events.addEventListener("cell.updated", handleCellUpdate);
+    return () => {
+      events.removeEventListener("cell.updated", handleCellUpdate);
+      events.close();
+    };
   }, []);
 
   const { columns, cellSize, totalRows, totalHeight } = useMemo(() => {

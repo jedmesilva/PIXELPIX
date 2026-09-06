@@ -323,6 +323,30 @@ button:focus-visible {
   min-width: 0;
 }
 
+.prototype-reserved-message {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #39434d;
+  border-radius: 10px;
+  color: #c3c9d1;
+  background: #171b20;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.prototype-reserved-message strong {
+  color: #f0f2f5;
+  font-weight: 600;
+}
+
+.prototype-reserved-message span {
+  color: #8b93a1;
+  font-size: 12px;
+}
+
 .prototype-revealed-by {
   display: flex;
   align-items: center;
