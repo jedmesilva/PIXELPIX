@@ -754,12 +754,12 @@ function PixelSheet({
                     <strong>
                       {isOwnedReservation
                         ? "Sua reserva está ativa"
-                        : "Esta célula está reservada temporariamente"}
+                        : "Pixel reservado temporariamente"}
                     </strong>
                     <span>
                       {isOwnedReservation
                         ? "Você pode continuar o processo de pagamento antes que o tempo termine."
-                        : "Outra pessoa está concluindo a revelação."}
+                        : "Alguém está revelando este pixel."}
                     </span>
                     <div className="prototype-reserved-countdown">
                       {secondsRemaining > 0
