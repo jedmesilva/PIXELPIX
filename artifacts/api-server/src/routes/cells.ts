@@ -91,17 +91,8 @@ function generatedCellEmojiSql(cellIdExpression: string) {
 }
 
 function generatedCellBackgroundSql(cellIdExpression: string) {
-  return `'hsl(220, 8%, ' ||
-    to_char(
-      14 + (
-        mod(
-          mod(${cellIdExpression}::bigint * 2654435761, 4294967296),
-          1000
-        ) / 100.0
-      ),
-      'FM990.###'
-    ) ||
-  '%)'`;
+  void cellIdExpression;
+  return "'hsl(220, 8%, 19%)'";
 }
 
 export async function ensureCellRecords() {
