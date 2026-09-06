@@ -411,6 +411,7 @@ function PixelSheet({
   const effectiveReservationExpiresAt =
     reservationExpiresAt ??
     (isReserved ? remoteReservationExpiresAt : null);
+  const checkoutExpired = checkoutOpen && secondsRemaining <= 0;
 
   const copyPix = useCallback(async () => {
     try {
@@ -435,6 +436,7 @@ function PixelSheet({
     setSignatureSubmitted(false);
     setCheckoutUrl("");
     setCheckoutAmountCents(STARTING_PIXEL_PRICE * 100);
+    setSecondsRemaining(300);
   }, [pixel.id]);
 
   useEffect(() => {
@@ -512,6 +514,36 @@ function PixelSheet({
     setReceiptEmail(getStoredReceiptEmail());
     setReceiptEmailError("");
     setEmailPromptOpen(true);
+  };
+
+  const retryReservation = async () => {
+    setIsSubmittingReveal(true);
+    setReceiptEmailError("");
+    try {
+      const reservation = await onReserve(pixel.id);
+      setReservationToken(reservation.token);
+      setReservationExpiresAt(new Date(reservation.expiresAt).getTime());
+      setSecondsRemaining(
+        Math.max(
+          0,
+          Math.ceil(
+            (new Date(reservation.expiresAt).getTime() - Date.now()) / 1000,
+          ),
+        ),
+      );
+      setCheckoutUrl("");
+      setCopied(false);
+      setCheckoutOpen(false);
+      setEmailPromptOpen(true);
+    } catch (error) {
+      setReceiptEmailError(
+        error instanceof Error
+          ? error.message
+          : "Esta célula não está disponível para uma nova reserva.",
+      );
+    } finally {
+      setIsSubmittingReveal(false);
+    }
   };
 
   const confirmDemoPayment = async () => {
@@ -636,11 +668,12 @@ function PixelSheet({
                <div className="prototype-price">
                  {formatBRL(checkoutAmountCents / 100)}
                </div>
-               <div className="prototype-subtle">
-                 Pixel #{pixel.id.toLocaleString("pt-BR")} · reserva expira em{" "}
-                 {String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:
-                 {String(secondsRemaining % 60).padStart(2, "0")}
-               </div>
+                <div className="prototype-subtle">
+                  Pixel #{pixel.id.toLocaleString("pt-BR")} ·{" "}
+                  {checkoutExpired
+                    ? "reserva expirada"
+                    : `reserva expira em ${String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:${String(secondsRemaining % 60).padStart(2, "0")}`}
+                </div>
             </div>
 
              <div className="prototype-receipt-destination">
@@ -668,28 +701,54 @@ function PixelSheet({
                  <div className="prototype-pix-label">Chave copia e cola</div>
                 <div className="prototype-pix-row">
                    <span className="prototype-pix-key">{checkoutReference}</span>
-                  <button className="prototype-copy-button" onClick={copyPix}>
+                  <button
+                    className="prototype-copy-button"
+                    onClick={copyPix}
+                    disabled={checkoutExpired}
+                  >
                     {copied ? <Check size={13} /> : <Copy size={13} />}
                     {copied ? "Copiado" : "Copiar"}
                   </button>
                 </div>
 
-                <div className="prototype-waiting">
-                  <Loader2 size={14} className="prototype-spinner" />
-                  {secondsRemaining > 0
-                    ? `Aguardando pagamento · ${Math.floor(secondsRemaining / 60)}:${String(secondsRemaining % 60).padStart(2, "0")}`
-                    : "Reserva expirada"}
-                </div>
+                {checkoutExpired ? (
+                  <div className="prototype-checkout-expired" role="status">
+                    <strong>Reserva expirada</strong>
+                    <span>
+                      O código PIX não está mais ativo. Tente novamente para
+                      verificar se este pixel ainda está disponível.
+                    </span>
+                    <button
+                      className="prototype-social-primary"
+                      onClick={retryReservation}
+                      disabled={isSubmittingReveal}
+                    >
+                      {isSubmittingReveal
+                        ? "Tentando reservar…"
+                        : "Tentar novamente"}
+                    </button>
+                    {receiptEmailError && <strong>{receiptEmailError}</strong>}
+                  </div>
+                ) : (
+                  <>
+                    <div className="prototype-waiting">
+                      <Loader2 size={14} className="prototype-spinner" />
+                      Aguardando pagamento ·{" "}
+                      {Math.floor(secondsRemaining / 60)}:
+                      {String(secondsRemaining % 60).padStart(2, "0")}
+                    </div>
 
-                <button
-                  className="prototype-demo-button"
-                  onClick={confirmDemoPayment}
-                  disabled={isSubmittingReveal}
-                >
-                  {isSubmittingReveal
-          ? "Preparando seu certificado…"
-                     : "(desenvolvimento) simular webhook confirmado"}
-                </button>
+                    <button
+                      className="prototype-demo-button"
+                      onClick={confirmDemoPayment}
+                      disabled={isSubmittingReveal}
+                    >
+                      {isSubmittingReveal
+                        ? "Preparando seu certificado…"
+                        : "(desenvolvimento) simular webhook confirmado"}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </>

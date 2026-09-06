@@ -1069,6 +1069,11 @@ button:focus-visible {
   background: color-mix(in srgb, var(--pixelpix-brand) 12%, var(--pixelpix-surface-strong));
 }
 
+.prototype-copy-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .prototype-waiting {
   display: flex;
   align-items: center;
@@ -1081,6 +1086,33 @@ button:focus-visible {
 
 .prototype-spinner {
   animation: prototype-spin 1s linear infinite;
+}
+
+.prototype-checkout-expired {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, #f0a44b 42%, #1f2328);
+  border-radius: 10px;
+  color: #c6ccd5;
+  background: color-mix(in srgb, #f0a44b 8%, #0b0d10);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.prototype-checkout-expired strong:first-child {
+  color: #f0a44b;
+  font-size: 13px;
+}
+
+.prototype-checkout-expired button {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.prototype-checkout-expired strong:last-child {
+  color: #ef8f8f;
+  font-weight: 500;
 }
 
 .prototype-demo-button {
