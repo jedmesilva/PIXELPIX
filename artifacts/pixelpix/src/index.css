@@ -919,25 +919,20 @@ button:focus-visible {
 
 .prototype-receipt-destination {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
-  padding: 10px 12px;
-  margin-bottom: 14px;
-  border: 1px solid #252b32;
-  border-radius: 9px;
-  color: #8b93a1;
-  background: #101317;
-  font-size: 11px;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 0 2px;
+  color: #697481;
+  font-size: 10px;
 }
 
 .prototype-receipt-destination strong {
-  flex: 1 1 100%;
   min-width: 0;
   overflow: hidden;
-  color: #e5e7eb;
-  font-size: 12px;
-  font-weight: 600;
+  color: #aab2bd;
+  font-size: 10px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -948,7 +943,7 @@ button:focus-visible {
   color: var(--pixelpix-brand);
   background: transparent;
   font: inherit;
-  font-size: 11px;
+  font-size: 10px;
   cursor: pointer;
 }
 

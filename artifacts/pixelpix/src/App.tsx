@@ -793,23 +793,6 @@ function PixelSheet({
               </div>
             </div>
 
-             <div className="prototype-receipt-destination">
-               <span>
-                 Após a confirmação do pagamento, o certificado será enviado
-                 para:
-               </span>
-               <strong>{receiptEmail}</strong>
-               <button
-                 type="button"
-                 onClick={() => {
-                   setCheckoutOpen(false);
-                   setEmailPromptOpen(true);
-                 }}
-               >
-                 Alterar e-mail
-               </button>
-             </div>
-
             {checkoutExpired ? (
               <div
                 className="prototype-checkout-expired prototype-checkout-expired-full"
@@ -832,7 +815,8 @@ function PixelSheet({
                 {receiptEmailError && <strong>{receiptEmailError}</strong>}
               </div>
             ) : (
-              <div className="prototype-checkout-layout">
+              <>
+                <div className="prototype-checkout-layout">
                 <section className="prototype-payment-method prototype-qr-method">
                   <div className="prototype-payment-step">
                     <span className="prototype-payment-step-number">1</span>
@@ -905,7 +889,21 @@ function PixelSheet({
                     </button>
                   )}
                 </section>
-              </div>
+                </div>
+                <div className="prototype-receipt-destination">
+                  <span>Certificado após o pagamento:</span>
+                  <strong>{receiptEmail}</strong>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCheckoutOpen(false);
+                      setEmailPromptOpen(true);
+                    }}
+                  >
+                    Alterar
+                  </button>
+                </div>
+              </>
             )}
           </>
         ) : emailPromptOpen ? (
