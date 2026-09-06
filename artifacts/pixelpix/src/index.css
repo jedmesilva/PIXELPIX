@@ -143,6 +143,7 @@ button:focus-visible {
   display: flex;
   width: 100%;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 12px;
   padding: 12px 16px;
   margin-top: 16px;
@@ -150,20 +151,22 @@ button:focus-visible {
   background: var(--pixelpix-surface-raised);
 }
 
-.pixelpix-large-remaining .pixelpix-large-remaining-dot {
-  flex: 0 0 10px;
-  align-self: center;
-  width: 10px;
-  height: 10px;
-  margin-top: 0;
-}
-
-.pixelpix-large-remaining-copy {
+.pixelpix-large-remaining-dot-container,
+.pixelpix-large-remaining-amount-container,
+.pixelpix-large-remaining-label-container {
   display: flex;
   min-width: 0;
-  align-items: baseline;
-  gap: 12px;
-  line-height: 1.15;
+  align-items: center;
+}
+
+.pixelpix-large-remaining-dot-container {
+  flex: 0 0 10px;
+}
+
+.pixelpix-large-remaining .pixelpix-remaining-dot {
+  width: 10px;
+  height: 10px;
+  margin: 0;
 }
 
 .pixelpix-large-remaining .pixelpix-remaining-amount {
@@ -1130,19 +1133,7 @@ button:focus-visible {
   }
 
   .pixelpix-large-remaining {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    row-gap: 2px;
-  }
-
-  .pixelpix-large-remaining .pixelpix-large-remaining-dot {
-    margin-top: 4px;
-  }
-
-  .pixelpix-large-remaining-copy {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 1px;
+    gap: 8px;
   }
 
   .pixelpix-remaining-copy {
