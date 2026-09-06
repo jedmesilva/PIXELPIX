@@ -76,7 +76,7 @@ button:focus-visible {
   padding: 20px 24px;
   border-bottom: 1px solid var(--pixelpix-border);
   background: color-mix(in srgb, var(--pixelpix-surface) 96%, transparent);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   backdrop-filter: blur(10px);
   transition: padding 180ms ease, box-shadow 180ms ease;
 }
