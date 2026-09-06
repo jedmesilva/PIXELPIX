@@ -794,7 +794,10 @@ function PixelSheet({
             </div>
 
              <div className="prototype-receipt-destination">
-               <span>Certificado enviado para</span>
+               <span>
+                 Após a confirmação do pagamento, o certificado será enviado
+                 para:
+               </span>
                <strong>{receiptEmail}</strong>
                <button
                  type="button"
