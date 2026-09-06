@@ -7,7 +7,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Check, Copy, Loader2, Lock, Mail } from "lucide-react";
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Check,
+  Clock3,
+  Copy,
+  Loader2,
+  Lock,
+  Mail,
+  QrCode as QrCodeIcon,
+} from "lucide-react";
 import { FiInstagram } from "react-icons/fi";
 import { RiTwitterXFill } from "react-icons/ri";
 import QRCode from "qrcode";
@@ -453,14 +463,19 @@ function PixelSheet({
 
   useEffect(() => {
     let active = true;
-    if (!checkoutOpen || checkoutMode !== "efi" || !checkoutUrl) {
+    if (!checkoutOpen || !checkoutUrl) {
       setCheckoutQrDataUrl("");
       return () => {
         active = false;
       };
     }
 
-    void QRCode.toDataURL(checkoutUrl, {
+    const qrPayload =
+      checkoutMode === "efi"
+        ? checkoutUrl
+        : new URL(checkoutUrl, window.location.origin).toString();
+
+    void QRCode.toDataURL(qrPayload, {
       width: 220,
       margin: 1,
       errorCorrectionLevel: "M",
@@ -755,7 +770,10 @@ function PixelSheet({
   };
 
   return (
-    <div className="prototype-overlay" onClick={onClose}>
+    <div
+      className={`prototype-overlay ${checkoutOpen ? "is-checkout-overlay" : ""}`}
+      onClick={onClose}
+    >
       <div
         className={`prototype-sheet ${checkoutOpen ? "is-checkout" : "is-detail"}`}
         role="dialog"
@@ -779,44 +797,71 @@ function PixelSheet({
               </button>
             </div>
 
-            <div className="prototype-checkout-title">
-              <div className="prototype-eyebrow">PAGAMENTO VIA PIX</div>
-              <h2>Conclua o pagamento</h2>
-              <div className="prototype-price">
-                {formatBRL(checkoutAmountCents / 100)}
+            <div className="prototype-checkout-content">
+              <div className="prototype-checkout-title">
+                <div className="prototype-eyebrow">PAGAMENTO VIA PIX</div>
+                <h2>Conclua o pagamento</h2>
+                <div className="prototype-price">
+                  {formatBRL(checkoutAmountCents / 100)}
+                </div>
+                <div className="prototype-subtle">
+                  Pixel #{pixel.id.toLocaleString("pt-BR")} ·{" "}
+                  {checkoutExpired
+                    ? "reserva expirada"
+                    : `reserva expira em ${String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:${String(secondsRemaining % 60).padStart(2, "0")}`}
+                </div>
               </div>
-              <div className="prototype-subtle">
-                Pixel #{pixel.id.toLocaleString("pt-BR")} ·{" "}
-                {checkoutExpired
-                  ? "reserva expirada"
-                  : `reserva expira em ${String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:${String(secondsRemaining % 60).padStart(2, "0")}`}
-              </div>
-            </div>
 
-            {checkoutExpired ? (
-              <div
-                className="prototype-checkout-expired prototype-checkout-expired-full"
-                role="status"
-              >
-                <strong>Reserva expirada</strong>
-                <span>
-                  O código Pix foi desativado. Tente reservar o pixel novamente
-                  para receber um novo código de pagamento.
-                </span>
-                <button
-                  className="prototype-social-primary"
-                  onClick={retryReservation}
-                  disabled={isSubmittingReveal}
+              {checkoutExpired ? (
+                <div
+                  className="prototype-checkout-expired prototype-checkout-expired-full"
+                  role="status"
                 >
-                  {isSubmittingReveal
-                    ? "Tentando reservar…"
-                    : "Tentar novamente"}
-                </button>
-                {receiptEmailError && <strong>{receiptEmailError}</strong>}
-              </div>
-            ) : (
-              <>
-                <div className="prototype-checkout-layout">
+                  <strong>Reserva expirada</strong>
+                  <span>
+                    O código Pix foi desativado. Tente reservar o pixel novamente
+                    para receber um novo código de pagamento.
+                  </span>
+                  <button
+                    className="prototype-social-primary"
+                    onClick={retryReservation}
+                    disabled={isSubmittingReveal}
+                  >
+                    {isSubmittingReveal
+                      ? "Tentando reservar…"
+                      : "Tentar novamente"}
+                  </button>
+                  {receiptEmailError && <strong>{receiptEmailError}</strong>}
+                </div>
+              ) : (
+                <>
+                  <div className="prototype-certificate-banner">
+                    <div className="prototype-certificate-icon" aria-hidden="true">
+                      <BadgeCheck size={30} strokeWidth={1.8} />
+                    </div>
+                    <div className="prototype-certificate-copy">
+                      <strong>Seu certificado será enviado por e-mail</strong>
+                      <p>
+                        Após a confirmação do pagamento, você receberá o
+                        certificado do Pixel #{pixel.id.toLocaleString("pt-BR")}{" "}
+                        no e-mail:
+                      </p>
+                      <div className="prototype-certificate-email">
+                        <strong>{receiptEmail}</strong>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCheckoutOpen(false);
+                            setEmailPromptOpen(true);
+                          }}
+                        >
+                          Alterar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="prototype-checkout-layout">
                 <section className="prototype-payment-method prototype-qr-method">
                   <div className="prototype-payment-step">
                     <span className="prototype-payment-step-number">1</span>
@@ -836,7 +881,8 @@ function PixelSheet({
                       />
                     ) : (
                       <div className="prototype-qr prototype-qr-placeholder">
-                        PIX
+                        <QrCodeIcon size={54} strokeWidth={1.4} />
+                        <span>Gerando QR Code…</span>
                       </div>
                     )}
                   </div>
@@ -870,13 +916,6 @@ function PixelSheet({
                     </button>
                   </div>
 
-                  <div className="prototype-waiting">
-                    <Loader2 size={14} className="prototype-spinner" />
-                    Aguardando pagamento ·{" "}
-                    {Math.floor(secondsRemaining / 60)}:
-                    {String(secondsRemaining % 60).padStart(2, "0")}
-                  </div>
-
                   {checkoutMode === "local" && (
                     <button
                       className="prototype-demo-button"
@@ -889,22 +928,19 @@ function PixelSheet({
                     </button>
                   )}
                 </section>
-                </div>
-                <div className="prototype-receipt-destination">
-                  <span>Certificado após o pagamento:</span>
-                  <strong>{receiptEmail}</strong>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCheckoutOpen(false);
-                      setEmailPromptOpen(true);
-                    }}
-                  >
-                    Alterar
-                  </button>
-                </div>
-              </>
-            )}
+                  </div>
+
+                  <div className="prototype-waiting" role="status">
+                    <Clock3 size={24} strokeWidth={1.8} />
+                    <span>Aguardando pagamento</span>
+                    <strong>
+                      {Math.floor(secondsRemaining / 60)}:
+                      {String(secondsRemaining % 60).padStart(2, "0")}
+                    </strong>
+                  </div>
+                </>
+              )}
+            </div>
           </>
         ) : emailPromptOpen ? (
           <ReceiptEmailView
