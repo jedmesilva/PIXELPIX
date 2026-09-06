@@ -2,9 +2,20 @@
 @import "tw-animate-css";
 
 :root {
+  --pixelpix-page-bg: #0b0d10;
+  --pixelpix-surface: #14171b;
+  --pixelpix-surface-raised: #171b20;
+  --pixelpix-surface-strong: #20262d;
+  --pixelpix-border: #1f2328;
+  --pixelpix-border-strong: #2b333c;
+  --pixelpix-text-primary: #e5e7eb;
+  --pixelpix-text-muted: #8b93a1;
+  --pixelpix-accent: #7dd3fc;
+  --pixelpix-brand: #00b85c;
+  --pixelpix-success: #22c55e;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #e5e7eb;
-  background: #0b0d10;
+  color: var(--pixelpix-text-primary);
+  background: var(--pixelpix-page-bg);
 }
 
 * {
@@ -22,7 +33,7 @@ body,
 
 body {
   overflow: hidden;
-  background: #0b0d10;
+  background: var(--pixelpix-page-bg);
 }
 
 button {
@@ -30,7 +41,7 @@ button {
 }
 
 button:focus-visible {
-  outline: 2px solid #7dd3fc;
+  outline: 2px solid var(--pixelpix-accent);
   outline-offset: 2px;
 }
 
@@ -50,8 +61,8 @@ button:focus-visible {
   width: 100%;
   height: 100dvh;
   overflow: hidden;
-  color: #e5e7eb;
-  background: #0b0d10;
+  color: var(--pixelpix-text-primary);
+  background: var(--pixelpix-page-bg);
 }
 
 .prototype-header {
@@ -61,7 +72,8 @@ button:focus-visible {
   justify-content: space-between;
   gap: 16px;
   padding: 16px 24px;
-  background: #fff;
+  border-bottom: 1px solid var(--pixelpix-border);
+  background: var(--pixelpix-surface);
 }
 
 .pixelpix-header-brand {
@@ -75,10 +87,11 @@ button:focus-visible {
   width: 24px;
   height: 24px;
   flex-shrink: 0;
+  fill: var(--pixelpix-brand);
 }
 
 .pixelpix-header-wordmark {
-  color: #171717;
+  color: var(--pixelpix-text-primary);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -92,8 +105,8 @@ button:focus-visible {
   gap: 8px;
   min-width: 0;
   padding: 6px 12px;
-  border: 1px solid #171717;
-  background: #fff;
+  border: 1px solid var(--pixelpix-border-strong);
+  background: var(--pixelpix-surface-raised);
 }
 
 .pixelpix-remaining-dot {
@@ -101,7 +114,7 @@ button:focus-visible {
   height: 8px;
   flex-shrink: 0;
   margin-top: 4px;
-  background: #22c55e;
+  background: var(--pixelpix-success);
 }
 
 .pixelpix-remaining-copy {
@@ -109,7 +122,7 @@ button:focus-visible {
   min-width: 0;
   align-items: baseline;
   gap: 8px;
-  color: #171717;
+  color: var(--pixelpix-text-primary);
   line-height: 1.15;
 }
 
@@ -124,7 +137,7 @@ button:focus-visible {
 }
 
 .pixelpix-remaining-label {
-  color: #737373;
+  color: var(--pixelpix-text-muted);
   font-size: 14px;
 }
 

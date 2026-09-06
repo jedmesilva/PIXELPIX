@@ -1589,12 +1589,12 @@ function PixelPixLogo() {
       viewBox="0 0 149 200"
       fill="none"
     >
-      <rect x="51.5" y="0" width="44.4" height="44.4" fill="#00B85C" />
-      <rect x="0" y="51.9" width="44.4" height="44.4" fill="#00B85C" />
-      <rect x="104.1" y="51.9" width="44.4" height="44.4" fill="#00B85C" />
-      <rect x="0" y="103.7" width="44.4" height="44.4" fill="#00B85C" />
-      <rect x="51.5" y="103.7" width="44.4" height="44.4" fill="#00B85C" />
-      <rect x="0" y="155.6" width="44.4" height="44.4" fill="#00B85C" />
+      <rect x="51.5" y="0" width="44.4" height="44.4" />
+      <rect x="0" y="51.9" width="44.4" height="44.4" />
+      <rect x="104.1" y="51.9" width="44.4" height="44.4" />
+      <rect x="0" y="103.7" width="44.4" height="44.4" />
+      <rect x="51.5" y="103.7" width="44.4" height="44.4" />
+      <rect x="0" y="155.6" width="44.4" height="44.4" />
     </svg>
   );
 }
