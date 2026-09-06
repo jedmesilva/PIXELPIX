@@ -1726,12 +1726,13 @@ function PixelPixHeader({
         <p className="pixelpix-large-description">{totalDescription}</p>
 
         <div className="pixelpix-large-remaining">
-          <span
-            className="pixelpix-remaining-dot pixelpix-large-remaining-dot"
-            aria-hidden="true"
-          />
-          <div className="pixelpix-large-remaining-copy">
+          <div className="pixelpix-large-remaining-dot-container">
+            <span className="pixelpix-remaining-dot" aria-hidden="true" />
+          </div>
+          <div className="pixelpix-large-remaining-amount-container">
             <span className="pixelpix-remaining-amount">{remainingAmount}</span>
+          </div>
+          <div className="pixelpix-large-remaining-label-container">
             <span className="pixelpix-remaining-label">{remainingLabel}</span>
           </div>
         </div>
