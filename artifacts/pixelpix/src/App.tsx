@@ -539,7 +539,36 @@ function PixelSheet({
   const displayedSignature = pixel.socialProfile;
   const hasSignature = Boolean(displayedSignature.handle);
 
-  const resumeReservation = () => {
+  const openCheckout = useCallback(
+    async (token: string, email: string) => {
+      const result = await fetchJson<{
+        checkoutUrl: string;
+        paymentId: string;
+        mode: "efi" | "local";
+        amountCents: number;
+        currency: string;
+      }>("/api/cells/email", {
+        method: "POST",
+        body: JSON.stringify({
+          cellId: pixel.id,
+          token,
+          email,
+          deviceId: getDeviceId(),
+        }),
+      });
+      storeReceiptEmail(email);
+      setReceiptEmail(email);
+      setCheckoutUrl(result.checkoutUrl);
+      setCheckoutPaymentId(result.paymentId);
+      setCheckoutMode(result.mode);
+      setCheckoutAmountCents(result.amountCents);
+      setEmailPromptOpen(false);
+      setCheckoutOpen(true);
+    },
+    [pixel.id],
+  );
+
+  const resumeReservation = async () => {
     const storedReservation = getStoredReservation(pixel.id);
     if (!storedReservation || !isOwnedReservation) return;
 
@@ -553,9 +582,28 @@ function PixelSheet({
         ),
       ),
     );
-    setReceiptEmail(getStoredReceiptEmail());
     setReceiptEmailError("");
-    setEmailPromptOpen(true);
+    const storedEmail = getStoredReceiptEmail();
+    const emailError = validateEmail(storedEmail);
+    setReceiptEmail(storedEmail);
+    if (emailError) {
+      setEmailPromptOpen(true);
+      return;
+    }
+
+    setIsSubmittingReveal(true);
+    try {
+      await openCheckout(storedReservation.token, normalizeEmail(storedEmail));
+    } catch (error) {
+      setReceiptEmailError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível recuperar o pagamento. Tente novamente.",
+      );
+      setEmailPromptOpen(true);
+    } finally {
+      setIsSubmittingReveal(false);
+    }
   };
 
   const retryReservation = async () => {
@@ -693,29 +741,7 @@ function PixelSheet({
     void (async () => {
       setIsSubmittingReveal(true);
       try {
-        const result = await fetchJson<{
-          checkoutUrl: string;
-          paymentId: string;
-          mode: "efi" | "local";
-          amountCents: number;
-          currency: string;
-        }>("/api/cells/email", {
-          method: "POST",
-          body: JSON.stringify({
-            cellId: pixel.id,
-            token: reservationToken,
-            email: normalizedEmail,
-            deviceId: getDeviceId(),
-          }),
-        });
-        storeReceiptEmail(normalizedEmail);
-        setReceiptEmail(normalizedEmail);
-        setCheckoutUrl(result.checkoutUrl);
-        setCheckoutPaymentId(result.paymentId);
-        setCheckoutMode(result.mode);
-        setCheckoutAmountCents(result.amountCents);
-        setEmailPromptOpen(false);
-        setCheckoutOpen(true);
+        await openCheckout(reservationToken, normalizedEmail);
       } catch (error) {
         setReceiptEmailError(
           error instanceof Error
