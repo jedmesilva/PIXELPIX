@@ -256,6 +256,30 @@ button:focus-visible {
   transition: opacity 120ms ease, transform 120ms ease;
 }
 
+.pixelpix-remaining-badge
+  .pixelpix-remaining-dot-container,
+.pixelpix-remaining-badge
+  .pixelpix-remaining-amount-container,
+.pixelpix-remaining-badge
+  .pixelpix-remaining-label-container {
+  height: 17px;
+  min-height: 17px;
+  box-sizing: border-box;
+}
+
+.pixelpix-remaining-badge .pixelpix-remaining-dot-container {
+  flex: 0 0 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.pixelpix-remaining-badge
+  .pixelpix-remaining-amount-container,
+.pixelpix-remaining-badge
+  .pixelpix-remaining-label-container {
+  line-height: 17px;
+}
+
 .pixelpix-compact-header.is-compact .pixelpix-remaining-badge {
   opacity: 1;
   visibility: visible;
@@ -272,7 +296,7 @@ button:focus-visible {
 }
 
 .pixelpix-compact-header .pixelpix-remaining-dot {
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .pixelpix-remaining-amount,
