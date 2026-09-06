@@ -1076,7 +1076,6 @@ function PixelGrid() {
   const compactHeaderTriggerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [scrollTopRow, setScrollTopRow] = useState(0);
-  const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [, setRevealVersion] = useState(0);
@@ -1362,7 +1361,7 @@ function PixelGrid() {
     failedVisibleChunks.forEach((chunkId) => requestChunk(chunkId));
   }, [failedVisibleChunks, requestChunk]);
 
-  const syncCompactHeaderVisibility = useCallback(() => {
+  const syncCompactHeaderVisibility = useCallback((scrollTop?: number) => {
     const scrollArea = containerRef.current;
     const compactHeader = compactHeaderRef.current;
     const trigger = compactHeaderTriggerRef.current;
@@ -1381,11 +1380,14 @@ function PixelGrid() {
     }
 
     const shouldCompactHeader =
-      scrollArea.scrollTop >= compactHeaderThresholdRef.current;
+      (scrollTop ?? scrollArea.scrollTop) >= compactHeaderThresholdRef.current;
+    const isCurrentlyCompact = compactHeader.classList.contains("is-compact");
+    if (isCurrentlyCompact === shouldCompactHeader) return;
 
-    setIsHeaderCompact((current) =>
-      current === shouldCompactHeader ? current : shouldCompactHeader,
-    );
+    compactHeader.classList.toggle("is-compact", shouldCompactHeader);
+    compactHeader
+      .querySelector(".pixelpix-remaining-badge")
+      ?.setAttribute("aria-hidden", String(!shouldCompactHeader));
   }, []);
 
   useEffect(() => {
@@ -1411,7 +1413,7 @@ function PixelGrid() {
   const handleScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
       const scrollArea = event.currentTarget;
-      syncCompactHeaderVisibility();
+      syncCompactHeaderVisibility(scrollArea.scrollTop);
       latestScrollTopRef.current = scrollArea.scrollTop;
       if (scrollFrameRef.current !== null) return;
 
@@ -1546,7 +1548,6 @@ function PixelGrid() {
       aria-busy={isInitialLoading}
     >
       <PixelPixHeader
-        isCompact={isHeaderCompact}
         compactHeaderRef={compactHeaderRef}
         expandedHeaderRef={expandedHeaderRef}
         compactHeaderTriggerRef={compactHeaderTriggerRef}
@@ -1680,7 +1681,6 @@ function PixelPixHeader({
   totalDescription = "escondidos em 1 milhão de pixels",
   remainingAmount = "R$ 957.000,00",
   remainingLabel = "ainda escondidos",
-  isCompact = false,
   compactHeaderRef,
   expandedHeaderRef,
   compactHeaderTriggerRef,
@@ -1689,7 +1689,6 @@ function PixelPixHeader({
   totalDescription?: string;
   remainingAmount?: string;
   remainingLabel?: string;
-  isCompact?: boolean;
   compactHeaderRef?: React.RefObject<HTMLDivElement | null>;
   expandedHeaderRef?: React.RefObject<HTMLDivElement | null>;
   compactHeaderTriggerRef?: React.RefObject<HTMLDivElement | null>;
@@ -1698,25 +1697,21 @@ function PixelPixHeader({
     <>
       <div
         ref={compactHeaderRef}
-        className={`pixelpix-compact-header${isCompact ? " is-compact" : ""}`}
+        className="pixelpix-compact-header"
       >
         <div className="pixelpix-header-compact-content">
           <div className="pixelpix-header-brand">
-            <PixelPixLogo size={isCompact ? "compact" : "large"} />
-            <span className={`pixelpix-header-wordmark${isCompact ? "" : " is-large"}`}>
-              PIXELPIX
-            </span>
+            <PixelPixLogo size="large" />
+            <span className="pixelpix-header-wordmark is-large">PIXELPIX</span>
           </div>
 
-          {isCompact && (
-            <div className="pixelpix-remaining-badge">
-              <span className="pixelpix-remaining-dot" aria-hidden="true" />
-              <div className="pixelpix-remaining-copy">
-                <span className="pixelpix-remaining-amount">{remainingAmount}</span>
-                <span className="pixelpix-remaining-label">{remainingLabel}</span>
-              </div>
+          <div className="pixelpix-remaining-badge" aria-hidden="true">
+            <span className="pixelpix-remaining-dot" aria-hidden="true" />
+            <div className="pixelpix-remaining-copy">
+              <span className="pixelpix-remaining-amount">{remainingAmount}</span>
+              <span className="pixelpix-remaining-label">{remainingLabel}</span>
             </div>
-          )}
+          </div>
         </div>
       </div>
 

@@ -86,6 +86,15 @@ button:focus-visible {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
 }
 
+.pixelpix-compact-header.is-compact .pixelpix-header-logo.is-large {
+  width: 24px;
+  height: 24px;
+}
+
+.pixelpix-compact-header.is-compact .pixelpix-header-wordmark.is-large {
+  font-size: 16px;
+}
+
 .pixelpix-header-compact-content {
   display: flex;
   width: 100%;
@@ -196,6 +205,18 @@ button:focus-visible {
   padding: 6px 12px;
   border: 1px solid var(--pixelpix-border-strong);
   background: var(--pixelpix-surface-raised);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.pixelpix-compact-header.is-compact .pixelpix-remaining-badge {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .pixelpix-remaining-dot {
