@@ -5,6 +5,11 @@ import {
   broadcastCellUpdate,
   subscribeToCellEvents,
 } from "../lib/cell-events";
+import {
+  createEfiTxid,
+  createImmediateCharge,
+  isEfiConfigured,
+} from "../lib/efi";
 
 const router: IRouter = Router();
 
@@ -582,22 +587,38 @@ router.post("/cells/email", async (request, response) => {
       return;
     }
 
-    if (process.env.NODE_ENV === "production") {
+    const amountCents = await calculateCellPriceCents(client);
+    const externalReference = JSON.stringify({ cellId, token });
+    let providerPaymentId: string;
+    let checkoutUrl: string;
+    let checkoutMode: "efi" | "local";
+
+    if (isEfiConfigured()) {
+      providerPaymentId = createEfiTxid();
+      const charge = await createImmediateCharge({
+        txid: providerPaymentId,
+        amountCents,
+        cellId,
+      });
+      checkoutUrl = charge.pixCopiaECola;
+      checkoutMode = "efi";
+    } else if (process.env.NODE_ENV === "production") {
       await client.query("ROLLBACK");
       response.status(503).json({
         error: "O provedor de pagamento ainda não está configurado",
       });
       return;
+    } else {
+      providerPaymentId = `local_${randomUUID()}`;
+      checkoutUrl = `/api/checkout/local/${providerPaymentId}`;
+      checkoutMode = "local";
     }
 
-    const providerPaymentId = `local_${randomUUID()}`;
-    const checkoutUrl = `/api/checkout/local/${providerPaymentId}`;
-    const amountCents = await calculateCellPriceCents(client);
     await client.query(
       `INSERT INTO payments
          (cell_id, provider_payment_id, checkout_url, amount_cents, status,
-          device_id, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7)`,
+          device_id, ip_address, user_agent, external_reference)
+       VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8)`,
       [
         cellId,
         providerPaymentId,
@@ -606,11 +627,14 @@ router.post("/cells/email", async (request, response) => {
         deviceId,
         clientIp(request),
         request.get("user-agent") ?? null,
+        externalReference,
       ],
     );
     await client.query("COMMIT");
     response.json({
       checkoutUrl,
+      paymentId: providerPaymentId,
+      mode: checkoutMode,
       amountCents,
       currency: "BRL",
     });
@@ -671,6 +695,24 @@ router.post("/cells/sign", async (request, response) => {
     return;
   }
   response.status(200).json({ ok: true, status: "pending" });
+});
+
+router.get("/checkout/:paymentId/status", async (request, response) => {
+  const payment = await pool.query(
+    `SELECT cell_id, status, provider_payment_id
+       FROM payments
+      WHERE provider_payment_id = $1`,
+    [request.params.paymentId],
+  );
+  if (!payment.rows[0]) {
+    response.status(404).json({ error: "Pagamento não encontrado" });
+    return;
+  }
+  response.json({
+    paymentId: payment.rows[0].provider_payment_id,
+    cellId: Number(payment.rows[0].cell_id),
+    status: payment.rows[0].status,
+  });
 });
 
 router.get("/checkout/local/:paymentId", async (request, response) => {

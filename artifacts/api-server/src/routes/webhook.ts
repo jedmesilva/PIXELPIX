@@ -4,6 +4,7 @@ import { pool } from "@workspace/db";
 import { releaseActiveReservationByCell } from "./cells";
 import { logger } from "../lib/logger";
 import { broadcastCellUpdate } from "../lib/cell-events";
+import { getEfiCharge } from "../lib/efi";
 
 const router: IRouter = Router();
 const MAX_DIRECT_ALERTS_PER_HOUR = 100;
@@ -53,6 +54,27 @@ function validSignature(rawBody: Buffer, signature: unknown) {
   const received = Buffer.from(signature);
   const wanted = Buffer.from(expected);
   return received.length === wanted.length && timingSafeEqual(received, wanted);
+}
+
+function validEfiWebhookToken(value: unknown) {
+  const expected = process.env.EFI_WEBHOOK_TOKEN?.trim();
+  const received =
+    typeof value === "string" ? value.trim() : Array.isArray(value) ? value[0] : "";
+  if (!expected || !received) return false;
+  const expectedBuffer = Buffer.from(expected);
+  const receivedBuffer = Buffer.from(received);
+  return (
+    expectedBuffer.length === receivedBuffer.length &&
+    timingSafeEqual(expectedBuffer, receivedBuffer)
+  );
+}
+
+function centsFromAmount(value: unknown) {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const normalized = String(value).replace(",", ".").trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+  const cents = Math.round(Number(normalized) * 100);
+  return Number.isSafeInteger(cents) ? cents : null;
 }
 
 async function calculateAvailableCash(client: { query: Function }) {
@@ -501,6 +523,127 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
       parsedCellId,
       request.body,
       signatureOk,
+      "error",
+    );
+    response.status(500).send("Erro interno");
+  }
+});
+
+router.post("/webhook/efi", async (request, response) => {
+  const txids = Array.isArray(request.body?.pix)
+    ? request.body.pix
+        .map((item: unknown) =>
+          item && typeof item === "object" && "txid" in item
+            ? item.txid
+            : null,
+        )
+        .filter((txid: unknown): txid is string => typeof txid === "string")
+    : [];
+  const firstPaymentId = txids[0] ?? "efi-webhook-test";
+  const tokenValid = validEfiWebhookToken(request.query.hmac);
+
+  if (!tokenValid) {
+    await safeRecordWebhookEvent(
+      firstPaymentId,
+      null,
+      request.body,
+      false,
+      "invalid_signature",
+    );
+    response.status(401).send("Webhook não autorizado");
+    return;
+  }
+
+  // Efí sends a test callback when the webhook is registered.
+  if (txids.length === 0) {
+    response.status(200).send("OK");
+    return;
+  }
+
+  try {
+    for (const txid of txids) {
+      const paymentResult = await pool.query(
+        `SELECT p.cell_id, p.amount_cents, p.status, p.external_reference,
+                c.reservation_token
+           FROM payments p
+           JOIN cells c ON c.id = p.cell_id
+          WHERE p.provider_payment_id = $1`,
+        [txid],
+      );
+      const payment = paymentResult.rows[0];
+      if (!payment) {
+        await safeRecordWebhookEvent(
+          txid,
+          null,
+          request.body,
+          true,
+          "invalid_reference",
+        );
+        continue;
+      }
+
+      let reference: { cellId?: unknown; token?: unknown } = {};
+      try {
+        const parsed = JSON.parse(String(payment.external_reference ?? "{}"));
+        if (parsed && typeof parsed === "object") reference = parsed;
+      } catch {
+        // Invalid internal references are rejected below.
+      }
+      const cellId = Number(reference.cellId);
+      const token = typeof reference.token === "string" ? reference.token : "";
+      if (
+        !Number.isInteger(cellId) ||
+        cellId !== Number(payment.cell_id) ||
+        cellId < 0 ||
+        cellId >= 1_000_000 ||
+        !/^[0-9a-f-]{36}$/i.test(token)
+      ) {
+        await safeRecordWebhookEvent(
+          txid,
+          Number.isInteger(cellId) ? cellId : null,
+          request.body,
+          true,
+          "invalid_reference",
+        );
+        continue;
+      }
+
+      const charge = await getEfiCharge(txid);
+      const chargedAmount = centsFromAmount(charge.valor?.original);
+      if (
+        charge.status !== "CONCLUIDA" ||
+        chargedAmount === null ||
+        chargedAmount !== Number(payment.amount_cents)
+      ) {
+        await safeRecordWebhookEvent(
+          txid,
+          cellId,
+          { notification: request.body, charge },
+          true,
+          "payment_not_pending",
+        );
+        continue;
+      }
+
+      const result = await processPaymentConfirmed({
+        paymentId: txid,
+        cellId,
+        token,
+        payload: request.body,
+      });
+      logger.info(
+        { txid, cellId, result: result.result },
+        "Efí Pix webhook processed",
+      );
+    }
+    response.status(200).send("OK");
+  } catch (error) {
+    request.log?.error({ error, paymentId: firstPaymentId }, "Efí webhook failed");
+    await safeRecordWebhookEvent(
+      firstPaymentId,
+      null,
+      request.body,
+      true,
       "error",
     );
     response.status(500).send("Erro interno");

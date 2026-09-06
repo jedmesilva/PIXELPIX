@@ -405,6 +405,8 @@ function PixelSheet({
   const [reservationExpiresAt, setReservationExpiresAt] = useState<number | null>(null);
   const [signatureSubmitted, setSignatureSubmitted] = useState(false);
   const [checkoutUrl, setCheckoutUrl] = useState("");
+  const [checkoutPaymentId, setCheckoutPaymentId] = useState("");
+  const [checkoutMode, setCheckoutMode] = useState<"efi" | "local">("local");
   const [checkoutAmountCents, setCheckoutAmountCents] = useState(
     STARTING_PIXEL_PRICE * 100,
   );
@@ -440,6 +442,8 @@ function PixelSheet({
     setReservationExpiresAt(null);
     setSignatureSubmitted(false);
     setCheckoutUrl("");
+    setCheckoutPaymentId("");
+    setCheckoutMode("local");
     setCheckoutAmountCents(STARTING_PIXEL_PRICE * 100);
     setSecondsRemaining(300);
   }, [pixel.id]);
@@ -551,19 +555,9 @@ function PixelSheet({
     }
   };
 
-  const confirmDemoPayment = async () => {
-    const normalizedEmail = normalizeEmail(receiptEmail);
-    const error = validateEmail(normalizedEmail);
-    setReceiptEmailError(error);
-    if (error) return;
-
-    storeReceiptEmail(normalizedEmail);
-    setIsSubmittingReveal(true);
-    try {
-      const confirmation = await fetchJson<{ cellId: number }>(
-        `${checkoutUrl}/confirm`,
-        { method: "POST", body: JSON.stringify({}) },
-      );
+  const finishConfirmedPayment = useCallback(
+    async (cellId: number) => {
+      const normalizedEmail = normalizeEmail(receiptEmail);
       const detail = await fetchJson<{
         id: number;
         emoji: string;
@@ -573,11 +567,11 @@ function PixelSheet({
         revealedBy: string | null;
         prizeValueCents?: number;
         prizeLabel?: string | null;
-      }>(`/api/cells/${confirmation.cellId}`);
+      }>(`/api/cells/${cellId}`);
       const receipt: ReceiptPayload = {
-        pixelId: confirmation.cellId,
+        pixelId: cellId,
         email: normalizedEmail,
-        paymentId: "server-confirmed",
+        paymentId: checkoutPaymentId || "server-confirmed",
         revealedAt: detail.revealedAt,
         value: Number(detail.prizeValueCents ?? 0) / 100,
         emoji: detail.emoji,
@@ -592,6 +586,24 @@ function PixelSheet({
       setSocialForm(socialProfile);
       setSocialError("");
       setSocialPromptOpen(true);
+    },
+    [checkoutPaymentId, onReveal, receiptEmail, socialProfile],
+  );
+
+  const confirmDemoPayment = async () => {
+    const normalizedEmail = normalizeEmail(receiptEmail);
+    const error = validateEmail(normalizedEmail);
+    setReceiptEmailError(error);
+    if (error) return;
+
+    storeReceiptEmail(normalizedEmail);
+    setIsSubmittingReveal(true);
+    try {
+      const confirmation = await fetchJson<{ cellId: number }>(
+        `${checkoutUrl}/confirm`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      await finishConfirmedPayment(confirmation.cellId);
     } catch (error) {
       setReceiptEmailError(
         error instanceof Error
@@ -602,6 +614,42 @@ function PixelSheet({
       setIsSubmittingReveal(false);
     }
   };
+
+  useEffect(() => {
+    if (!checkoutOpen || checkoutMode !== "efi" || !checkoutPaymentId) return;
+    let active = true;
+    const checkPayment = async () => {
+      try {
+        const result = await fetchJson<{
+          status: string;
+          cellId: number;
+        }>(`/api/checkout/${encodeURIComponent(checkoutPaymentId)}/status`);
+        if (!active) return;
+        if (result.status === "confirmed") {
+          setIsSubmittingReveal(true);
+          await finishConfirmedPayment(result.cellId);
+          setIsSubmittingReveal(false);
+        } else if (result.status === "failed") {
+          setReceiptEmailError(
+            "Este pagamento expirou. Tente reservar a célula novamente.",
+          );
+        }
+      } catch {
+        // The next polling cycle retries transient API failures.
+      }
+    };
+    void checkPayment();
+    const timer = window.setInterval(() => void checkPayment(), 3_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [
+    checkoutOpen,
+    checkoutMode,
+    checkoutPaymentId,
+    finishConfirmedPayment,
+  ]);
 
   const continueToCheckout = () => {
     const normalizedEmail = normalizeEmail(receiptEmail);
@@ -614,6 +662,8 @@ function PixelSheet({
       try {
         const result = await fetchJson<{
           checkoutUrl: string;
+          paymentId: string;
+          mode: "efi" | "local";
           amountCents: number;
           currency: string;
         }>("/api/cells/email", {
@@ -628,6 +678,8 @@ function PixelSheet({
         storeReceiptEmail(normalizedEmail);
         setReceiptEmail(normalizedEmail);
         setCheckoutUrl(result.checkoutUrl);
+        setCheckoutPaymentId(result.paymentId);
+        setCheckoutMode(result.mode);
         setCheckoutAmountCents(result.amountCents);
         setEmailPromptOpen(false);
         setCheckoutOpen(true);
@@ -743,15 +795,22 @@ function PixelSheet({
                       {String(secondsRemaining % 60).padStart(2, "0")}
                     </div>
 
-                    <button
-                      className="prototype-demo-button"
-                      onClick={confirmDemoPayment}
-                      disabled={isSubmittingReveal}
-                    >
-                      {isSubmittingReveal
-                        ? "Preparando seu certificado…"
-                        : "(desenvolvimento) simular webhook confirmado"}
-                    </button>
+                    {checkoutMode === "local" ? (
+                      <button
+                        className="prototype-demo-button"
+                        onClick={confirmDemoPayment}
+                        disabled={isSubmittingReveal}
+                      >
+                        {isSubmittingReveal
+                          ? "Preparando seu certificado…"
+                          : "(desenvolvimento) simular webhook confirmado"}
+                      </button>
+                    ) : (
+                      <div className="prototype-waiting">
+                        Assim que a Efí confirmar o pagamento, o pixel será
+                        revelado automaticamente.
+                      </div>
+                    )}
                   </>
                 )}
               </div>
