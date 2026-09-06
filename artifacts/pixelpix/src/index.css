@@ -59,8 +59,73 @@ button:focus-visible {
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #1f2328;
+  gap: 16px;
+  padding: 16px 24px;
+  background: #fff;
+}
+
+.pixelpix-header-brand {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.pixelpix-header-logo {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.pixelpix-header-wordmark {
+  color: #171717;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.pixelpix-remaining-badge {
+  display: flex;
+  flex-shrink: 1;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 12px;
+  border: 1px solid #171717;
+  background: #fff;
+}
+
+.pixelpix-remaining-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  background: #22c55e;
+}
+
+.pixelpix-remaining-copy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+  color: #171717;
+  line-height: 1.15;
+}
+
+.pixelpix-remaining-amount,
+.pixelpix-remaining-label {
+  white-space: nowrap;
+}
+
+.pixelpix-remaining-amount {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pixelpix-remaining-label {
+  color: #737373;
+  font-size: 14px;
 }
 
 .prototype-title {
@@ -910,6 +975,16 @@ button:focus-visible {
 @media (max-width: 699px) {
   .prototype-header {
     padding: 16px;
+  }
+
+  .pixelpix-remaining-copy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .pixelpix-remaining-label {
+    font-size: 12px;
   }
 
   .prototype-hover-badge {

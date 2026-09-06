@@ -1581,19 +1581,53 @@ function PixelGrid() {
   );
 }
 
+function PixelPixLogo() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="pixelpix-header-logo"
+      viewBox="0 0 149 200"
+      fill="none"
+    >
+      <rect x="51.5" y="0" width="44.4" height="44.4" fill="#00B85C" />
+      <rect x="0" y="51.9" width="44.4" height="44.4" fill="#00B85C" />
+      <rect x="104.1" y="51.9" width="44.4" height="44.4" fill="#00B85C" />
+      <rect x="0" y="103.7" width="44.4" height="44.4" fill="#00B85C" />
+      <rect x="51.5" y="103.7" width="44.4" height="44.4" fill="#00B85C" />
+      <rect x="0" y="155.6" width="44.4" height="44.4" fill="#00B85C" />
+    </svg>
+  );
+}
+
+function PixelPixHeaderCompact({
+  remainingAmount = "R$ 957.000,00",
+  remainingLabel = "ainda escondidos",
+}: {
+  remainingAmount?: string;
+  remainingLabel?: string;
+} = {}) {
+  return (
+    <header className="prototype-header">
+      <div className="pixelpix-header-brand">
+        <PixelPixLogo />
+        <span className="pixelpix-header-wordmark">PIXELPIX</span>
+      </div>
+
+      <div className="pixelpix-remaining-badge">
+        <span className="pixelpix-remaining-dot" aria-hidden="true" />
+        <div className="pixelpix-remaining-copy">
+          <span className="pixelpix-remaining-amount">{remainingAmount}</span>
+          <span className="pixelpix-remaining-label">{remainingLabel}</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 function Home() {
   return (
     <main className="prototype-page">
-      <header className="prototype-header">
-        <div>
-          <h1 className="prototype-title">
-            PIXEL<span>PIX</span>
-          </h1>
-          <p className="prototype-subtitle">
-            1 milhão de pixels disponíveis pra revelar
-          </p>
-        </div>
-      </header>
+      <PixelPixHeaderCompact />
       <PixelGrid />
     </main>
   );
