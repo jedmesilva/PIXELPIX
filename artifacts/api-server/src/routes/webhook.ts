@@ -378,12 +378,21 @@ export async function processPaymentConfirmed(input: {
       [input.cellId],
     );
     const cell = updatedCell.rows[0];
+     if (
+       !cell ||
+       typeof cell.background_color !== "string" ||
+       cell.background_color.length === 0
+     ) {
+       throw new Error(
+         `Célula ${input.cellId} confirmada sem background_color persistido`,
+       );
+     }
     broadcastCellUpdate({
       type: "cell.updated",
       cellId: input.cellId,
       status: "paid",
       emoji: String(cell?.emoji ?? "💰"),
-      backgroundColor: String(cell?.background_color ?? "hsl(220, 8%, 19%)"),
+       backgroundColor: cell.background_color,
       expiresAt: null,
       revealedBy: cell?.revealed_by ? String(cell.revealed_by) : null,
       revealedAt: cell?.revealed_at
