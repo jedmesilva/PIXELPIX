@@ -86,6 +86,13 @@ function generatedCellBackground(id: number) {
   return AVAILABLE_CELL_BACKGROUND;
 }
 
+function pixelSurfaceBackground(pixel: Pixel) {
+  if (pixel.status === "reserved" && pixel.backgroundColor) {
+    return `repeating-linear-gradient(45deg, ${pixel.backgroundColor}, ${pixel.backgroundColor} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`;
+  }
+  return pixel.backgroundColor ?? undefined;
+}
+
 function getChunk(chunkId: number) {
   const cached = chunkCache.get(chunkId);
   if (cached) return cached;
@@ -737,7 +744,7 @@ function PixelSheet({
             <div className="prototype-detail-layout">
               <div
                 className="prototype-pixel-hero"
-                style={{ background: pixel.backgroundColor ?? undefined }}
+                style={{ background: pixelSurfaceBackground(pixel) }}
               >
                 {pixel.revealed ? (
                   <span className="prototype-hero-emoji">{pixel.emoji}</span>
@@ -1606,10 +1613,7 @@ function PixelGrid() {
                   left: col * cellSize,
                   width: cellSize,
                   height: cellSize,
-                  background:
-                    isReserved && pixel.backgroundColor
-                      ? `repeating-linear-gradient(45deg, ${pixel.backgroundColor}, ${pixel.backgroundColor} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
-                      : pixel.backgroundColor ?? undefined,
+                  background: pixelSurfaceBackground(pixel),
                 }}
                 onClick={() => {
                   setSelectedId(id);

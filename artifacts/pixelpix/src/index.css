@@ -480,7 +480,6 @@ button:focus-visible {
   max-height: 180px;
   aspect-ratio: 1;
   margin-bottom: 14px;
-  border: 1px solid color-mix(in srgb, var(--pixelpix-brand) 24%, var(--pixelpix-border));
   border-radius: 14px;
 }
 
