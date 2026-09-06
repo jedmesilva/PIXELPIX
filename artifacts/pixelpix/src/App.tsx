@@ -1071,6 +1071,7 @@ function SocialProfileForm({
 function PixelGrid() {
   const containerRef = useRef<HTMLDivElement>(null);
   const compactHeaderRef = useRef<HTMLDivElement>(null);
+  const expandedHeaderRef = useRef<HTMLDivElement>(null);
   const compactHeaderTriggerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [scrollTopRow, setScrollTopRow] = useState(0);
@@ -1085,6 +1086,7 @@ function PixelGrid() {
   const chunkStatesRef = useRef(new Map<number, ChunkStatus>());
   const scrollFrameRef = useRef<number | null>(null);
   const latestScrollTopRef = useRef(0);
+  const compactHeaderThresholdRef = useRef<number | null>(null);
   const cellSizeRef = useRef(0);
   const [socialProfile, setSocialProfile] = useState<SocialProfile>(() => {
     try {
@@ -1360,11 +1362,20 @@ function PixelGrid() {
     const trigger = compactHeaderTriggerRef.current;
     if (!scrollArea || !compactHeader || !trigger) return;
 
-    const scrollAreaTop = scrollArea.getBoundingClientRect().top;
-    const compactHeaderHeight = compactHeader.getBoundingClientRect().height;
-    const triggerTop = trigger.getBoundingClientRect().top;
+    if (compactHeaderThresholdRef.current === null) {
+      const scrollAreaRect = scrollArea.getBoundingClientRect();
+      const triggerRect = trigger.getBoundingClientRect();
+      const triggerContentTop =
+        triggerRect.top - scrollAreaRect.top + scrollArea.scrollTop;
+      const compactHeaderHeight = compactHeader.getBoundingClientRect().height;
+      compactHeaderThresholdRef.current = Math.max(
+        0,
+        triggerContentTop - compactHeaderHeight,
+      );
+    }
+
     const shouldCompactHeader =
-      triggerTop <= scrollAreaTop + compactHeaderHeight;
+      scrollArea.scrollTop >= compactHeaderThresholdRef.current;
 
     setIsHeaderCompact((current) =>
       current === shouldCompactHeader ? current : shouldCompactHeader,
@@ -1373,25 +1384,21 @@ function PixelGrid() {
 
   useEffect(() => {
     const scrollArea = containerRef.current;
-    const trigger = compactHeaderTriggerRef.current;
-    if (!scrollArea || !trigger) return;
+    const expandedHeader = expandedHeaderRef.current;
+    if (!scrollArea || !expandedHeader) return;
 
-    const observer = new IntersectionObserver(
-      () => syncCompactHeaderVisibility(),
-      { root: scrollArea, threshold: [0, 1] },
-    );
-    observer.observe(trigger);
-
-    const resizeObserver = new ResizeObserver(() => syncCompactHeaderVisibility());
-    resizeObserver.observe(scrollArea);
-    if (compactHeaderRef.current) {
-      resizeObserver.observe(compactHeaderRef.current);
-    }
+    const handleResize = () => {
+      compactHeaderThresholdRef.current = null;
+      syncCompactHeaderVisibility();
+    };
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(expandedHeader);
+    window.addEventListener("resize", handleResize);
 
     syncCompactHeaderVisibility();
     return () => {
-      observer.disconnect();
       resizeObserver.disconnect();
+      window.removeEventListener("resize", handleResize);
     };
   }, [syncCompactHeaderVisibility]);
 
@@ -1535,6 +1542,7 @@ function PixelGrid() {
       <PixelPixHeader
         isCompact={isHeaderCompact}
         compactHeaderRef={compactHeaderRef}
+        expandedHeaderRef={expandedHeaderRef}
         compactHeaderTriggerRef={compactHeaderTriggerRef}
       />
 
@@ -1661,6 +1669,7 @@ function PixelPixHeader({
   remainingLabel = "ainda escondidos",
   isCompact = false,
   compactHeaderRef,
+  expandedHeaderRef,
   compactHeaderTriggerRef,
 }: {
   totalLabel?: string;
@@ -1669,6 +1678,7 @@ function PixelPixHeader({
   remainingLabel?: string;
   isCompact?: boolean;
   compactHeaderRef?: React.RefObject<HTMLDivElement | null>;
+  expandedHeaderRef?: React.RefObject<HTMLDivElement | null>;
   compactHeaderTriggerRef?: React.RefObject<HTMLDivElement | null>;
 } = {}) {
   return (
@@ -1697,7 +1707,11 @@ function PixelPixHeader({
         </div>
       </div>
 
-      <section className="pixelpix-large-header" aria-label="Resumo do PIXELPIX">
+      <section
+        ref={expandedHeaderRef}
+        className="pixelpix-large-header"
+        aria-label="Resumo do PIXELPIX"
+      >
         <h1 className="pixelpix-large-title">{totalLabel}</h1>
         <p className="pixelpix-large-description">{totalDescription}</p>
 
