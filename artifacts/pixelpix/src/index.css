@@ -121,10 +121,11 @@ button:focus-visible {
 }
 
 .pixelpix-compact-header-shell {
-  position: sticky;
+  position: fixed;
   top: 0;
+  right: 0;
+  left: 0;
   z-index: 6;
-  height: 0;
   overflow: visible;
   pointer-events: none;
 }

@@ -1112,28 +1112,36 @@ function PixelGrid() {
     return () => observer.disconnect();
   }, []);
 
+  const syncCompactHeaderVisibility = useCallback(
+    (scrollArea: HTMLDivElement) => {
+      const largeHeader = largeHeaderRef.current;
+      if (!largeHeader) return;
+
+      const scrollAreaTop = scrollArea.getBoundingClientRect().top;
+      const largeHeaderBottom = largeHeader.getBoundingClientRect().bottom;
+      const shouldShowCompact = largeHeaderBottom <= scrollAreaTop;
+
+      setShowCompactHeader((current) =>
+        current === shouldShowCompact ? current : shouldShowCompact,
+      );
+    },
+    [],
+  );
+
   useEffect(() => {
     const scrollArea = containerRef.current;
     const largeHeader = largeHeaderRef.current;
-    if (
-      !scrollArea ||
-      !largeHeader ||
-      typeof IntersectionObserver === "undefined"
-    ) {
+    if (!scrollArea || !largeHeader) {
       return;
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowCompactHeader(
-          !entry.isIntersecting && entry.boundingClientRect.bottom <= 0,
-        );
-      },
-      { root: scrollArea, threshold: 0 },
-    );
-    observer.observe(largeHeader);
-    return () => observer.disconnect();
-  }, []);
+    const sync = () => syncCompactHeaderVisibility(scrollArea);
+    sync();
+
+    const resizeObserver = new ResizeObserver(sync);
+    resizeObserver.observe(largeHeader);
+    return () => resizeObserver.disconnect();
+  }, [syncCompactHeaderVisibility]);
 
   useEffect(() => {
     if (typeof EventSource === "undefined") return;
@@ -1376,18 +1384,23 @@ function PixelGrid() {
     failedVisibleChunks.forEach((chunkId) => requestChunk(chunkId));
   }, [failedVisibleChunks, requestChunk]);
 
-  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    latestScrollTopRef.current = event.currentTarget.scrollTop;
-    if (scrollFrameRef.current !== null) return;
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const scrollArea = event.currentTarget;
+      syncCompactHeaderVisibility(scrollArea);
+      latestScrollTopRef.current = scrollArea.scrollTop;
+      if (scrollFrameRef.current !== null) return;
 
-    scrollFrameRef.current = requestAnimationFrame(() => {
-      scrollFrameRef.current = null;
-      const row = Math.floor(
-        latestScrollTopRef.current / Math.max(1, cellSizeRef.current),
-      );
-      setScrollTopRow((current) => (current === row ? current : row));
-    });
-  }, []);
+      scrollFrameRef.current = requestAnimationFrame(() => {
+        scrollFrameRef.current = null;
+        const row = Math.floor(
+          latestScrollTopRef.current / Math.max(1, cellSizeRef.current),
+        );
+        setScrollTopRow((current) => (current === row ? current : row));
+      });
+    },
+    [syncCompactHeaderVisibility],
+  );
 
   useEffect(
     () => () => {
