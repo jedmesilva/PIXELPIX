@@ -1295,6 +1295,12 @@ function PixelGrid() {
           const selected = id === selectedId;
           const iconSize = Math.min(cellSize * 0.42, 16);
           const emojiSize = Math.min(cellSize * 0.55, 20);
+          const isReserved = pixel.status === "reserved";
+          const statusLabel = pixel.revealed
+            ? "revelado"
+            : isReserved
+              ? "reservado"
+              : "disponível";
 
           return (
             <button
@@ -1311,11 +1317,10 @@ function PixelGrid() {
                 left: col * cellSize,
                 width: cellSize,
                 height: cellSize,
-                background: pixel.revealed
-                  ? pixel.backgroundColor ?? undefined
-                  : pixel.backgroundColor
+                background:
+                  isReserved && pixel.backgroundColor
                     ? `repeating-linear-gradient(45deg, ${pixel.backgroundColor}, ${pixel.backgroundColor} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
-                    : undefined,
+                    : pixel.backgroundColor ?? undefined,
               }}
               onClick={() => {
                 setSelectedId(id);
@@ -1327,8 +1332,8 @@ function PixelGrid() {
               disabled={false}
               aria-label={
                 pixel.revealed
-                  ? `Pixel ${id}, revelado, ${pixel.emoji}`
-                  : `Pixel ${id}, não revelado`
+                  ? `Pixel ${id}, ${statusLabel}, ${pixel.emoji}`
+                  : `Pixel ${id}, ${statusLabel}`
               }
             >
               {pixel.revealed || pixel.emoji === "💰" ? (
