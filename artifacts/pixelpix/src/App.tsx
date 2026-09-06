@@ -863,7 +863,7 @@ function PixelSheet({
                       {String(secondsRemaining % 60).padStart(2, "0")}
                     </div>
 
-                    {checkoutMode === "local" ? (
+                    {checkoutMode === "local" && (
                       <button
                         className="prototype-demo-button"
                         onClick={confirmDemoPayment}
@@ -873,11 +873,6 @@ function PixelSheet({
                           ? "Preparando seu certificado…"
                           : "(desenvolvimento) simular webhook confirmado"}
                       </button>
-                    ) : (
-                      <p className="prototype-checkout-note">
-                        Você pode manter esta tela aberta enquanto conclui o
-                        pagamento.
-                      </p>
                     )}
                   </>
                 )}

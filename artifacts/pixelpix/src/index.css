@@ -1175,13 +1175,6 @@ button:focus-visible {
   line-height: 1.4;
 }
 
-.prototype-checkout-note {
-  margin: 14px 0 0;
-  color: #697481;
-  font-size: 11px;
-  line-height: 1.45;
-}
-
 .prototype-spinner {
   animation: prototype-spin 1s linear infinite;
 }
