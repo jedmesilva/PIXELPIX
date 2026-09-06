@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 
 :root {
-  --pixelpix-page-bg: #0b0d10;
+  --pixelpix-page-bg: var(--pixelpix-surface);
   --pixelpix-surface: #14171b;
   --pixelpix-surface-raised: #171b20;
   --pixelpix-surface-strong: #20262d;
