@@ -1070,6 +1070,7 @@ function SocialProfileForm({
 
 function PixelGrid() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const gridCanvasRef = useRef<HTMLDivElement>(null);
   const compactHeaderRef = useRef<HTMLDivElement>(null);
   const expandedHeaderRef = useRef<HTMLDivElement>(null);
   const compactHeaderTriggerRef = useRef<HTMLDivElement>(null);
@@ -1102,16 +1103,21 @@ function PixelGrid() {
   }, [socialProfile]);
 
   useEffect(() => {
-    const element = containerRef.current;
-    if (!element) return;
+    const scrollArea = containerRef.current;
+    const gridCanvas = gridCanvasRef.current;
+    if (!scrollArea || !gridCanvas) return;
 
-    const observer = new ResizeObserver(([entry]) => {
+    const updateSize = () => {
       setContainerSize({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
+        width: gridCanvas.getBoundingClientRect().width,
+        height: scrollArea.clientHeight,
       });
-    });
-    observer.observe(element);
+    };
+
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(scrollArea);
+    observer.observe(gridCanvas);
+    updateSize();
     return () => observer.disconnect();
   }, []);
 
@@ -1562,67 +1568,74 @@ function PixelGrid() {
         </div>
       )}
 
-      <div
-        className="prototype-grid-canvas"
+      <section
+        className="prototype-grid-section"
         style={{ height: totalHeight }}
+        aria-label="Grade de pixels"
       >
-        {visiblePixels.map(({ id, row, col }) => {
-          const pixel = getPixel(id);
-          const chunkStatus = chunkStates.get(Math.floor(id / CHUNK_SIZE));
-          const isChunkFailed = chunkStatus === "error";
-          const selected = id === selectedId;
-          const iconSize = Math.min(cellSize * 0.42, 16);
-          const emojiSize = Math.min(cellSize * 0.55, 20);
-          const isReserved = pixel.status === "reserved";
-          const statusLabel = pixel.revealed
-            ? "revelado"
-            : isReserved
-              ? "reservado"
-              : "disponível";
+        <div
+          ref={gridCanvasRef}
+          className="prototype-grid-canvas"
+          style={{ height: totalHeight }}
+        >
+          {visiblePixels.map(({ id, row, col }) => {
+            const pixel = getPixel(id);
+            const chunkStatus = chunkStates.get(Math.floor(id / CHUNK_SIZE));
+            const isChunkFailed = chunkStatus === "error";
+            const selected = id === selectedId;
+            const iconSize = Math.min(cellSize * 0.42, 16);
+            const emojiSize = Math.min(cellSize * 0.55, 20);
+            const isReserved = pixel.status === "reserved";
+            const statusLabel = pixel.revealed
+              ? "revelado"
+              : isReserved
+                ? "reservado"
+                : "disponível";
 
-          return (
-            <button
-              key={id}
-              className={[
-                "prototype-cell",
-                selected ? "is-selected" : "",
-                isChunkFailed ? "is-error" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              style={{
-                top: row * cellSize,
-                left: col * cellSize,
-                width: cellSize,
-                height: cellSize,
-                background:
-                  isReserved && pixel.backgroundColor
-                    ? `repeating-linear-gradient(45deg, ${pixel.backgroundColor}, ${pixel.backgroundColor} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
-                    : pixel.backgroundColor ?? undefined,
-              }}
-              onClick={() => {
-                setSelectedId(id);
-              }}
-              onMouseEnter={() => setHoveredId(id)}
-              onMouseLeave={() =>
-                setHoveredId((current) => (current === id ? null : current))
-              }
-              disabled={false}
-              aria-label={
-                pixel.revealed
-                  ? `Pixel ${id}, ${statusLabel}, ${pixel.emoji}`
-                  : `Pixel ${id}, ${statusLabel}`
-              }
-            >
-              {pixel.revealed || pixel.emoji === "💰" ? (
-                <span style={{ fontSize: emojiSize }}>{pixel.emoji}</span>
-              ) : (
-                <Lock size={iconSize} color="rgba(255,255,255,.75)" />
-              )}
-            </button>
-          );
-        })}
-      </div>
+            return (
+              <button
+                key={id}
+                className={[
+                  "prototype-cell",
+                  selected ? "is-selected" : "",
+                  isChunkFailed ? "is-error" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                style={{
+                  top: row * cellSize,
+                  left: col * cellSize,
+                  width: cellSize,
+                  height: cellSize,
+                  background:
+                    isReserved && pixel.backgroundColor
+                      ? `repeating-linear-gradient(45deg, ${pixel.backgroundColor}, ${pixel.backgroundColor} 4px, rgba(0,0,0,.35) 4px, rgba(0,0,0,.35) 8px)`
+                      : pixel.backgroundColor ?? undefined,
+                }}
+                onClick={() => {
+                  setSelectedId(id);
+                }}
+                onMouseEnter={() => setHoveredId(id)}
+                onMouseLeave={() =>
+                  setHoveredId((current) => (current === id ? null : current))
+                }
+                disabled={false}
+                aria-label={
+                  pixel.revealed
+                    ? `Pixel ${id}, ${statusLabel}, ${pixel.emoji}`
+                    : `Pixel ${id}, ${statusLabel}`
+                }
+              >
+                {pixel.revealed || pixel.emoji === "💰" ? (
+                  <span style={{ fontSize: emojiSize }}>{pixel.emoji}</span>
+                ) : (
+                  <Lock size={iconSize} color="rgba(255,255,255,.75)" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {selected && (
         <PixelSheet

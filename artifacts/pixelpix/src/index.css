@@ -258,6 +258,11 @@ button:focus-visible {
   scrollbar-width: thin;
 }
 
+.prototype-grid-section {
+  width: 100%;
+  padding-inline: 24px;
+}
+
 .prototype-grid-canvas {
   position: relative;
   width: 100%;
@@ -1105,6 +1110,10 @@ button:focus-visible {
 
   .pixelpix-remaining-label {
     font-size: 12px;
+  }
+
+  .prototype-grid-section {
+    padding-inline: 16px;
   }
 
   .prototype-hover-badge {
