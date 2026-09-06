@@ -384,6 +384,7 @@ function PixelSheet({
   onClose,
   onReveal,
   onReserve,
+  canReserve = true,
   socialProfile,
   onSaveSocialProfile,
 }: {
@@ -395,6 +396,7 @@ function PixelSheet({
   onReserve: (
     id: number,
   ) => Promise<{ token: string; expiresAt: string }>;
+  canReserve?: boolean;
   socialProfile: SocialProfile;
   onSaveSocialProfile: (
     profile: SocialProfile,
@@ -411,6 +413,7 @@ function PixelSheet({
   const [receiptEmail, setReceiptEmail] = useState(getStoredReceiptEmail);
   const [receiptEmailError, setReceiptEmailError] = useState("");
   const [isSubmittingReveal, setIsSubmittingReveal] = useState(false);
+  const [reservationError, setReservationError] = useState("");
   const [copied, setCopied] = useState(false);
   const [reservationToken, setReservationToken] = useState("");
   const [reservationExpiresAt, setReservationExpiresAt] = useState<number | null>(null);
@@ -449,6 +452,7 @@ function PixelSheet({
     setCopied(false);
     setReceiptEmail(getStoredReceiptEmail());
     setReceiptEmailError("");
+    setReservationError("");
     setIsSubmittingReveal(false);
     setReservationToken("");
     setReservationExpiresAt(null);
@@ -1023,43 +1027,57 @@ function PixelSheet({
                 )}
 
                 {!pixel.revealed && !isReserved && (
-                  <button
-                    className="prototype-reveal-button"
-                    disabled={isSubmittingReveal}
-                    onClick={async () => {
-                      setReceiptEmail(getStoredReceiptEmail());
-                      setReceiptEmailError("");
-                      setIsSubmittingReveal(true);
-                      try {
-                        const reservation = await onReserve(pixel.id);
-                        setReservationToken(reservation.token);
-                        setReservationExpiresAt(
-                          new Date(reservation.expiresAt).getTime(),
-                        );
-                        setSecondsRemaining(
-                          Math.max(
-                            0,
-                            Math.ceil(
-                              (new Date(reservation.expiresAt).getTime() -
-                                Date.now()) /
-                                1000,
+                  <>
+                    {!canReserve && (
+                      <div className="prototype-reservation-error" role="status">
+                        Não foi possível carregar os dados desta área. Tente
+                        carregar as células novamente antes de reservar.
+                      </div>
+                    )}
+                    {reservationError && (
+                      <div className="prototype-reservation-error" role="alert">
+                        {reservationError}
+                      </div>
+                    )}
+                    <button
+                      className="prototype-reveal-button"
+                      disabled={isSubmittingReveal || !canReserve}
+                      onClick={async () => {
+                        setReceiptEmail(getStoredReceiptEmail());
+                        setReceiptEmailError("");
+                        setReservationError("");
+                        setIsSubmittingReveal(true);
+                        try {
+                          const reservation = await onReserve(pixel.id);
+                          setReservationToken(reservation.token);
+                          setReservationExpiresAt(
+                            new Date(reservation.expiresAt).getTime(),
+                          );
+                          setSecondsRemaining(
+                            Math.max(
+                              0,
+                              Math.ceil(
+                                (new Date(reservation.expiresAt).getTime() -
+                                  Date.now()) /
+                                  1000,
+                              ),
                             ),
-                          ),
-                        );
-                        setEmailPromptOpen(true);
-                      } catch (error) {
-                        setReceiptEmailError(
-                          error instanceof Error
-                            ? error.message
-                            : "Esta célula não está disponível.",
-                        );
-                      } finally {
-                        setIsSubmittingReveal(false);
-                      }
-                    }}
-                  >
-                    {isSubmittingReveal ? "Reservando…" : "Revelar pixel"}
-                  </button>
+                          );
+                          setEmailPromptOpen(true);
+                        } catch (error) {
+                          setReservationError(
+                            error instanceof Error
+                              ? error.message
+                              : "Esta célula não está disponível.",
+                          );
+                        } finally {
+                          setIsSubmittingReveal(false);
+                        }
+                      }}
+                    >
+                      {isSubmittingReveal ? "Reservando…" : "Revelar pixel"}
+                    </button>
+                  </>
                 )}
 
                 {pixel.revealed && (
@@ -1750,6 +1768,15 @@ function PixelGrid() {
   }, [selectedId]);
 
   const handleReserve = useCallback(async (id: number) => {
+    const chunkStatus = chunkStatesRef.current.get(
+      Math.floor(id / CHUNK_SIZE),
+    );
+    if (chunkStatus === "error") {
+      throw new Error(
+        "Não foi possível confirmar esta área. Carregue as células novamente.",
+      );
+    }
+
     const result = await fetchJson<{
       cellId: number;
       token: string;
@@ -1885,17 +1912,20 @@ function PixelGrid() {
                   background: pixelSurfaceBackground(pixel),
                 }}
                 onClick={() => {
+                  if (isChunkFailed) return;
                   setSelectedId(id);
                 }}
                 onMouseEnter={() => setHoveredId(id)}
                 onMouseLeave={() =>
                   setHoveredId((current) => (current === id ? null : current))
                 }
-                disabled={false}
+                disabled={isChunkFailed}
                 aria-label={
-                  pixel.revealed
-                    ? `Pixel ${id}, ${statusLabel}, ${pixel.emoji}`
-                    : `Pixel ${id}, ${statusLabel}`
+                  isChunkFailed
+                    ? `Pixel ${id}, área indisponível; carregue as células novamente`
+                    : pixel.revealed
+                      ? `Pixel ${id}, ${statusLabel}, ${pixel.emoji}`
+                      : `Pixel ${id}, ${statusLabel}`
                 }
               >
                 {pixel.revealed || pixel.emoji === "💰" ? (
@@ -1914,7 +1944,10 @@ function PixelGrid() {
           pixel={selected}
           onClose={() => setSelectedId(null)}
           onReveal={handleReveal}
-           onReserve={handleReserve}
+          onReserve={handleReserve}
+          canReserve={
+            chunkStates.get(Math.floor(selected.id / CHUNK_SIZE)) !== "error"
+          }
           socialProfile={socialProfile}
           onSaveSocialProfile={handleSaveSocialProfile}
         />
