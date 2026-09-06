@@ -1708,9 +1708,13 @@ function PixelPixHeader({
           </div>
 
           <div className="pixelpix-remaining-badge" aria-hidden="true">
-            <span className="pixelpix-remaining-dot" aria-hidden="true" />
-            <div className="pixelpix-remaining-copy">
+            <div className="pixelpix-remaining-dot-container">
+              <span className="pixelpix-remaining-dot" aria-hidden="true" />
+            </div>
+            <div className="pixelpix-remaining-amount-container">
               <span className="pixelpix-remaining-amount">{remainingAmount}</span>
+            </div>
+            <div className="pixelpix-remaining-label-container">
               <span className="pixelpix-remaining-label">{remainingLabel}</span>
             </div>
           </div>
@@ -1726,13 +1730,13 @@ function PixelPixHeader({
         <p className="pixelpix-large-description">{totalDescription}</p>
 
         <div className="pixelpix-large-remaining">
-          <div className="pixelpix-large-remaining-dot-container">
+          <div className="pixelpix-remaining-dot-container pixelpix-large-remaining-dot-container">
             <span className="pixelpix-remaining-dot" aria-hidden="true" />
           </div>
-          <div className="pixelpix-large-remaining-amount-container">
+          <div className="pixelpix-remaining-amount-container">
             <span className="pixelpix-remaining-amount">{remainingAmount}</span>
           </div>
-          <div className="pixelpix-large-remaining-label-container">
+          <div className="pixelpix-remaining-label-container">
             <span className="pixelpix-remaining-label">{remainingLabel}</span>
           </div>
         </div>

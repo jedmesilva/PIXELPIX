@@ -151,9 +151,9 @@ button:focus-visible {
   background: var(--pixelpix-surface-raised);
 }
 
-.pixelpix-large-remaining-dot-container,
-.pixelpix-large-remaining-amount-container,
-.pixelpix-large-remaining-label-container {
+.pixelpix-remaining-dot-container,
+.pixelpix-remaining-amount-container,
+.pixelpix-remaining-label-container {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -214,7 +214,7 @@ button:focus-visible {
 .pixelpix-remaining-badge {
   display: flex;
   flex-shrink: 1;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   min-width: 0;
   padding: 6px 12px;
@@ -244,15 +244,6 @@ button:focus-visible {
 
 .pixelpix-compact-header .pixelpix-remaining-dot {
   margin-top: 4px;
-}
-
-.pixelpix-remaining-copy {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 8px;
-  color: var(--pixelpix-text-primary);
-  line-height: 1.15;
 }
 
 .pixelpix-remaining-amount,
@@ -1134,12 +1125,6 @@ button:focus-visible {
 
   .pixelpix-large-remaining {
     gap: 8px;
-  }
-
-  .pixelpix-remaining-copy {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 1px;
   }
 
   .pixelpix-remaining-label {
