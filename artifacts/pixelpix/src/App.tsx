@@ -665,7 +665,7 @@ function PixelSheet({
               </div>
 
               <div className="prototype-checkout-info">
-                 <div className="prototype-pix-label">Checkout Pix seguro</div>
+                 <div className="prototype-pix-label">Chave copia e cola</div>
                 <div className="prototype-pix-row">
                    <span className="prototype-pix-key">{checkoutReference}</span>
                   <button className="prototype-copy-button" onClick={copyPix}>
