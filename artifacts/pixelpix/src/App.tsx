@@ -894,8 +894,7 @@ function ReceiptEmailView({
       <div className="prototype-signature-title">
         <h2>Receba o certificado do seu pixel</h2>
         <p>
-          Informe seu e-mail para receber o certificado do pixel que você está
-          revelando.
+          Informe seu e-mail para receber o certificado deste pixel.
         </p>
       </div>
 
