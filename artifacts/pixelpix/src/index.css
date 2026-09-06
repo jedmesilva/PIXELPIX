@@ -185,6 +185,11 @@ button:focus-visible {
   box-sizing: border-box;
 }
 
+.pixelpix-large-remaining .pixelpix-remaining-dot-container {
+  align-items: flex-start;
+  justify-content: center;
+}
+
 .pixelpix-large-remaining
   .pixelpix-remaining-amount-container,
 .pixelpix-large-remaining
