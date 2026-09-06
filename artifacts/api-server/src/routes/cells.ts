@@ -574,15 +574,19 @@ router.post("/cells/email", async (request, response) => {
     // The reservation row stays locked until COMMIT. Concurrent retries
     // serialize here and observe the pending checkout created by the winner.
     const existing = await client.query(
-      `SELECT checkout_url, amount_cents, currency FROM payments
+      `SELECT provider_payment_id, checkout_url, amount_cents, currency
+         FROM payments
        WHERE cell_id = $1 AND status = 'pending'
        ORDER BY created_at DESC LIMIT 1`,
       [cellId],
     );
     if (existing.rows[0]) {
+      const existingPaymentId = String(existing.rows[0].provider_payment_id);
       await client.query("COMMIT");
       response.json({
         checkoutUrl: existing.rows[0].checkout_url,
+        paymentId: existingPaymentId,
+        mode: existingPaymentId.startsWith("local_") ? "local" : "efi",
         amountCents: Number(existing.rows[0].amount_cents),
         currency: existing.rows[0].currency,
       });
