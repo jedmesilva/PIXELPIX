@@ -417,6 +417,7 @@ components:
         emoji: { type: string }
         backgroundColor: { type: string }
         expiresAt: { type: ["string", "null"], format: date-time }
+        reservationOwned: { type: boolean }
         prizeValueCents: { type: integer, minimum: 0 }
         prizeLabel: { type: ["string", "null"] }
         revealedBy: { type: ["string", "null"] }
@@ -424,7 +425,7 @@ components:
           oneOf:
             - { $ref: "#/components/schemas/PublicSignature" }
             - { type: "null" }
-      required: [id, status, emoji, backgroundColor, expiresAt]
+      required: [id, status, emoji, backgroundColor, expiresAt, reservationOwned]
     PublicSignature:
       type: object
       properties:

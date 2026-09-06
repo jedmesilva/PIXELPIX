@@ -347,6 +347,17 @@ button:focus-visible {
   font-size: 12px;
 }
 
+.prototype-reserved-countdown {
+  color: #f0c674;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.prototype-reserved-message .prototype-reveal-button {
+  margin-top: 4px;
+}
+
 .prototype-revealed-by {
   display: flex;
   align-items: center;

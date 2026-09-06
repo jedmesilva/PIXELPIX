@@ -68,6 +68,7 @@ export interface CellDetail {
   backgroundColor: string;
   /** @nullable */
   expiresAt: string | null;
+  reservationOwned: boolean;
   /** @minimum 0 */
   prizeValueCents?: number;
   /** @nullable */

@@ -32,6 +32,7 @@ const CHUNK_SIZE = 10_000;
 const STARTING_PIXEL_PRICE = 1;
 const RECEIPT_EMAIL_STORAGE_KEY = "pixelpix-receipt-email";
 const SOCIAL_PROFILE_STORAGE_KEY = "pixelpix-social-profile";
+const RESERVATION_STORAGE_PREFIX = "pixelpix-reservation:";
 const CURRENT_USER_NICKNAME = "você";
 
 type Pixel = {
@@ -42,6 +43,7 @@ type Pixel = {
   revealedBy: string | null;
   revealedAt: Date | null;
   reservedUntil: Date | null;
+  reservationOwned: boolean;
   prizeValueCents: number;
   prizeLabel: string | null;
   socialProfile: SocialProfile;
@@ -69,6 +71,7 @@ function emptyPixel(id: number): Pixel {
     revealedBy: null,
     revealedAt: null,
     reservedUntil: null,
+    reservationOwned: false,
     prizeValueCents: 0,
     prizeLabel: null,
     socialProfile: EMPTY_SOCIAL_PROFILE,
@@ -122,6 +125,7 @@ function revealPixelInCache(
   pixel.prizeLabel = prizeLabel;
   pixel.socialProfile = socialProfile;
   pixel.status = "paid";
+  pixel.reservationOwned = false;
   return pixel;
 }
 
@@ -132,6 +136,7 @@ function applyCellStatus(
     backgroundColor?: string | null;
     emoji?: string | null;
     expiresAt?: string | null;
+    reservationOwned?: boolean;
   },
 ) {
   const pixel = getPixel(id);
@@ -151,12 +156,64 @@ function applyCellStatus(
       : status === "reserved"
         ? pixel.reservedUntil
         : null;
+  if (visual?.reservationOwned !== undefined) {
+    pixel.reservationOwned = visual.reservationOwned;
+  } else if (status !== "reserved") {
+    pixel.reservationOwned = false;
+  }
   if (!pixel.revealed) {
     pixel.revealedBy = null;
     pixel.revealedAt = null;
     pixel.prizeValueCents = 0;
     pixel.prizeLabel = null;
     pixel.socialProfile = EMPTY_SOCIAL_PROFILE;
+  }
+}
+
+type StoredReservation = {
+  token: string;
+  expiresAt: string;
+};
+
+function reservationStorageKey(cellId: number) {
+  return `${RESERVATION_STORAGE_PREFIX}${cellId}`;
+}
+
+function getStoredReservation(cellId: number): StoredReservation | null {
+  try {
+    const raw = window.sessionStorage.getItem(reservationStorageKey(cellId));
+    if (!raw) return null;
+    const stored = JSON.parse(raw) as Partial<StoredReservation>;
+    if (
+      typeof stored.token !== "string" ||
+      typeof stored.expiresAt !== "string" ||
+      new Date(stored.expiresAt).getTime() <= Date.now()
+    ) {
+      window.sessionStorage.removeItem(reservationStorageKey(cellId));
+      return null;
+    }
+    return { token: stored.token, expiresAt: stored.expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+function storeReservation(cellId: number, reservation: StoredReservation) {
+  try {
+    window.sessionStorage.setItem(
+      reservationStorageKey(cellId),
+      JSON.stringify(reservation),
+    );
+  } catch {
+    // The server token remains authoritative if browser storage is unavailable.
+  }
+}
+
+function clearStoredReservation(cellId: number) {
+  try {
+    window.sessionStorage.removeItem(reservationStorageKey(cellId));
+  } catch {
+    // Ignore storage failures; the reservation will expire on the server.
   }
 }
 
@@ -352,6 +409,7 @@ function PixelSheet({
   const checkoutReference = checkoutUrl || "checkout ainda não criado";
   const [secondsRemaining, setSecondsRemaining] = useState(300);
   const isReserved = pixel.status === "reserved";
+  const isOwnedReservation = isReserved && pixel.reservationOwned;
   const remoteReservationExpiresAt = pixel.reservedUntil?.getTime() ?? null;
   const effectiveReservationExpiresAt =
     reservationExpiresAt ??
@@ -439,6 +497,25 @@ function PixelSheet({
 
   const displayedSignature = pixel.socialProfile;
   const hasSignature = Boolean(displayedSignature.handle);
+
+  const resumeReservation = () => {
+    const storedReservation = getStoredReservation(pixel.id);
+    if (!storedReservation || !isOwnedReservation) return;
+
+    setReservationToken(storedReservation.token);
+    setReservationExpiresAt(new Date(storedReservation.expiresAt).getTime());
+    setSecondsRemaining(
+      Math.max(
+        0,
+        Math.ceil(
+          (new Date(storedReservation.expiresAt).getTime() - Date.now()) / 1000,
+        ),
+      ),
+    );
+    setReceiptEmail(getStoredReceiptEmail());
+    setReceiptEmailError("");
+    setEmailPromptOpen(true);
+  };
 
   const confirmDemoPayment = async () => {
     const normalizedEmail = normalizeEmail(receiptEmail);
@@ -674,8 +751,30 @@ function PixelSheet({
               <div className="prototype-detail-actions">
                 {!pixel.revealed && isReserved && (
                   <div className="prototype-reserved-message" role="status">
-                    <strong>Esta célula está reservada temporariamente</strong>
-                    <span>Outra pessoa está concluindo a revelação.</span>
+                    <strong>
+                      {isOwnedReservation
+                        ? "Sua reserva está ativa"
+                        : "Esta célula está reservada temporariamente"}
+                    </strong>
+                    <span>
+                      {isOwnedReservation
+                        ? "Você pode continuar o processo de pagamento antes que o tempo termine."
+                        : "Outra pessoa está concluindo a revelação."}
+                    </span>
+                    <div className="prototype-reserved-countdown">
+                      {secondsRemaining > 0
+                        ? `Expira em ${Math.floor(secondsRemaining / 60)}:${String(secondsRemaining % 60).padStart(2, "0")}`
+                        : "Reserva expirada"}
+                    </div>
+                    {isOwnedReservation && (
+                      <button
+                        className="prototype-reveal-button"
+                        disabled={secondsRemaining <= 0}
+                        onClick={resumeReservation}
+                      >
+                        Retomar pagamento
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1031,6 +1130,9 @@ function PixelGrid() {
         if (!Number.isInteger(update.cellId)) return;
 
         const pixel = getPixel(update.cellId);
+        if (update.status !== "reserved") {
+          clearStoredReservation(update.cellId);
+        }
         applyCellStatus(update.cellId, update.status, {
           backgroundColor: update.backgroundColor,
           emoji: update.emoji,
@@ -1273,24 +1375,32 @@ function PixelGrid() {
 
   useEffect(() => {
     if (selectedId === null) return;
+    const storedReservation = getStoredReservation(selectedId);
     void fetchJson<{
       id: number;
       status: "available" | "reserved" | "paid";
       emoji: string;
       backgroundColor: string;
       expiresAt?: string | null;
+      reservationOwned: boolean;
       revealedBy?: string | null;
       revealedAt?: string | null;
       prizeValueCents?: number;
       prizeLabel?: string | null;
       signature?: { platform: SignatureNetwork; handle: string } | null;
-    }>(`/api/cells/${selectedId}`)
+    }>(
+      `/api/cells/${selectedId}`,
+      storedReservation
+        ? { headers: { "x-reservation-token": storedReservation.token } }
+        : undefined,
+    )
       .then((detail) => {
         const pixel = getPixel(selectedId);
         applyCellStatus(selectedId, detail.status, {
           backgroundColor: detail.backgroundColor,
           emoji: detail.emoji,
           expiresAt: detail.expiresAt,
+          reservationOwned: detail.reservationOwned,
         });
         if (detail.status === "paid") {
           pixel.revealedBy = detail.revealedBy ?? null;
@@ -1302,6 +1412,9 @@ function PixelGrid() {
           pixel.socialProfile = detail.signature
             ? { network: detail.signature.platform, handle: detail.signature.handle }
             : EMPTY_SOCIAL_PROFILE;
+        }
+        if (detail.status !== "reserved" || !detail.reservationOwned) {
+          clearStoredReservation(selectedId);
         }
         setRevealVersion((version) => version + 1);
       })
@@ -1320,12 +1433,20 @@ function PixelGrid() {
         body: JSON.stringify({ id, deviceId: getDeviceId() }),
       },
     );
-    applyCellStatus(id, "reserved", { expiresAt: result.expiresAt });
+    storeReservation(id, {
+      token: result.token,
+      expiresAt: result.expiresAt,
+    });
+    applyCellStatus(id, "reserved", {
+      expiresAt: result.expiresAt,
+      reservationOwned: true,
+    });
     setRevealVersion((version) => version + 1);
     return { token: result.token, expiresAt: result.expiresAt };
   }, []);
 
   const handleReveal = useCallback(async (receipt: ReceiptPayload) => {
+      clearStoredReservation(receipt.pixelId);
       revealPixelInCache(
         receipt.pixelId,
         receipt.emoji,

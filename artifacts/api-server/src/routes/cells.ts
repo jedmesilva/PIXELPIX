@@ -377,7 +377,7 @@ router.get("/cells/:id", async (request, response) => {
   }
   const result = await pool.query(
     `SELECT c.id, c.status, c.emoji, c.background_color, c.reserved_at,
-            c.revealed_by,
+            c.reservation_token, c.revealed_by,
             c.revealed_at, c.prize_value_cents,
             s.platform, s.handle, pp.label AS prize_label
        FROM cells c
@@ -389,6 +389,13 @@ router.get("/cells/:id", async (request, response) => {
     [id],
   );
   const cell = result.rows[0];
+  const requestReservationToken = parseToken(
+    request.header("x-reservation-token"),
+  );
+  const reservationOwned = Boolean(
+    requestReservationToken &&
+      String(cell?.reservation_token ?? "") === requestReservationToken,
+  );
   if (!cell) {
     response.status(503).json({ error: "Dados da célula indisponíveis" });
     return;
@@ -400,6 +407,7 @@ router.get("/cells/:id", async (request, response) => {
       emoji: cell.emoji,
       backgroundColor: cell.background_color,
       expiresAt: null,
+      reservationOwned: false,
     });
     return;
   }
@@ -415,6 +423,7 @@ router.get("/cells/:id", async (request, response) => {
               new Date(cell.reserved_at).getTime() + RESERVATION_TTL_MS,
             ).toISOString()
           : null,
+      reservationOwned,
     });
     return;
   }
@@ -424,6 +433,7 @@ router.get("/cells/:id", async (request, response) => {
     emoji: cell.emoji,
     backgroundColor: cell.background_color,
     expiresAt: null,
+    reservationOwned,
     revealedAt: cell.revealed_at,
     prizeValueCents: Number(cell.prize_value_cents ?? 0),
     prizeLabel: cell.prize_label ?? null,

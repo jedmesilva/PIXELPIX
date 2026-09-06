@@ -73,6 +73,7 @@ export const GetCellResponse = zod.object({
   "emoji": zod.string(),
   "backgroundColor": zod.string(),
   "expiresAt": zod.coerce.date().nullable(),
+  "reservationOwned": zod.boolean(),
   "prizeValueCents": zod.int().min(getCellResponsePrizeValueCentsMin).optional(),
   "prizeLabel": zod.string().nullish(),
   "revealedBy": zod.string().nullish(),
