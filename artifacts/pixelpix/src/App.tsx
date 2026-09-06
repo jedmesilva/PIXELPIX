@@ -1730,8 +1730,10 @@ function PixelPixHeader({
             className="pixelpix-remaining-dot pixelpix-large-remaining-dot"
             aria-hidden="true"
           />
-          <span className="pixelpix-remaining-amount">{remainingAmount}</span>
-          <span className="pixelpix-remaining-label">{remainingLabel}</span>
+          <div className="pixelpix-large-remaining-copy">
+            <span className="pixelpix-remaining-amount">{remainingAmount}</span>
+            <span className="pixelpix-remaining-label">{remainingLabel}</span>
+          </div>
         </div>
       </section>
 

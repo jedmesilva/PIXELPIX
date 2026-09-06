@@ -151,10 +151,19 @@ button:focus-visible {
 }
 
 .pixelpix-large-remaining .pixelpix-large-remaining-dot {
+  flex: 0 0 10px;
   align-self: center;
   width: 10px;
   height: 10px;
   margin-top: 0;
+}
+
+.pixelpix-large-remaining-copy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+  line-height: 1.15;
 }
 
 .pixelpix-large-remaining .pixelpix-remaining-amount {
@@ -1126,8 +1135,14 @@ button:focus-visible {
     row-gap: 2px;
   }
 
-  .pixelpix-large-remaining .pixelpix-remaining-dot {
+  .pixelpix-large-remaining .pixelpix-large-remaining-dot {
     margin-top: 4px;
+  }
+
+  .pixelpix-large-remaining-copy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1px;
   }
 
   .pixelpix-remaining-copy {
