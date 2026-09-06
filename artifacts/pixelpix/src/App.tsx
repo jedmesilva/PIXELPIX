@@ -24,7 +24,7 @@ const apiBaseUrl = (import.meta.env.VITE_API_URL ?? "")
 
 const TOTAL_PIXELS = 1_000_000;
 const LOGICAL_COLUMNS = 1_000;
-const MIN_CELL_PX = 34;
+const MIN_CELL_PX = 44;
 // A chunk of 10k cells keeps the request count low while remaining small
 // enough for a quick sparse response. Available cells are rendered locally.
 const CHUNK_SIZE = 10_000;
