@@ -1191,6 +1191,10 @@ button:focus-visible {
   line-height: 1.45;
 }
 
+.prototype-checkout-expired-full {
+  margin-top: 8px;
+}
+
 .prototype-checkout-expired strong:first-child {
   color: #f0a44b;
   font-size: 13px;

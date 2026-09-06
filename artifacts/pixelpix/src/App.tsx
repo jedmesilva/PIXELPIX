@@ -807,103 +807,103 @@ function PixelSheet({
                </button>
              </div>
 
-            <div className="prototype-checkout-layout">
-              <section className="prototype-payment-method prototype-qr-method">
-                <div className="prototype-payment-step">
-                  <span className="prototype-payment-step-number">1</span>
-                  <div>
-                    <strong>Leia o QR Code Pix</strong>
-                    <p>
-                      Abra o app do seu banco e aponte a câmera para o código.
-                    </p>
-                  </div>
-                </div>
-                <div className="prototype-qr-wrap">
-                  {checkoutMode === "efi" && checkoutQrDataUrl ? (
-                    <img
-                      className="prototype-qr"
-                      src={checkoutQrDataUrl}
-                      alt="QR Code para pagamento Pix"
-                    />
-                  ) : (
-                    <div className="prototype-qr prototype-qr-placeholder">
-                      PIX
-                    </div>
-                  )}
-                </div>
-                <span className="prototype-qr-caption">
-                  Confira o valor antes de confirmar
+            {checkoutExpired ? (
+              <div
+                className="prototype-checkout-expired prototype-checkout-expired-full"
+                role="status"
+              >
+                <strong>Reserva expirada</strong>
+                <span>
+                  O código Pix foi desativado. Tente reservar o pixel novamente
+                  para receber um novo código de pagamento.
                 </span>
-              </section>
-
-              <section className="prototype-payment-method prototype-copy-method">
-                <div className="prototype-payment-divider">
-                  <span>ou</span>
-                </div>
-                <div className="prototype-payment-step">
-                  <span className="prototype-payment-step-number">2</span>
-                  <div>
-                    <strong>Copie e cole a chave Pix</strong>
-                    <p>
-                      Copie o código abaixo e cole na opção Pix Copia e Cola do
-                      app do seu banco.
-                    </p>
+                <button
+                  className="prototype-social-primary"
+                  onClick={retryReservation}
+                  disabled={isSubmittingReveal}
+                >
+                  {isSubmittingReveal
+                    ? "Tentando reservar…"
+                    : "Tentar novamente"}
+                </button>
+                {receiptEmailError && <strong>{receiptEmailError}</strong>}
+              </div>
+            ) : (
+              <div className="prototype-checkout-layout">
+                <section className="prototype-payment-method prototype-qr-method">
+                  <div className="prototype-payment-step">
+                    <span className="prototype-payment-step-number">1</span>
+                    <div>
+                      <strong>Leia o QR Code Pix</strong>
+                      <p>
+                        Abra o app do seu banco e aponte a câmera para o código.
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="prototype-pix-row">
-                  <span className="prototype-pix-key">{checkoutReference}</span>
-                  <button
-                    className="prototype-copy-button"
-                    onClick={copyPix}
-                    disabled={checkoutExpired}
-                  >
-                    {copied ? <Check size={13} /> : <Copy size={13} />}
-                    {copied ? "Copiado" : "Copiar"}
-                  </button>
-                </div>
+                  <div className="prototype-qr-wrap">
+                    {checkoutMode === "efi" && checkoutQrDataUrl ? (
+                      <img
+                        className="prototype-qr"
+                        src={checkoutQrDataUrl}
+                        alt="QR Code para pagamento Pix"
+                      />
+                    ) : (
+                      <div className="prototype-qr prototype-qr-placeholder">
+                        PIX
+                      </div>
+                    )}
+                  </div>
+                  <span className="prototype-qr-caption">
+                    Confira o valor antes de confirmar
+                  </span>
+                </section>
 
-                {checkoutExpired ? (
-                  <div className="prototype-checkout-expired" role="status">
-                    <strong>Reserva expirada</strong>
-                    <span>
-                      O código PIX não está mais ativo. Tente novamente para
-                      verificar se este pixel ainda está disponível.
-                    </span>
+                <section className="prototype-payment-method prototype-copy-method">
+                  <div className="prototype-payment-divider">
+                    <span>ou</span>
+                  </div>
+                  <div className="prototype-payment-step">
+                    <span className="prototype-payment-step-number">2</span>
+                    <div>
+                      <strong>Copie e cole a chave Pix</strong>
+                      <p>
+                        Copie o código abaixo e cole na opção Pix Copia e Cola
+                        do app do seu banco.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="prototype-pix-row">
+                    <span className="prototype-pix-key">{checkoutReference}</span>
                     <button
-                      className="prototype-social-primary"
-                      onClick={retryReservation}
+                      className="prototype-copy-button"
+                      onClick={copyPix}
+                    >
+                      {copied ? <Check size={13} /> : <Copy size={13} />}
+                      {copied ? "Copiado" : "Copiar"}
+                    </button>
+                  </div>
+
+                  <div className="prototype-waiting">
+                    <Loader2 size={14} className="prototype-spinner" />
+                    Aguardando pagamento ·{" "}
+                    {Math.floor(secondsRemaining / 60)}:
+                    {String(secondsRemaining % 60).padStart(2, "0")}
+                  </div>
+
+                  {checkoutMode === "local" && (
+                    <button
+                      className="prototype-demo-button"
+                      onClick={confirmDemoPayment}
                       disabled={isSubmittingReveal}
                     >
                       {isSubmittingReveal
-                        ? "Tentando reservar…"
-                        : "Tentar novamente"}
+                        ? "Preparando seu certificado…"
+                        : "(desenvolvimento) simular webhook confirmado"}
                     </button>
-                    {receiptEmailError && <strong>{receiptEmailError}</strong>}
-                  </div>
-                ) : (
-                  <>
-                    <div className="prototype-waiting">
-                      <Loader2 size={14} className="prototype-spinner" />
-                      Aguardando pagamento ·{" "}
-                      {Math.floor(secondsRemaining / 60)}:
-                      {String(secondsRemaining % 60).padStart(2, "0")}
-                    </div>
-
-                    {checkoutMode === "local" && (
-                      <button
-                        className="prototype-demo-button"
-                        onClick={confirmDemoPayment}
-                        disabled={isSubmittingReveal}
-                      >
-                        {isSubmittingReveal
-                          ? "Preparando seu certificado…"
-                          : "(desenvolvimento) simular webhook confirmado"}
-                      </button>
-                    )}
-                  </>
-                )}
-              </section>
-            </div>
+                  )}
+                </section>
+              </div>
+            )}
           </>
         ) : emailPromptOpen ? (
           <ReceiptEmailView
