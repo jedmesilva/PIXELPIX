@@ -77,7 +77,7 @@ function generatedCellBackground(id: number) {
   // This mirrors the server's stable visual seed. Keeping it local means the
   // million-cell canvas never needs a million-row response just to paint locks.
   const hash = (id * 2_654_435_761) % 4_294_967_296;
-  const lightness = 14 + (hash % 1_000) / 100;
+  const lightness = hash % 2 === 0 ? 17 : 21;
   return `hsl(220, 8%, ${lightness}%)`;
 }
 
