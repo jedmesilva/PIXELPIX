@@ -874,10 +874,10 @@ function PixelSheet({
                           : "(desenvolvimento) simular webhook confirmado"}
                       </button>
                     ) : (
-                      <div className="prototype-waiting">
-                        Assim que a Efí confirmar o pagamento, o pixel será
-                        revelado automaticamente.
-                      </div>
+                      <p className="prototype-checkout-note">
+                        Você pode manter esta tela aberta enquanto conclui o
+                        pagamento.
+                      </p>
                     )}
                   </>
                 )}
