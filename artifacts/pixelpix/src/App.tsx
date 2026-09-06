@@ -1070,8 +1070,10 @@ function SocialProfileForm({
 
 function PixelGrid() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const largeHeaderRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [scrollTopRow, setScrollTopRow] = useState(0);
+  const [showCompactHeader, setShowCompactHeader] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [, setRevealVersion] = useState(0);
@@ -1107,6 +1109,29 @@ function PixelGrid() {
       });
     });
     observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const scrollArea = containerRef.current;
+    const largeHeader = largeHeaderRef.current;
+    if (
+      !scrollArea ||
+      !largeHeader ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowCompactHeader(
+          !entry.isIntersecting && entry.boundingClientRect.bottom <= 0,
+        );
+      },
+      { root: scrollArea, threshold: 0 },
+    );
+    observer.observe(largeHeader);
     return () => observer.disconnect();
   }, []);
 
@@ -1483,6 +1508,21 @@ function PixelGrid() {
       onScroll={handleScroll}
       aria-busy={isInitialLoading}
     >
+      <div ref={largeHeaderRef}>
+        <PixelPixHeader />
+      </div>
+      <div
+        className={[
+          "pixelpix-compact-header-shell",
+          showCompactHeader ? "is-visible" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        aria-hidden={!showCompactHeader}
+      >
+        <PixelPixHeaderCompact />
+      </div>
+
       {isInitialLoading && (
         <div className="prototype-load-status" role="status" aria-live="polite">
           <Loader2 size={14} className="prototype-spinner" />
@@ -1581,11 +1621,11 @@ function PixelGrid() {
   );
 }
 
-function PixelPixLogo() {
+function PixelPixLogo({ size = "compact" }: { size?: "compact" | "large" }) {
   return (
     <svg
       aria-hidden="true"
-      className="pixelpix-header-logo"
+      className={`pixelpix-header-logo is-${size}`}
       viewBox="0 0 149 200"
       fill="none"
     >
@@ -1599,6 +1639,36 @@ function PixelPixLogo() {
   );
 }
 
+function PixelPixHeader({
+  totalLabel = "R$ 1.000.000",
+  totalDescription = "escondidos em 1 milhão de pixels",
+  remainingAmount = "R$ 957.000,00",
+  remainingLabel = "ainda escondidos",
+}: {
+  totalLabel?: string;
+  totalDescription?: string;
+  remainingAmount?: string;
+  remainingLabel?: string;
+} = {}) {
+  return (
+    <section className="pixelpix-large-header" aria-label="Resumo do PIXELPIX">
+      <div className="pixelpix-large-brand">
+        <PixelPixLogo size="large" />
+        <span className="pixelpix-header-wordmark is-large">PIXELPIX</span>
+      </div>
+
+      <h1 className="pixelpix-large-title">{totalLabel}</h1>
+      <p className="pixelpix-large-description">{totalDescription}</p>
+
+      <div className="pixelpix-large-remaining">
+        <span className="pixelpix-remaining-dot" aria-hidden="true" />
+        <span className="pixelpix-remaining-amount">{remainingAmount}</span>
+        <span className="pixelpix-remaining-label">{remainingLabel}</span>
+      </div>
+    </section>
+  );
+}
+
 function PixelPixHeaderCompact({
   remainingAmount = "R$ 957.000,00",
   remainingLabel = "ainda escondidos",
@@ -1607,7 +1677,7 @@ function PixelPixHeaderCompact({
   remainingLabel?: string;
 } = {}) {
   return (
-    <header className="prototype-header">
+    <div className="pixelpix-compact-header">
       <div className="pixelpix-header-brand">
         <PixelPixLogo />
         <span className="pixelpix-header-wordmark">PIXELPIX</span>
@@ -1620,14 +1690,13 @@ function PixelPixHeaderCompact({
           <span className="pixelpix-remaining-label">{remainingLabel}</span>
         </div>
       </div>
-    </header>
+    </div>
   );
 }
 
 function Home() {
   return (
     <main className="prototype-page">
-      <PixelPixHeaderCompact />
       <PixelGrid />
     </main>
   );
