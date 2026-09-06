@@ -41,6 +41,7 @@ type Pixel = {
   emoji: string | null;
   revealedBy: string | null;
   revealedAt: Date | null;
+  reservedUntil: Date | null;
   prizeValueCents: number;
   prizeLabel: string | null;
   socialProfile: SocialProfile;
@@ -67,6 +68,7 @@ function emptyPixel(id: number): Pixel {
     emoji: null,
     revealedBy: null,
     revealedAt: null,
+    reservedUntil: null,
     prizeValueCents: 0,
     prizeLabel: null,
     socialProfile: EMPTY_SOCIAL_PROFILE,
@@ -115,6 +117,7 @@ function revealPixelInCache(
   pixel.backgroundColor = backgroundColor;
   pixel.revealedBy = revealedBy;
   pixel.revealedAt = revealedAt;
+  pixel.reservedUntil = null;
   pixel.prizeValueCents = prizeValueCents;
   pixel.prizeLabel = prizeLabel;
   pixel.socialProfile = socialProfile;
@@ -128,6 +131,7 @@ function applyCellStatus(
   visual?: {
     backgroundColor?: string | null;
     emoji?: string | null;
+    expiresAt?: string | null;
   },
 ) {
   const pixel = getPixel(id);
@@ -141,6 +145,12 @@ function applyCellStatus(
   }
   pixel.status = status;
   pixel.revealed = status === "paid";
+  pixel.reservedUntil =
+    status === "reserved" && visual?.expiresAt
+      ? new Date(visual.expiresAt)
+      : status === "reserved"
+        ? pixel.reservedUntil
+        : null;
   if (!pixel.revealed) {
     pixel.revealedBy = null;
     pixel.revealedAt = null;
@@ -312,7 +322,9 @@ function PixelSheet({
   onReveal: (
     receipt: ReceiptPayload,
   ) => Promise<void>;
-  onReserve: (id: number) => Promise<string>;
+  onReserve: (
+    id: number,
+  ) => Promise<{ token: string; expiresAt: string }>;
   socialProfile: SocialProfile;
   onSaveSocialProfile: (
     profile: SocialProfile,
@@ -339,6 +351,11 @@ function PixelSheet({
   );
   const checkoutReference = checkoutUrl || "checkout ainda não criado";
   const [secondsRemaining, setSecondsRemaining] = useState(300);
+  const isReserved = pixel.status === "reserved";
+  const remoteReservationExpiresAt = pixel.reservedUntil?.getTime() ?? null;
+  const effectiveReservationExpiresAt =
+    reservationExpiresAt ??
+    (isReserved ? remoteReservationExpiresAt : null);
 
   const copyPix = useCallback(async () => {
     try {
@@ -366,16 +383,19 @@ function PixelSheet({
   }, [pixel.id]);
 
   useEffect(() => {
-    if (!reservationExpiresAt) return;
+    if (!effectiveReservationExpiresAt) return;
     const update = () => {
       setSecondsRemaining(
-        Math.max(0, Math.ceil((reservationExpiresAt - Date.now()) / 1000)),
+        Math.max(
+          0,
+          Math.ceil((effectiveReservationExpiresAt - Date.now()) / 1000),
+        ),
       );
     };
     update();
     const timer = window.setInterval(update, 1_000);
     return () => window.clearInterval(timer);
-  }, [reservationExpiresAt]);
+  }, [effectiveReservationExpiresAt]);
 
   useEffect(() => {
     if (pixel.revealed) {
@@ -419,7 +439,6 @@ function PixelSheet({
 
   const displayedSignature = pixel.socialProfile;
   const hasSignature = Boolean(displayedSignature.handle);
-  const isReserved = pixel.status === "reserved";
 
   const confirmDemoPayment = async () => {
     const normalizedEmail = normalizeEmail(receiptEmail);
@@ -669,10 +688,21 @@ function PixelSheet({
                       setReceiptEmailError("");
                       setIsSubmittingReveal(true);
                       try {
-                        const token = await onReserve(pixel.id);
-                        setReservationToken(token);
-                         setReservationExpiresAt(Date.now() + 5 * 60 * 1000);
-                         setSecondsRemaining(300);
+                        const reservation = await onReserve(pixel.id);
+                        setReservationToken(reservation.token);
+                        setReservationExpiresAt(
+                          new Date(reservation.expiresAt).getTime(),
+                        );
+                        setSecondsRemaining(
+                          Math.max(
+                            0,
+                            Math.ceil(
+                              (new Date(reservation.expiresAt).getTime() -
+                                Date.now()) /
+                                1000,
+                            ),
+                          ),
+                        );
                         setEmailPromptOpen(true);
                       } catch (error) {
                         setReceiptEmailError(
@@ -992,6 +1022,7 @@ function PixelGrid() {
           status: "available" | "reserved" | "paid";
           emoji?: string;
           backgroundColor?: string;
+          expiresAt?: string | null;
           revealedBy?: string | null;
           revealedAt?: string | null;
           prizeValueCents?: number;
@@ -1003,6 +1034,7 @@ function PixelGrid() {
         applyCellStatus(update.cellId, update.status, {
           backgroundColor: update.backgroundColor,
           emoji: update.emoji,
+          expiresAt: update.expiresAt,
         });
         if (update.status === "paid") {
           pixel.revealedBy = update.revealedBy ?? null;
@@ -1163,6 +1195,7 @@ function PixelGrid() {
           status: "available" | "reserved" | "paid";
           emoji: string;
           backgroundColor: string;
+          expiresAt?: string | null;
         }>
       >(`/api/cells?from=${from}&to=${to}`)
         .then((cells) => {
@@ -1170,6 +1203,7 @@ function PixelGrid() {
             applyCellStatus(cell.id, cell.status, {
               backgroundColor: cell.backgroundColor,
               emoji: cell.emoji,
+              expiresAt: cell.expiresAt,
             }),
           );
           updateChunkState(chunkId, "loaded");
@@ -1244,6 +1278,7 @@ function PixelGrid() {
       status: "available" | "reserved" | "paid";
       emoji: string;
       backgroundColor: string;
+      expiresAt?: string | null;
       revealedBy?: string | null;
       revealedAt?: string | null;
       prizeValueCents?: number;
@@ -1255,6 +1290,7 @@ function PixelGrid() {
         applyCellStatus(selectedId, detail.status, {
           backgroundColor: detail.backgroundColor,
           emoji: detail.emoji,
+          expiresAt: detail.expiresAt,
         });
         if (detail.status === "paid") {
           pixel.revealedBy = detail.revealedBy ?? null;
@@ -1273,16 +1309,20 @@ function PixelGrid() {
   }, [selectedId]);
 
   const handleReserve = useCallback(async (id: number) => {
-    const result = await fetchJson<{ cellId: number; token: string }>(
+    const result = await fetchJson<{
+      cellId: number;
+      token: string;
+      expiresAt: string;
+    }>(
       "/api/cells/reserve",
       {
         method: "POST",
         body: JSON.stringify({ id, deviceId: getDeviceId() }),
       },
     );
-    applyCellStatus(id, "reserved");
+    applyCellStatus(id, "reserved", { expiresAt: result.expiresAt });
     setRevealVersion((version) => version + 1);
-    return result.token;
+    return { token: result.token, expiresAt: result.expiresAt };
   }, []);
 
   const handleReveal = useCallback(async (receipt: ReceiptPayload) => {

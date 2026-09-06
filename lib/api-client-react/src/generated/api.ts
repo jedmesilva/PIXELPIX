@@ -309,6 +309,83 @@ export function useGetCell<TData = Awaited<ReturnType<typeof getCell>>, TError =
 
 
 
+export const getStreamCellEventsUrl = () => {
+
+
+
+
+  return `/api/cells/events`
+}
+
+/**
+ * @summary Stream public cell updates
+ */
+export const streamCellEvents = async ( options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getStreamCellEventsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getStreamCellEventsQueryKey = () => {
+    return [
+    `/api/cells/events`
+    ] as const;
+    }
+
+
+export const getStreamCellEventsQueryOptions = <TData = Awaited<ReturnType<typeof streamCellEvents>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamCellEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getStreamCellEventsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamCellEvents>>> = ({ signal }) => streamCellEvents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamCellEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type StreamCellEventsQueryResult = NonNullable<Awaited<ReturnType<typeof streamCellEvents>>>
+export type StreamCellEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Stream public cell updates
+ */
+
+export function useStreamCellEvents<TData = Awaited<ReturnType<typeof streamCellEvents>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamCellEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getStreamCellEventsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getReserveCellUrl = () => {
 
 

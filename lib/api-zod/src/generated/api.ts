@@ -42,7 +42,8 @@ export const ListCellsResponseItem = zod.object({
   "id": zod.int().min(listCellsResponseIdMin).max(listCellsResponseIdMax),
   "status": zod.enum(['available', 'reserved', 'paid']),
   "emoji": zod.string(),
-  "backgroundColor": zod.string()
+  "backgroundColor": zod.string(),
+  "expiresAt": zod.coerce.date().nullable()
 })
 export const ListCellsResponse = zod.array(ListCellsResponseItem)
 
@@ -71,6 +72,7 @@ export const GetCellResponse = zod.object({
   "status": zod.enum(['available', 'reserved', 'paid']),
   "emoji": zod.string(),
   "backgroundColor": zod.string(),
+  "expiresAt": zod.coerce.date().nullable(),
   "prizeValueCents": zod.int().min(getCellResponsePrizeValueCentsMin).optional(),
   "prizeLabel": zod.string().nullish(),
   "revealedBy": zod.string().nullish(),
@@ -79,6 +81,12 @@ export const GetCellResponse = zod.object({
   "handle": zod.string()
 }),zod.null()]).optional()
 })
+
+
+/**
+ * @summary Stream public cell updates
+ */
+export const StreamCellEventsResponse = zod.unknown()
 
 
 /**
@@ -105,7 +113,8 @@ export const reserveCellResponseCellIdMax = 999999;
 
 export const ReserveCellResponse = zod.object({
   "cellId": zod.int().min(reserveCellResponseCellIdMin).max(reserveCellResponseCellIdMax),
-  "token": zod.uuid()
+  "token": zod.uuid(),
+  "expiresAt": zod.coerce.date()
 })
 
 

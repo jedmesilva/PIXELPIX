@@ -17,6 +17,8 @@ export interface CellDetail {
   status: CellDetailStatus;
   emoji: string;
   backgroundColor: string;
+  /** @nullable */
+  expiresAt: Date | null;
   /** @minimum 0 */
   prizeValueCents?: number;
   /** @nullable */

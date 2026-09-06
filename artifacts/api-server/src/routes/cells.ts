@@ -330,7 +330,7 @@ router.get("/cells", async (request, response) => {
   }
 
   const rows = await pool.query(
-    `SELECT id, status, emoji, background_color
+    `SELECT id, status, emoji, background_color, reserved_at
        FROM cells
        WHERE id BETWEEN $1 AND $2
          AND (status <> 'available' OR emoji = '💰')
@@ -348,11 +348,18 @@ router.get("/cells", async (request, response) => {
         status: string;
         emoji: string;
         background_color: string;
+        reserved_at: Date | null;
       }) => ({
         id: row.id,
         status: publicStatus(row.status),
         emoji: row.emoji,
         backgroundColor: row.background_color,
+        expiresAt:
+          publicStatus(row.status) === "reserved" && row.reserved_at
+            ? new Date(
+                new Date(row.reserved_at).getTime() + RESERVATION_TTL_MS,
+              ).toISOString()
+            : null,
       }),
     ),
   );
@@ -369,7 +376,8 @@ router.get("/cells/:id", async (request, response) => {
     return;
   }
   const result = await pool.query(
-    `SELECT c.id, c.status, c.emoji, c.background_color, c.revealed_by,
+    `SELECT c.id, c.status, c.emoji, c.background_color, c.reserved_at,
+            c.revealed_by,
             c.revealed_at, c.prize_value_cents,
             s.platform, s.handle, pp.label AS prize_label
        FROM cells c
@@ -391,6 +399,7 @@ router.get("/cells/:id", async (request, response) => {
       status: "available",
       emoji: cell.emoji,
       backgroundColor: cell.background_color,
+      expiresAt: null,
     });
     return;
   }
@@ -400,6 +409,12 @@ router.get("/cells/:id", async (request, response) => {
       status: publicStatus(cell.status),
       emoji: cell.emoji,
       backgroundColor: cell.background_color,
+      expiresAt:
+        publicStatus(cell.status) === "reserved" && cell.reserved_at
+          ? new Date(
+              new Date(cell.reserved_at).getTime() + RESERVATION_TTL_MS,
+            ).toISOString()
+          : null,
     });
     return;
   }
@@ -408,6 +423,7 @@ router.get("/cells/:id", async (request, response) => {
     status: cell.status,
     emoji: cell.emoji,
     backgroundColor: cell.background_color,
+    expiresAt: null,
     revealedAt: cell.revealed_at,
     prizeValueCents: Number(cell.prize_value_cents ?? 0),
     prizeLabel: cell.prize_label ?? null,
@@ -463,7 +479,7 @@ router.post("/cells/reserve", async (request, response) => {
              revealed_by = NULL,
              certificate_sent_at = NULL
         WHERE cells.status IN ('available', 'expired')
-       RETURNING id, reservation_token`,
+       RETURNING id, reservation_token, reserved_at`,
       [id],
     );
     if (result.rows.length === 0) {
@@ -486,10 +502,16 @@ router.post("/cells/reserve", async (request, response) => {
       type: "cell.updated",
       cellId: result.rows[0].id,
       status: "reserved",
+      expiresAt: new Date(
+        new Date(result.rows[0].reserved_at).getTime() + RESERVATION_TTL_MS,
+      ).toISOString(),
     });
     response.json({
       cellId: result.rows[0].id,
       token: result.rows[0].reservation_token,
+      expiresAt: new Date(
+        new Date(result.rows[0].reserved_at).getTime() + RESERVATION_TTL_MS,
+      ).toISOString(),
     });
   } catch (error) {
     request.log?.error({ error }, "Could not reserve cell");
@@ -717,6 +739,7 @@ export async function expireReservations() {
       type: "cell.updated",
       cellId,
       status: "available",
+      expiresAt: null,
     });
   }
   pruneActiveReservations(Date.now());

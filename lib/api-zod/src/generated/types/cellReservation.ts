@@ -13,4 +13,5 @@ export interface CellReservation {
      */
   cellId: number;
   token: string;
+  expiresAt: Date;
 }

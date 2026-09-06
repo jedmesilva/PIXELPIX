@@ -78,6 +78,17 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /cells/events:
+    get:
+      operationId: streamCellEvents
+      tags: [cells]
+      summary: Stream public cell updates
+      responses:
+        "200":
+          description: Server-sent stream of changed cell states
+          content:
+            text/event-stream:
+              schema: { type: string }
   /cells/reserve:
     post:
       operationId: reserveCell
@@ -394,7 +405,8 @@ components:
           enum: [available, reserved, paid]
         emoji: { type: string }
         backgroundColor: { type: string }
-      required: [id, status, emoji, backgroundColor]
+        expiresAt: { type: ["string", "null"], format: date-time }
+      required: [id, status, emoji, backgroundColor, expiresAt]
     CellDetail:
       type: object
       properties:
@@ -404,6 +416,7 @@ components:
           enum: [available, reserved, paid]
         emoji: { type: string }
         backgroundColor: { type: string }
+        expiresAt: { type: ["string", "null"], format: date-time }
         prizeValueCents: { type: integer, minimum: 0 }
         prizeLabel: { type: ["string", "null"] }
         revealedBy: { type: ["string", "null"] }
@@ -411,7 +424,7 @@ components:
           oneOf:
             - { $ref: "#/components/schemas/PublicSignature" }
             - { type: "null" }
-      required: [id, status, emoji, backgroundColor]
+      required: [id, status, emoji, backgroundColor, expiresAt]
     PublicSignature:
       type: object
       properties:
@@ -430,7 +443,8 @@ components:
       properties:
         cellId: { type: integer, minimum: 0, maximum: 999999 }
         token: { type: string, format: uuid }
-      required: [cellId, token]
+        expiresAt: { type: string, format: date-time }
+      required: [cellId, token, expiresAt]
     CellEmailInput:
       type: object
       properties:

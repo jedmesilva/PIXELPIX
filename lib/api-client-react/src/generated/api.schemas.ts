@@ -31,6 +31,8 @@ export interface CellRangeItem {
   status: CellRangeItemStatus;
   emoji: string;
   backgroundColor: string;
+  /** @nullable */
+  expiresAt: string | null;
 }
 
 export type CellDetailStatus = typeof CellDetailStatus[keyof typeof CellDetailStatus];
@@ -64,6 +66,8 @@ export interface CellDetail {
   status: CellDetailStatus;
   emoji: string;
   backgroundColor: string;
+  /** @nullable */
+  expiresAt: string | null;
   /** @minimum 0 */
   prizeValueCents?: number;
   /** @nullable */
@@ -94,6 +98,7 @@ export interface CellReservation {
      */
   cellId: number;
   token: string;
+  expiresAt: string;
 }
 
 export interface CellEmailInput {

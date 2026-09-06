@@ -384,6 +384,7 @@ export async function processPaymentConfirmed(input: {
       status: "paid",
       emoji: String(cell?.emoji ?? "💰"),
       backgroundColor: String(cell?.background_color ?? "hsl(220, 8%, 19%)"),
+      expiresAt: null,
       revealedBy: cell?.revealed_by ? String(cell.revealed_by) : null,
       revealedAt: cell?.revealed_at
         ? new Date(cell.revealed_at).toISOString()

@@ -16,4 +16,6 @@ export interface CellRangeItem {
   status: CellRangeItemStatus;
   emoji: string;
   backgroundColor: string;
+  /** @nullable */
+  expiresAt: Date | null;
 }

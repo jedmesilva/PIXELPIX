@@ -8,6 +8,7 @@ export type CellUpdateEvent = {
   status: PublicCellStatus;
   emoji?: string;
   backgroundColor?: string;
+  expiresAt?: string | null;
   revealedBy?: string | null;
   revealedAt?: string | null;
   prizeValueCents?: number;
