@@ -9,6 +9,13 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface PublicStats {
+  /** @minimum 0 */
+  totalPrizeCents: number;
+  /** @minimum 0 */
+  remainingPrizeCents: number;
+}
+
 export interface ErrorResponse {
   error: string;
 }

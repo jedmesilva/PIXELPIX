@@ -3,11 +3,13 @@ import cellsRouter from "./cells";
 import healthRouter from "./health";
 import webhookRouter from "./webhook";
 import adminRouter from "./admin";
+import statsRouter from "./stats";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(cellsRouter);
+router.use(statsRouter);
 router.use(webhookRouter);
 // Keep administrative capabilities behind their own namespace and middleware.
 // The admin router only defines paths relative to /admin, so a new admin route

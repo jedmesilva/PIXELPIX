@@ -49,6 +49,11 @@ type Pixel = {
   status: "available" | "reserved" | "paid";
 };
 
+type PublicStats = {
+  totalPrizeCents: number;
+  remainingPrizeCents: number;
+};
+
 type SignatureNetwork = "instagram" | "x";
 
 type SocialProfile = {
@@ -1149,10 +1154,31 @@ function PixelGrid() {
       return EMPTY_SOCIAL_PROFILE;
     }
   });
+  const [publicStats, setPublicStats] = useState<PublicStats | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem(SOCIAL_PROFILE_STORAGE_KEY, JSON.stringify(socialProfile));
   }, [socialProfile]);
+
+  useEffect(() => {
+    let disposed = false;
+    const loadPublicStats = () => {
+      void fetchJson<PublicStats>("/api/stats")
+        .then((stats) => {
+          if (!disposed) setPublicStats(stats);
+        })
+        .catch(() => {
+          // Keep the last confirmed balance visible if a refresh is unavailable.
+        });
+    };
+
+    loadPublicStats();
+    const interval = window.setInterval(loadPublicStats, 5_000);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     const scrollArea = containerRef.current;
@@ -1604,6 +1630,16 @@ function PixelGrid() {
         compactHeaderRef={compactHeaderRef}
         expandedHeaderRef={expandedHeaderRef}
         compactHeaderTriggerRef={compactHeaderTriggerRef}
+        totalLabel={
+          publicStats
+            ? formatBRL(publicStats.totalPrizeCents / 100)
+            : "Carregando…"
+        }
+        remainingAmount={
+          publicStats
+            ? formatBRL(publicStats.remainingPrizeCents / 100)
+            : "Carregando…"
+        }
       />
 
       {isInitialLoading && (
@@ -1727,22 +1763,22 @@ function PixelPixLogo({ size = "compact" }: { size?: "compact" | "large" }) {
 }
 
 function PixelPixHeader({
-  totalLabel = "R$ 1.000.000",
+  totalLabel,
   totalDescription = "escondidos em 1 milhão de pixels",
-  remainingAmount = "R$ 957.000,00",
+  remainingAmount,
   remainingLabel = "ainda escondidos",
   compactHeaderRef,
   expandedHeaderRef,
   compactHeaderTriggerRef,
 }: {
-  totalLabel?: string;
+  totalLabel: string;
   totalDescription?: string;
-  remainingAmount?: string;
+  remainingAmount: string;
   remainingLabel?: string;
   compactHeaderRef?: React.RefObject<HTMLDivElement | null>;
   expandedHeaderRef?: React.RefObject<HTMLDivElement | null>;
   compactHeaderTriggerRef?: React.RefObject<HTMLDivElement | null>;
-} = {}) {
+}) {
   return (
     <>
       <div

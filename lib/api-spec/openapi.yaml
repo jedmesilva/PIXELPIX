@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: stats
+    description: Public prize balance
   - name: cells
     description: Sparse one-million-cell grid and reservation flow
   - name: payments
@@ -30,6 +32,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /stats:
+    get:
+      operationId: getPublicStats
+      tags: [stats]
+      summary: Read the public prize balance
+      responses:
+        "200":
+          description: Configured and remaining prize values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicStats"
   /cells:
     get:
       operationId: listCells
@@ -391,6 +405,12 @@ components:
           type: string
       required:
         - status
+    PublicStats:
+      type: object
+      properties:
+        totalPrizeCents: { type: integer, minimum: 0 }
+        remainingPrizeCents: { type: integer, minimum: 0 }
+      required: [totalPrizeCents, remainingPrizeCents]
     ErrorResponse:
       type: object
       properties:

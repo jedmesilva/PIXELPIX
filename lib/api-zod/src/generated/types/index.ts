@@ -42,5 +42,6 @@ export * from './paymentWebhookReference';
 export * from './paymentWebhookReferenciaExterna';
 export * from './publicSignature';
 export * from './publicSignaturePlatform';
+export * from './publicStats';
 export * from './signatureResponse';
 export * from './signatureResponseStatus';

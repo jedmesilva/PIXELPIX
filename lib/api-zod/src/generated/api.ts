@@ -18,6 +18,21 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Read the public prize balance
+ */
+export const getPublicStatsResponseTotalPrizeCentsMin = 0;
+
+export const getPublicStatsResponseRemainingPrizeCentsMin = 0;
+
+
+
+export const GetPublicStatsResponse = zod.object({
+  "totalPrizeCents": zod.int().min(getPublicStatsResponseTotalPrizeCentsMin),
+  "remainingPrizeCents": zod.int().min(getPublicStatsResponseRemainingPrizeCentsMin)
+})
+
+
+/**
  * @summary Read a range of cells
  */
 export const listCellsQueryFromMin = 0;
