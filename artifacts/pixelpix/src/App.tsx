@@ -755,15 +755,16 @@ function PixelSheet({
 
             <div className="prototype-checkout-title">
               <div className="prototype-eyebrow">PAGAMENTO VIA PIX</div>
-               <div className="prototype-price">
-                 {formatBRL(checkoutAmountCents / 100)}
-               </div>
-                <div className="prototype-subtle">
-                  Pixel #{pixel.id.toLocaleString("pt-BR")} ·{" "}
-                  {checkoutExpired
-                    ? "reserva expirada"
-                    : `reserva expira em ${String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:${String(secondsRemaining % 60).padStart(2, "0")}`}
-                </div>
+              <h2>Conclua o pagamento</h2>
+              <div className="prototype-price">
+                {formatBRL(checkoutAmountCents / 100)}
+              </div>
+              <div className="prototype-subtle">
+                Pixel #{pixel.id.toLocaleString("pt-BR")} ·{" "}
+                {checkoutExpired
+                  ? "reserva expirada"
+                  : `reserva expira em ${String(Math.floor(secondsRemaining / 60)).padStart(2, "0")}:${String(secondsRemaining % 60).padStart(2, "0")}`}
+              </div>
             </div>
 
              <div className="prototype-receipt-destination">
@@ -781,24 +782,50 @@ function PixelSheet({
              </div>
 
             <div className="prototype-checkout-layout">
-              <div className="prototype-qr-wrap">
-                {checkoutMode === "efi" && checkoutQrDataUrl ? (
-                  <img
-                    className="prototype-qr"
-                    src={checkoutQrDataUrl}
-                    alt="QR Code para pagamento Pix"
-                  />
-                ) : (
-                  <div className="prototype-qr prototype-qr-placeholder">
-                    PIX
+              <section className="prototype-payment-method prototype-qr-method">
+                <div className="prototype-payment-step">
+                  <span className="prototype-payment-step-number">1</span>
+                  <div>
+                    <strong>Leia o QR Code Pix</strong>
+                    <p>
+                      Abra o app do seu banco e aponte a câmera para o código.
+                    </p>
                   </div>
-                )}
-              </div>
+                </div>
+                <div className="prototype-qr-wrap">
+                  {checkoutMode === "efi" && checkoutQrDataUrl ? (
+                    <img
+                      className="prototype-qr"
+                      src={checkoutQrDataUrl}
+                      alt="QR Code para pagamento Pix"
+                    />
+                  ) : (
+                    <div className="prototype-qr prototype-qr-placeholder">
+                      PIX
+                    </div>
+                  )}
+                </div>
+                <span className="prototype-qr-caption">
+                  Confira o valor antes de confirmar
+                </span>
+              </section>
 
-              <div className="prototype-checkout-info">
-                 <div className="prototype-pix-label">Chave copia e cola</div>
+              <section className="prototype-payment-method prototype-copy-method">
+                <div className="prototype-payment-divider">
+                  <span>ou</span>
+                </div>
+                <div className="prototype-payment-step">
+                  <span className="prototype-payment-step-number">2</span>
+                  <div>
+                    <strong>Copie e cole a chave Pix</strong>
+                    <p>
+                      Copie o código abaixo e cole na opção Pix Copia e Cola do
+                      app do seu banco.
+                    </p>
+                  </div>
+                </div>
                 <div className="prototype-pix-row">
-                   <span className="prototype-pix-key">{checkoutReference}</span>
+                  <span className="prototype-pix-key">{checkoutReference}</span>
                   <button
                     className="prototype-copy-button"
                     onClick={copyPix}
@@ -854,7 +881,7 @@ function PixelSheet({
                     )}
                   </>
                 )}
-              </div>
+              </section>
             </div>
           </>
         ) : emailPromptOpen ? (

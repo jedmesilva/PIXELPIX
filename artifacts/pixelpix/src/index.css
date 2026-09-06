@@ -991,6 +991,14 @@ button:focus-visible {
   text-align: center;
 }
 
+.prototype-checkout-title h2 {
+  margin: 8px 0 0;
+  color: #e5e7eb;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
 .prototype-price {
   margin-top: 4px;
   color: #e5e7eb;
@@ -1003,6 +1011,46 @@ button:focus-visible {
   margin-top: 4px;
   color: #8b93a1;
   font-size: 12px;
+}
+
+.prototype-payment-method {
+  min-width: 0;
+}
+
+.prototype-payment-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.prototype-payment-step-number {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--pixelpix-brand) 55%, #1f2328);
+  border-radius: 50%;
+  color: var(--pixelpix-brand);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.prototype-payment-step strong {
+  display: block;
+  color: #e5e7eb;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.prototype-payment-step p {
+  max-width: 320px;
+  margin: 3px 0 0;
+  color: #8b93a1;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .prototype-qr-wrap {
@@ -1019,6 +1067,34 @@ button:focus-visible {
   width: 220px;
   height: 220px;
   border-radius: 4px;
+}
+
+.prototype-qr-caption {
+  display: block;
+  margin-top: 8px;
+  color: #697481;
+  font-size: 11px;
+  text-align: center;
+}
+
+.prototype-payment-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  color: #697481;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.prototype-payment-divider::before,
+.prototype-payment-divider::after {
+  height: 1px;
+  flex: 1;
+  background: #1f2328;
+  content: "";
 }
 
 .prototype-pix-label {
@@ -1038,6 +1114,10 @@ button:focus-visible {
   border: 1px solid #1f2328;
   border-radius: 10px;
   background: #0b0d10;
+}
+
+.prototype-copy-method .prototype-pix-row {
+  margin-top: 16px;
 }
 
 .prototype-pix-key {
@@ -1084,6 +1164,15 @@ button:focus-visible {
   margin-bottom: 4px;
   color: #8b93a1;
   font-size: 12px;
+}
+
+.prototype-copy-method > .prototype-waiting {
+  justify-content: flex-start;
+  padding: 10px 12px;
+  border: 1px solid #1f2328;
+  border-radius: 8px;
+  background: #101317;
+  line-height: 1.4;
 }
 
 .prototype-spinner {
@@ -1175,6 +1264,10 @@ button:focus-visible {
     text-align: left;
   }
 
+  .prototype-checkout-title h2 {
+    font-size: 26px;
+  }
+
   .prototype-price {
     font-size: 38px;
   }
@@ -1182,12 +1275,16 @@ button:focus-visible {
   .prototype-checkout-layout {
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr);
-    align-items: center;
+    align-items: start;
     gap: 28px;
   }
 
   .prototype-qr-wrap {
     margin: 0;
+  }
+
+  .prototype-payment-divider {
+    margin-top: 34px;
   }
 
   .prototype-checkout-info {
