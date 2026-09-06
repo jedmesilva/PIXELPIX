@@ -2,3 +2,4 @@
 - [PIXELPIX grid performance](pixelpix-grid-performance.md) — Paint stable available cells locally and fetch only occupied cells in large prefetched chunks.
 - [Prize value semantics](prize-value-semantics.md) — Planned value is nominal tier value; distributed value is dynamically released at discovery time.
 - [Supabase connection verification](supabase-connection.md) — Drizzle uses Supabase PostgreSQL and the API fails closed if the configured project or schema cannot be verified.
+- [PIXELPIX header behavior](pixelpix-header-behavior.md) — Use one sticky adaptive header; duplicate fixed and flow headers can visibly desynchronize during desktop scrolling.

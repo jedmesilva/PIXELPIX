@@ -1070,10 +1070,9 @@ function SocialProfileForm({
 
 function PixelGrid() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const largeHeaderRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [scrollTopRow, setScrollTopRow] = useState(0);
-  const [showCompactHeader, setShowCompactHeader] = useState(false);
+  const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [, setRevealVersion] = useState(0);
@@ -1111,37 +1110,6 @@ function PixelGrid() {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-
-  const syncCompactHeaderVisibility = useCallback(
-    (scrollArea: HTMLDivElement) => {
-      const largeHeader = largeHeaderRef.current;
-      if (!largeHeader) return;
-
-      const scrollAreaTop = scrollArea.getBoundingClientRect().top;
-      const largeHeaderBottom = largeHeader.getBoundingClientRect().bottom;
-      const shouldShowCompact = largeHeaderBottom <= scrollAreaTop;
-
-      setShowCompactHeader((current) =>
-        current === shouldShowCompact ? current : shouldShowCompact,
-      );
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const scrollArea = containerRef.current;
-    const largeHeader = largeHeaderRef.current;
-    if (!scrollArea || !largeHeader) {
-      return;
-    }
-
-    const sync = () => syncCompactHeaderVisibility(scrollArea);
-    sync();
-
-    const resizeObserver = new ResizeObserver(sync);
-    resizeObserver.observe(largeHeader);
-    return () => resizeObserver.disconnect();
-  }, [syncCompactHeaderVisibility]);
 
   useEffect(() => {
     if (typeof EventSource === "undefined") return;
@@ -1387,7 +1355,10 @@ function PixelGrid() {
   const handleScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
       const scrollArea = event.currentTarget;
-      syncCompactHeaderVisibility(scrollArea);
+      const shouldCompactHeader = scrollArea.scrollTop > 16;
+      setIsHeaderCompact((current) =>
+        current === shouldCompactHeader ? current : shouldCompactHeader,
+      );
       latestScrollTopRef.current = scrollArea.scrollTop;
       if (scrollFrameRef.current !== null) return;
 
@@ -1399,7 +1370,7 @@ function PixelGrid() {
         setScrollTopRow((current) => (current === row ? current : row));
       });
     },
-    [syncCompactHeaderVisibility],
+    [],
   );
 
   useEffect(
@@ -1521,20 +1492,7 @@ function PixelGrid() {
       onScroll={handleScroll}
       aria-busy={isInitialLoading}
     >
-      <div ref={largeHeaderRef}>
-        <PixelPixHeader />
-      </div>
-      <div
-        className={[
-          "pixelpix-compact-header-shell",
-          showCompactHeader ? "is-visible" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        aria-hidden={!showCompactHeader}
-      >
-        <PixelPixHeaderCompact />
-      </div>
+      <PixelPixHeader isCompact={isHeaderCompact} />
 
       {isInitialLoading && (
         <div className="prototype-load-status" role="status" aria-live="polite">
@@ -1657,53 +1615,52 @@ function PixelPixHeader({
   totalDescription = "escondidos em 1 milhão de pixels",
   remainingAmount = "R$ 957.000,00",
   remainingLabel = "ainda escondidos",
+  isCompact = false,
 }: {
   totalLabel?: string;
   totalDescription?: string;
   remainingAmount?: string;
   remainingLabel?: string;
+  isCompact?: boolean;
 } = {}) {
   return (
-    <section className="pixelpix-large-header" aria-label="Resumo do PIXELPIX">
-      <div className="pixelpix-large-brand">
-        <PixelPixLogo size="large" />
-        <span className="pixelpix-header-wordmark is-large">PIXELPIX</span>
-      </div>
+    <section
+      className={`pixelpix-large-header${isCompact ? " is-compact" : ""}`}
+      aria-label="Resumo do PIXELPIX"
+    >
+      {isCompact ? (
+        <div className="pixelpix-header-compact-content">
+          <div className="pixelpix-header-brand">
+            <PixelPixLogo />
+            <span className="pixelpix-header-wordmark">PIXELPIX</span>
+          </div>
 
-      <h1 className="pixelpix-large-title">{totalLabel}</h1>
-      <p className="pixelpix-large-description">{totalDescription}</p>
-
-      <div className="pixelpix-large-remaining">
-        <span className="pixelpix-remaining-dot" aria-hidden="true" />
-        <span className="pixelpix-remaining-amount">{remainingAmount}</span>
-        <span className="pixelpix-remaining-label">{remainingLabel}</span>
-      </div>
-    </section>
-  );
-}
-
-function PixelPixHeaderCompact({
-  remainingAmount = "R$ 957.000,00",
-  remainingLabel = "ainda escondidos",
-}: {
-  remainingAmount?: string;
-  remainingLabel?: string;
-} = {}) {
-  return (
-    <div className="pixelpix-compact-header">
-      <div className="pixelpix-header-brand">
-        <PixelPixLogo />
-        <span className="pixelpix-header-wordmark">PIXELPIX</span>
-      </div>
-
-      <div className="pixelpix-remaining-badge">
-        <span className="pixelpix-remaining-dot" aria-hidden="true" />
-        <div className="pixelpix-remaining-copy">
-          <span className="pixelpix-remaining-amount">{remainingAmount}</span>
-          <span className="pixelpix-remaining-label">{remainingLabel}</span>
+          <div className="pixelpix-remaining-badge">
+            <span className="pixelpix-remaining-dot" aria-hidden="true" />
+            <div className="pixelpix-remaining-copy">
+              <span className="pixelpix-remaining-amount">{remainingAmount}</span>
+              <span className="pixelpix-remaining-label">{remainingLabel}</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      ) : (
+        <>
+          <div className="pixelpix-large-brand">
+            <PixelPixLogo size="large" />
+            <span className="pixelpix-header-wordmark is-large">PIXELPIX</span>
+          </div>
+
+          <h1 className="pixelpix-large-title">{totalLabel}</h1>
+          <p className="pixelpix-large-description">{totalDescription}</p>
+
+          <div className="pixelpix-large-remaining">
+            <span className="pixelpix-remaining-dot" aria-hidden="true" />
+            <span className="pixelpix-remaining-amount">{remainingAmount}</span>
+            <span className="pixelpix-remaining-label">{remainingLabel}</span>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
