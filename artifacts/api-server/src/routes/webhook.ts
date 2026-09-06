@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { pool } from "@workspace/db";
 import { releaseActiveReservationByCell } from "./cells";
@@ -529,7 +529,7 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
   }
 });
 
-router.post("/webhook/efi", async (request, response) => {
+async function handleEfiWebhook(request: Request, response: Response) {
   const txids = Array.isArray(request.body?.pix)
     ? request.body.pix
         .map((item: unknown) =>
@@ -648,6 +648,11 @@ router.post("/webhook/efi", async (request, response) => {
     );
     response.status(500).send("Erro interno");
   }
-});
+}
+
+// The registered URL includes `ignorar=` so the provider keeps this exact
+// route. The /pix alias also accepts callbacks from an older registration.
+router.post("/webhook/efi", handleEfiWebhook);
+router.post("/webhook/efi/pix", handleEfiWebhook);
 
 export default router;

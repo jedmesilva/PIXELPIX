@@ -3,6 +3,11 @@ import { logger } from "./lib/logger";
 import { ensureCellRecords, expireReservations } from "./routes/cells";
 import { processPendingCertificates } from "./routes/webhook";
 import { pool, verifySupabaseConnection } from "@workspace/db";
+import {
+  isEfiConfigured,
+  isEfiWebhookRegistrationConfigured,
+  registerEfiWebhook,
+} from "./lib/efi";
 
 const rawPort = process.env["PORT"];
 
@@ -36,6 +41,14 @@ async function start() {
   `);
   await expireReservations();
   await processPendingCertificates();
+  if (isEfiConfigured() && isEfiWebhookRegistrationConfigured()) {
+    try {
+      await registerEfiWebhook();
+      logger.info("Efí Pix webhook registered");
+    } catch (error) {
+      logger.error({ err: error }, "Efí Pix webhook registration failed");
+    }
+  }
   setInterval(() => {
     void expireReservations().catch((error) =>
       logger.error({ error }, "Reservation expiration failed"),

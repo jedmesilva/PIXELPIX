@@ -8,6 +8,8 @@ import {
 import {
   createEfiTxid,
   createImmediateCharge,
+  EfiApiError,
+  EfiConfigurationError,
   isEfiConfigured,
 } from "../lib/efi";
 
@@ -641,6 +643,16 @@ router.post("/cells/email", async (request, response) => {
   } catch (error) {
     await client.query("ROLLBACK");
     request.log?.error({ error }, "Could not create checkout");
+    if (error instanceof EfiConfigurationError) {
+      response.status(503).json({ error: error.message });
+      return;
+    }
+    if (error instanceof EfiApiError) {
+      response.status(502).json({
+        error: `A Efí não aceitou a cobrança: ${error.message}`,
+      });
+      return;
+    }
     response.status(500).json({ error: "Não foi possível criar o checkout" });
   } finally {
     client.release();

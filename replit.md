@@ -15,6 +15,11 @@ PIXELPIX is an interactive grid of one million stable cells that users can reser
 - Required runtime: Supabase PostgreSQL via the configured `DATABASE_URL`
 - Supabase project credentials are configured as `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`
 - Optional webhook secret: `WEBHOOK_SECRET` for signed payment webhooks
+- Efí Pix uses the server-only variables `EFI_ENVIRONMENT`, `EFI_CLIENT_ID`,
+  `EFI_CLIENT_SECRET`, `EFI_CERTIFICATE_BASE64`, `EFI_PIX_KEY`, and
+  `EFI_WEBHOOK_TOKEN`. Set `EFI_WEBHOOK_URL` to a public HTTPS endpoint when
+  registering the webhook; the Efí callback also requires mTLS at the public
+  deployment edge.
 - Admin access: the separate `/admin/` console calls `/api/admin/*`, and every administrative request requires `ADMIN_ACCESS_KEY`. The current access-key flow is a bootstrap protection for the operations console, not a replacement for per-user admin authentication.
 
 ## Stack

@@ -10,6 +10,7 @@ import {
 import { ArrowLeft, Check, Copy, Loader2, Lock, Mail } from "lucide-react";
 import { FiInstagram } from "react-icons/fi";
 import { RiTwitterXFill } from "react-icons/ri";
+import QRCode from "qrcode";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -407,6 +408,7 @@ function PixelSheet({
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [checkoutPaymentId, setCheckoutPaymentId] = useState("");
   const [checkoutMode, setCheckoutMode] = useState<"efi" | "local">("local");
+  const [checkoutQrDataUrl, setCheckoutQrDataUrl] = useState("");
   const [checkoutAmountCents, setCheckoutAmountCents] = useState(
     STARTING_PIXEL_PRICE * 100,
   );
@@ -444,9 +446,40 @@ function PixelSheet({
     setCheckoutUrl("");
     setCheckoutPaymentId("");
     setCheckoutMode("local");
+    setCheckoutQrDataUrl("");
     setCheckoutAmountCents(STARTING_PIXEL_PRICE * 100);
     setSecondsRemaining(300);
   }, [pixel.id]);
+
+  useEffect(() => {
+    let active = true;
+    if (!checkoutOpen || checkoutMode !== "efi" || !checkoutUrl) {
+      setCheckoutQrDataUrl("");
+      return () => {
+        active = false;
+      };
+    }
+
+    void QRCode.toDataURL(checkoutUrl, {
+      width: 220,
+      margin: 1,
+      errorCorrectionLevel: "M",
+      color: {
+        dark: "#000000",
+        light: "#ffffff",
+      },
+    })
+      .then((dataUrl) => {
+        if (active) setCheckoutQrDataUrl(dataUrl);
+      })
+      .catch(() => {
+        if (active) setCheckoutQrDataUrl("");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [checkoutMode, checkoutOpen, checkoutUrl]);
 
   useEffect(() => {
     if (!effectiveReservationExpiresAt) return;
@@ -749,9 +782,17 @@ function PixelSheet({
 
             <div className="prototype-checkout-layout">
               <div className="prototype-qr-wrap">
-                 <div className="prototype-qr prototype-qr-placeholder">
-                   PIX
-                 </div>
+                {checkoutMode === "efi" && checkoutQrDataUrl ? (
+                  <img
+                    className="prototype-qr"
+                    src={checkoutQrDataUrl}
+                    alt="QR Code para pagamento Pix"
+                  />
+                ) : (
+                  <div className="prototype-qr prototype-qr-placeholder">
+                    PIX
+                  </div>
+                )}
               </div>
 
               <div className="prototype-checkout-info">

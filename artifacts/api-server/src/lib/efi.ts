@@ -15,6 +15,9 @@ type EfiConfig = {
 export type EfiCharge = {
   txid: string;
   status?: string;
+  calendario?: {
+    expiracao?: number;
+  };
   valor?: {
     original?: string;
   };
@@ -49,6 +52,14 @@ let cachedToken: {
 
 export function isEfiConfigured() {
   return Boolean(process.env.EFI_ENVIRONMENT?.trim());
+}
+
+export function isEfiWebhookRegistrationConfigured() {
+  return Boolean(
+    process.env.EFI_PIX_KEY?.trim() &&
+      process.env.EFI_WEBHOOK_URL?.trim() &&
+      process.env.EFI_WEBHOOK_TOKEN?.trim(),
+  );
 }
 
 export function createEfiTxid() {
@@ -263,4 +274,52 @@ export function getEfiCharge(txid: string) {
     `/v2/cob/${encodeURIComponent(txid)}`,
     { method: "GET" },
   );
+}
+
+function getConfiguredWebhookUrl() {
+  const configuredUrl = process.env.EFI_WEBHOOK_URL?.trim();
+  const hmac = process.env.EFI_WEBHOOK_TOKEN?.trim();
+  if (!configuredUrl || !hmac) {
+    throw new EfiConfigurationError(
+      "Configure EFI_WEBHOOK_URL e EFI_WEBHOOK_TOKEN para registrar o webhook Efí.",
+    );
+  }
+
+  let url: URL;
+  try {
+    url = new URL(configuredUrl);
+  } catch {
+    throw new EfiConfigurationError(
+      "EFI_WEBHOOK_URL deve ser uma URL HTTPS pública válida.",
+    );
+  }
+  if (url.protocol !== "https:") {
+    throw new EfiConfigurationError(
+      "EFI_WEBHOOK_URL deve usar HTTPS para atender ao requisito mTLS da Efí.",
+    );
+  }
+
+  // Efí normally appends /pix to the registered URL. `ignorar=` keeps the
+  // callback on the exact route exposed by this API.
+  url.searchParams.set("ignorar", "");
+  url.searchParams.set("hmac", hmac);
+  return url.toString();
+}
+
+export async function registerEfiWebhook() {
+  const pixKey = process.env.EFI_PIX_KEY?.trim();
+  if (!pixKey) {
+    throw new EfiConfigurationError(
+      "Configure EFI_PIX_KEY antes de registrar o webhook Efí.",
+    );
+  }
+
+  const result = await authenticatedRequest<unknown>(
+    `/v2/webhook/${encodeURIComponent(pixKey)}`,
+    {
+      method: "PUT",
+      body: { webhookUrl: getConfiguredWebhookUrl() },
+    },
+  );
+  return result;
 }
