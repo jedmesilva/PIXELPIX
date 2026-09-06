@@ -618,8 +618,6 @@ function PixelSheet({
         aria-label={`Detalhes do pixel ${pixel.id}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="prototype-drag-handle" />
-
         {checkoutOpen ? (
           <>
             <div className="prototype-sheet-header">

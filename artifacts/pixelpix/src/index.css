@@ -433,14 +433,6 @@ button:focus-visible {
   box-shadow: 0 -18px 55px rgba(0, 0, 0, 0.28);
 }
 
-.prototype-drag-handle {
-  width: 36px;
-  height: 4px;
-  margin: 0 auto 16px;
-  border-radius: 2px;
-  background: #2a2f36;
-}
-
 .prototype-sheet-header {
   display: flex;
   align-items: flex-start;
@@ -1055,10 +1047,6 @@ button:focus-visible {
     border-top-width: 2px;
     border-radius: 16px;
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
-  }
-
-  .prototype-drag-handle {
-    display: none;
   }
 
   .prototype-sheet-header {
