@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { randomUUID } from "node:crypto";
 import {
   GetAdminPrizePoolResponse,
   ListAdminPrizePositionsQueryParams,
@@ -14,6 +15,11 @@ import {
 } from "@workspace/api-zod";
 import { pool } from "@workspace/db";
 import { requireAdminAccess } from "../middlewares/require-admin-access";
+import {
+  hashCertificateToken,
+  verifyCertificateToken,
+} from "../lib/certificates";
+import { sendPixTransfer } from "../lib/efi";
 
 const router: IRouter = Router();
 
@@ -41,8 +47,17 @@ function mapRedemption(row: Record<string, unknown>) {
     rejectionReason: row.rejection_reason
       ? String(row.rejection_reason)
       : null,
+    tokenVerifiedAt: iso(row.token_verified_at),
+    approvedAmountCents:
+      row.approved_amount_cents == null ? null : Number(row.approved_amount_cents),
+    reviewedAt: iso(row.reviewed_at),
+    reviewedBy: row.reviewed_by ? String(row.reviewed_by) : null,
     cellStatus: row.cell_status ? String(row.cell_status) : null,
     paymentStatus: row.payment_status ? String(row.payment_status) : null,
+    payoutStatus: row.payout_status ? String(row.payout_status) : null,
+    payoutProviderReference: row.payout_provider_reference
+      ? String(row.payout_provider_reference)
+      : null,
   };
 }
 
@@ -58,7 +73,7 @@ router.get("/overview", async (_request, response): Promise<void> => {
       COALESCE((SELECT SUM(amount_cents) FROM cash_ledger WHERE entry_type = 'prize_payout'), 0) AS distributed_prize_cents,
       COALESCE((SELECT SUM(requested_amount_cents) FROM prize_redemption_requests WHERE status = 'paid'), 0) AS redeemed_prize_cents,
       COALESCE((SELECT SUM(total_value_cents) FROM prize_pool), 0) AS total_prize_to_distribute_cents,
-      COALESCE((SELECT SUM(requested_amount_cents) FROM prize_redemption_requests WHERE status IN ('pending', 'approved')), 0) AS pending_redemption_cents,
+      COALESCE((SELECT SUM(requested_amount_cents) FROM prize_redemption_requests WHERE status IN ('pending', 'approved', 'payment_pending')), 0) AS pending_redemption_cents,
       COALESCE((SELECT SUM(amount_cents) FROM cash_ledger WHERE entry_type = 'revenue'), 0) AS gross_revenue_cents,
       COALESCE((SELECT SUM(amount_cents) FROM cash_ledger WHERE entry_type = 'refund'), 0) AS refunds_cents,
       GREATEST(
@@ -128,9 +143,18 @@ router.get("/redemptions", async (request, response): Promise<void> => {
   params.push(limit ?? 50, offset ?? 0);
   const rows = await pool.query(
     `SELECT r.*, c.status AS cell_status, p.status AS payment_status
+            , payout.status AS payout_status
+            , COALESCE(payout.provider_transaction_id, payout.provider_end_to_end_id) AS payout_provider_reference
      FROM prize_redemption_requests r
      LEFT JOIN cells c ON c.id = r.cell_id
      LEFT JOIN payments p ON p.cell_id = r.cell_id AND p.status = 'confirmed'
+      LEFT JOIN LATERAL (
+        SELECT status, provider_transaction_id, provider_end_to_end_id
+          FROM prize_payouts
+         WHERE redemption_request_id = r.id
+         ORDER BY requested_at DESC
+         LIMIT 1
+      ) payout ON true
      ${where}
      ORDER BY r.requested_at DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -152,9 +176,18 @@ router.get("/redemptions/:id", async (request, response): Promise<void> => {
   }
   const result = await pool.query(
     `SELECT r.*, c.status AS cell_status, p.status AS payment_status
+            , payout.status AS payout_status
+            , COALESCE(payout.provider_transaction_id, payout.provider_end_to_end_id) AS payout_provider_reference
      FROM prize_redemption_requests r
      LEFT JOIN cells c ON c.id = r.cell_id
      LEFT JOIN payments p ON p.cell_id = r.cell_id AND p.status = 'confirmed'
+      LEFT JOIN LATERAL (
+        SELECT status, provider_transaction_id, provider_end_to_end_id
+          FROM prize_payouts
+         WHERE redemption_request_id = r.id
+         ORDER BY requested_at DESC
+         LIMIT 1
+      ) payout ON true
      WHERE r.id = $1`,
     [parsed.data.id],
   );
@@ -193,26 +226,53 @@ router.patch("/redemptions/:id", async (request, response): Promise<void> => {
     }
 
     const allowed =
-      (current.status === "pending" &&
-        ["approved", "rejected"].includes(body.data.status)) ||
-      (current.status === "approved" && body.data.status === "paid");
+      (["pending", "failed"].includes(current.status) &&
+        ["approved", "rejected"].includes(body.data.status));
     if (!allowed) {
       await client.query("ROLLBACK");
       response.status(400).json({ error: "Invalid redemption status transition" });
       return;
     }
 
-    // The access-key flow has one server-side identity. Never trust a
-    // browser-supplied actor header for the financial audit trail. A future
-    // session-based admin auth flow can replace this with the authenticated
-    // principal from the middleware.
     const processedBy = "admin-access-key";
+    if (body.data.status === "approved") {
+      const certificate = await client.query(
+        `SELECT pc.id, pc.cell_id, pc.certificate_code, pc.token_hash,
+                pc.prize_value_cents
+           FROM prize_certificates pc
+           INNER JOIN prize_redemption_requests r ON r.certificate_id = pc.id
+          WHERE r.id = $1
+          FOR UPDATE`,
+        [params.data.id],
+      );
+      const cert = certificate.rows[0];
+      const token = body.data.certificateToken?.trim() ?? "";
+      const payload = verifyCertificateToken(token);
+      if (
+        !cert ||
+        !payload ||
+        payload.certificateId !== String(cert.id) ||
+        payload.cellId !== Number(cert.cell_id) ||
+        payload.prizeValueCents !== Number(cert.prize_value_cents) ||
+        hashCertificateToken(token) !== String(cert.token_hash)
+      ) {
+        await client.query("ROLLBACK");
+        response.status(400).json({ error: "Token do certificado inválido." });
+        return;
+      }
+    }
     const updated = await client.query(
       `UPDATE prize_redemption_requests
        SET status = $1,
-           processed_at = CASE WHEN $1 IN ('paid', 'rejected') THEN NOW() ELSE processed_at END,
-           processed_by = CASE WHEN $1 IN ('paid', 'rejected') THEN $2 ELSE processed_by END,
-           rejection_reason = CASE WHEN $1 = 'rejected' THEN $3 ELSE NULL END
+           processed_at = CASE WHEN $1 = 'rejected' THEN NOW() ELSE processed_at END,
+           processed_by = CASE WHEN $1 = 'rejected' THEN $2 ELSE processed_by END,
+           rejection_reason = CASE WHEN $1 = 'rejected' THEN $3 ELSE NULL END,
+           approved_amount_cents = CASE
+             WHEN $1 = 'approved' THEN prize_value_cents
+             ELSE approved_amount_cents
+           END,
+           reviewed_at = NOW(),
+           reviewed_by = $2
        WHERE id = $4
        RETURNING *`,
       [
@@ -222,12 +282,33 @@ router.patch("/redemptions/:id", async (request, response): Promise<void> => {
         params.data.id,
       ],
     );
+    await client.query(
+      `INSERT INTO prize_redemption_audit
+         (redemption_request_id, from_status, to_status, actor, reason)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        params.data.id,
+        current.status,
+        body.data.status,
+        processedBy,
+        body.data.rejectionReason ?? "resgate aprovado para pagamento",
+      ],
+    );
     await client.query("COMMIT");
     const enriched = await pool.query(
       `SELECT r.*, c.status AS cell_status, p.status AS payment_status
+              , payout.status AS payout_status
+              , COALESCE(payout.provider_transaction_id, payout.provider_end_to_end_id) AS payout_provider_reference
        FROM prize_redemption_requests r
        LEFT JOIN cells c ON c.id = r.cell_id
        LEFT JOIN payments p ON p.cell_id = r.cell_id AND p.status = 'confirmed'
+       LEFT JOIN LATERAL (
+         SELECT status, provider_transaction_id, provider_end_to_end_id
+           FROM prize_payouts
+          WHERE redemption_request_id = r.id
+          ORDER BY requested_at DESC
+          LIMIT 1
+       ) payout ON true
        WHERE r.id = $1`,
       [params.data.id],
     );
@@ -242,6 +323,227 @@ router.patch("/redemptions/:id", async (request, response): Promise<void> => {
     client.release();
   }
 });
+
+router.post("/redemptions/:id/payout", async (request, response): Promise<void> => {
+  const params = GetAdminRedemptionParams.safeParse(request.params);
+  const token =
+    typeof request.body?.certificateToken === "string"
+      ? request.body.certificateToken.trim()
+      : "";
+  const confirmPixKey = request.body?.confirmPixKey === true;
+  if (!params.success || !token || !confirmPixKey) {
+    response.status(400).json({
+      error: "Confirme a chave Pix e informe o token do certificado.",
+    });
+    return;
+  }
+
+  const client = await pool.connect();
+  let payoutId = "";
+  let amountCents = 0;
+  let pixKey = "";
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `SELECT r.*, pc.id AS certificate_id, pc.token_hash,
+              pc.cell_id AS certificate_cell_id
+         FROM prize_redemption_requests r
+         INNER JOIN prize_certificates pc ON pc.id = r.certificate_id
+        WHERE r.id = $1
+        FOR UPDATE`,
+      [params.data.id],
+    );
+    const redemption = result.rows[0];
+    const payload = verifyCertificateToken(token);
+    if (
+      !redemption ||
+      !["approved", "failed"].includes(String(redemption.status)) ||
+      !payload ||
+      payload.certificateId !== String(redemption.certificate_id) ||
+      payload.cellId !== Number(redemption.certificate_cell_id) ||
+      payload.prizeValueCents !== Number(redemption.prize_value_cents) ||
+      hashCertificateToken(token) !== String(redemption.token_hash)
+    ) {
+      await client.query("ROLLBACK");
+      response.status(400).json({ error: "Resgate, token ou status inválido." });
+      return;
+    }
+
+    payoutId = randomUUID();
+    amountCents = Number(redemption.approved_amount_cents ?? redemption.prize_value_cents);
+    pixKey = String(redemption.pix_key);
+    const idempotencyKey = `prize-redemption-${params.data.id}-${payoutId}`;
+    await client.query(
+      `INSERT INTO prize_payouts
+         (id, redemption_request_id, idempotency_key, amount_cents, pix_key, created_by)
+       VALUES ($1, $2, $3, $4, $5, 'admin-access-key')`,
+      [payoutId, params.data.id, idempotencyKey, amountCents, pixKey],
+    );
+    await client.query(
+      `UPDATE prize_redemption_requests
+          SET status = 'payment_pending',
+              processed_at = NOW(),
+              processed_by = 'admin-access-key'
+        WHERE id = $1`,
+      [params.data.id],
+    );
+    await client.query(
+      `INSERT INTO prize_redemption_audit
+         (redemption_request_id, from_status, to_status, actor, reason, metadata)
+       VALUES ($1, 'approved', 'payment_pending', 'admin-access-key',
+               'transferência Pix enviada para a Efí', $2)`,
+      [params.data.id, JSON.stringify({ payoutId })],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    client.release();
+    request.log.error({ error }, "Prize payout preparation failed");
+    throw error;
+  }
+  client.release();
+
+  try {
+    const provider = await sendPixTransfer({
+      idEnvio: payoutId.replace(/-/g, "").slice(0, 32),
+      amountCents,
+      pixKey,
+      description: `PIXELPIX prêmio resgate #${params.data.id}`,
+    });
+    const providerReference = provider.e2eId ?? provider.endToEndId ?? null;
+    await pool.query(
+      `UPDATE prize_payouts
+          SET status = 'submitted',
+              provider_transaction_id = $1,
+              provider_end_to_end_id = $2,
+              provider_response = $3,
+              submitted_at = NOW()
+        WHERE id = $4`,
+      [
+        payoutId.replace(/-/g, "").slice(0, 32),
+        providerReference,
+        provider,
+        payoutId,
+      ],
+    );
+    response.status(202).json({
+      ok: true,
+      status: "payment_pending",
+      payoutId,
+      providerReference,
+    });
+  } catch (error) {
+    await pool.query(
+      `UPDATE prize_payouts
+          SET status = 'failed', failure_reason = $1, failed_at = NOW()
+        WHERE id = $2`,
+      [error instanceof Error ? error.message.slice(0, 500) : "provider_error", payoutId],
+    );
+    await pool.query(
+      `UPDATE prize_redemption_requests
+          SET status = 'failed'
+        WHERE id = $1 AND status = 'payment_pending'`,
+      [params.data.id],
+    );
+    request.log.error({ error, redemptionId: params.data.id }, "Prize payout failed");
+    response.status(502).json({ error: "A Efí não confirmou o envio do Pix." });
+  }
+});
+
+router.post(
+  "/redemptions/:id/payout/confirm",
+  async (request, response): Promise<void> => {
+    const params = GetAdminRedemptionParams.safeParse(request.params);
+    const token =
+      typeof request.body?.certificateToken === "string"
+        ? request.body.certificateToken.trim()
+        : "";
+    if (!params.success || !token) {
+      response.status(400).json({ error: "Token do certificado é obrigatório." });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query(
+        `SELECT r.*, pc.token_hash
+           FROM prize_redemption_requests r
+           INNER JOIN prize_certificates pc ON pc.id = r.certificate_id
+          WHERE r.id = $1
+          FOR UPDATE`,
+        [params.data.id],
+      );
+      const redemption = result.rows[0];
+      const payload = verifyCertificateToken(token);
+      if (
+        !redemption ||
+        String(redemption.status) !== "payment_pending" ||
+        !payload ||
+        payload.certificateId !== String(redemption.certificate_id) ||
+        payload.prizeValueCents !== Number(redemption.prize_value_cents) ||
+        hashCertificateToken(token) !== String(redemption.token_hash)
+      ) {
+        await client.query("ROLLBACK");
+        response.status(400).json({ error: "Pagamento, token ou status inválido." });
+        return;
+      }
+
+      const payout = await client.query(
+        `SELECT id, amount_cents FROM prize_payouts
+          WHERE redemption_request_id = $1 AND status IN ('submitted', 'created')
+          ORDER BY requested_at DESC LIMIT 1
+          FOR UPDATE`,
+        [params.data.id],
+      );
+      if (!payout.rows[0]) {
+        await client.query("ROLLBACK");
+        response.status(409).json({ error: "Nenhuma tentativa de pagamento aguardando confirmação." });
+        return;
+      }
+      const amount = Number(payout.rows[0].amount_cents);
+      await client.query(
+        `UPDATE prize_payouts
+            SET status = 'confirmed', confirmed_at = NOW()
+          WHERE id = $1`,
+        [payout.rows[0].id],
+      );
+      await client.query(
+        `UPDATE prize_redemption_requests
+            SET status = 'paid', processed_at = NOW(), processed_by = 'admin-access-key'
+          WHERE id = $1`,
+        [params.data.id],
+      );
+      await client.query(
+        `INSERT INTO cash_ledger (entry_type, cell_id, amount_cents)
+         VALUES ('prize_commitment_released', $1, $2)
+         ON CONFLICT (entry_type, cell_id) DO NOTHING`,
+        [redemption.cell_id, amount],
+      );
+      await client.query(
+        `INSERT INTO cash_ledger (entry_type, cell_id, amount_cents)
+         VALUES ('prize_payout', $1, $2)
+         ON CONFLICT (entry_type, cell_id) DO NOTHING`,
+        [redemption.cell_id, amount],
+      );
+      await client.query(
+        `INSERT INTO prize_redemption_audit
+           (redemption_request_id, from_status, to_status, actor, reason)
+         VALUES ($1, 'payment_pending', 'paid', 'admin-access-key',
+                 'pagamento Pix confirmado e auditado')`,
+        [params.data.id],
+      );
+      await client.query("COMMIT");
+      response.json({ ok: true, status: "paid", amountCents: amount });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      request.log.error({ error }, "Prize payout confirmation failed");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+);
 
 router.get("/prize-pool", async (_request, response): Promise<void> => {
   const [tiers, batch, safety] = await Promise.all([
@@ -277,8 +579,8 @@ router.get("/prize-pool", async (_request, response): Promise<void> => {
            wp.tier_id,
            COUNT(*) FILTER (WHERE r.status = 'paid')::int AS redeemed_positions,
            COALESCE(SUM(r.prize_value_cents) FILTER (WHERE r.status = 'paid'), 0)::int AS redeemed_value_cents,
-           COUNT(*) FILTER (WHERE r.status IN ('pending', 'approved'))::int AS pending_redemption_positions,
-           COALESCE(SUM(r.prize_value_cents) FILTER (WHERE r.status IN ('pending', 'approved')), 0)::int AS pending_redemption_value_cents,
+           COUNT(*) FILTER (WHERE r.status IN ('pending', 'approved', 'payment_pending'))::int AS pending_redemption_positions,
+           COALESCE(SUM(r.prize_value_cents) FILTER (WHERE r.status IN ('pending', 'approved', 'payment_pending')), 0)::int AS pending_redemption_value_cents,
            COUNT(*) FILTER (WHERE r.status = 'rejected')::int AS rejected_positions,
            COALESCE(SUM(r.prize_value_cents) FILTER (WHERE r.status = 'rejected'), 0)::int AS rejected_value_cents
          FROM prize_redemption_requests r

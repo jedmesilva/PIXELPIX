@@ -12,7 +12,9 @@ export type ListAdminRedemptionsStatus = typeof ListAdminRedemptionsStatus[keyof
 export const ListAdminRedemptionsStatus = {
   pending: 'pending',
   approved: 'approved',
+  payment_pending: 'payment_pending',
   paid: 'paid',
   rejected: 'rejected',
+  failed: 'failed',
   all: 'all',
 } as const;

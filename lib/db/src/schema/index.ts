@@ -199,11 +199,43 @@ export const cashLedger = pgTable(
     ),
     typeValues: check(
       "cash_ledger_entry_type_values",
-      sql`${table.entryType} IN ('revenue', 'prize_payout', 'refund')`,
+      sql`${table.entryType} IN ('revenue', 'prize_commitment', 'prize_commitment_released', 'prize_payout', 'refund')`,
     ),
     amountPositive: check(
       "cash_ledger_amount_positive",
       sql`${table.amountCents} > 0`,
+    ),
+  }),
+);
+
+export const prizeCertificates = pgTable(
+  "prize_certificates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    cellId: integer("cell_id").notNull().references(() => cells.id).unique(),
+    certificateCode: text("certificate_code").notNull().unique(),
+    tokenHash: text("token_hash").notNull().unique(),
+    tokenCiphertext: text("token_ciphertext").notNull(),
+    tokenIv: text("token_iv").notNull(),
+    tokenAuthTag: text("token_auth_tag").notNull(),
+    tokenKeyVersion: integer("token_key_version").notNull().default(1),
+    prizeValueCents: integer("prize_value_cents").notNull(),
+    email: text("email").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    status: text("status").notNull().default("issued"),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).defaultNow().notNull(),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => ({
+    statusIndex: index("idx_prize_certificates_status").on(table.status),
+    statusValues: check(
+      "prize_certificates_status_values",
+      sql`${table.status} IN ('issued', 'redeemed', 'revoked')`,
+    ),
+    valueNonNegative: check(
+      "prize_certificates_value_non_negative",
+      sql`${table.prizeValueCents} >= 0`,
     ),
   }),
 );
@@ -213,9 +245,10 @@ export const prizeRedemptionRequests = pgTable(
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     cellId: integer("cell_id").notNull().references(() => cells.id),
+    certificateId: uuid("certificate_id").notNull().references(() => prizeCertificates.id),
     email: text("email").notNull(),
     pixKey: text("pix_key").notNull(),
-    certificateCode: text("certificate_code").notNull().unique(),
+    certificateCode: text("certificate_code").notNull(),
     requestedAmountCents: integer("requested_amount_cents").notNull(),
     prizeValueCents: integer("prize_value_cents").notNull(),
     wonAt: timestamp("won_at", { withTimezone: true }).notNull(),
@@ -224,16 +257,24 @@ export const prizeRedemptionRequests = pgTable(
     processedAt: timestamp("processed_at", { withTimezone: true }),
     processedBy: text("processed_by"),
     rejectionReason: text("rejection_reason"),
+    tokenVerifiedAt: timestamp("token_verified_at", { withTimezone: true }),
+    submittedIp: inet("submitted_ip"),
+    submittedUserAgent: text("submitted_user_agent"),
+    approvedAmountCents: integer("approved_amount_cents"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: text("reviewed_by"),
   },
   (table) => ({
     cellId: index("idx_prize_redemptions_cell_id").on(table.cellId),
+    certificateId: index("idx_prize_redemptions_certificate_id").on(table.certificateId),
+    certificateCode: index("idx_prize_redemptions_certificate_code").on(table.certificateCode),
     statusRequested: index("idx_prize_redemptions_status_requested_at").on(
       table.status,
       table.requestedAt,
     ),
     statusValues: check(
       "prize_redemptions_status_values",
-      sql`${table.status} IN ('pending', 'approved', 'paid', 'rejected')`,
+      sql`${table.status} IN ('pending', 'approved', 'payment_pending', 'paid', 'rejected', 'failed')`,
     ),
     requestedAmountNonNegative: check(
       "prize_redemptions_requested_amount_non_negative",
@@ -242,6 +283,69 @@ export const prizeRedemptionRequests = pgTable(
     prizeValueNonNegative: check(
       "prize_redemptions_prize_value_non_negative",
       sql`${table.prizeValueCents} >= 0`,
+    ),
+  }),
+);
+
+export const prizePayouts = pgTable(
+  "prize_payouts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    redemptionRequestId: bigint("redemption_request_id", { mode: "number" })
+      .notNull()
+      .references(() => prizeRedemptionRequests.id),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    amountCents: integer("amount_cents").notNull(),
+    pixKey: text("pix_key").notNull(),
+    status: text("status").notNull().default("created"),
+    provider: text("provider").notNull().default("efi"),
+    providerTransactionId: text("provider_transaction_id"),
+    providerEndToEndId: text("provider_end_to_end_id"),
+    providerResponse: jsonb("provider_response"),
+    failureReason: text("failure_reason"),
+    createdBy: text("created_by").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+  },
+  (table) => ({
+    requestIndex: index("idx_prize_payouts_redemption_request").on(
+      table.redemptionRequestId,
+    ),
+    statusIndex: index("idx_prize_payouts_status_requested_at").on(
+      table.status,
+      table.requestedAt,
+    ),
+    statusValues: check(
+      "prize_payouts_status_values",
+      sql`${table.status} IN ('created', 'submitted', 'confirmed', 'failed')`,
+    ),
+    amountPositive: check(
+      "prize_payouts_amount_positive",
+      sql`${table.amountCents} > 0`,
+    ),
+  }),
+);
+
+export const prizeRedemptionAudit = pgTable(
+  "prize_redemption_audit",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    redemptionRequestId: bigint("redemption_request_id", { mode: "number" })
+      .notNull()
+      .references(() => prizeRedemptionRequests.id),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
+    actor: text("actor").notNull(),
+    reason: text("reason"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    requestCreated: index("idx_prize_redemption_audit_request_created").on(
+      table.redemptionRequestId,
+      table.createdAt,
     ),
   }),
 );

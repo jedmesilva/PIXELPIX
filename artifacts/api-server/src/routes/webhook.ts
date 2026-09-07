@@ -5,6 +5,8 @@ import { releaseActiveReservationByCell } from "./cells";
 import { logger } from "../lib/logger";
 import { broadcastCellUpdate } from "../lib/cell-events";
 import { getEfiCharge } from "../lib/efi";
+import { ensureCertificateForCell } from "../lib/certificates";
+import { confirmEfiPayout } from "../lib/payouts";
 
 const router: IRouter = Router();
 const MAX_DIRECT_ALERTS_PER_HOUR = 100;
@@ -81,6 +83,8 @@ async function calculateAvailableCash(client: { query: Function }) {
   const result = await client.query(
     `SELECT
        COALESCE(SUM(amount_cents) FILTER (WHERE entry_type = 'revenue'), 0)
+       - COALESCE(SUM(amount_cents) FILTER (WHERE entry_type = 'prize_commitment'), 0)
+       + COALESCE(SUM(amount_cents) FILTER (WHERE entry_type = 'prize_commitment_released'), 0)
        - COALESCE(SUM(amount_cents) FILTER (WHERE entry_type = 'prize_payout'), 0)
        - COALESCE(SUM(amount_cents) FILTER (WHERE entry_type = 'refund'), 0)
        AS balance_cents
@@ -125,6 +129,9 @@ async function sendCertificateEmail(input: {
   email: string;
   cellId: number;
   prizeValueCents: number;
+  certificateCode: string;
+  certificateToken: string;
+  issuedAt: string;
 }) {
   const deliveryUrl = process.env.CERTIFICATE_DELIVERY_URL;
   if (!deliveryUrl) {
@@ -142,10 +149,15 @@ async function sendCertificateEmail(input: {
     if (process.env.CERTIFICATE_DELIVERY_SECRET) {
       headers.Authorization = `Bearer ${process.env.CERTIFICATE_DELIVERY_SECRET}`;
     }
+    const redemptionUrl =
+      process.env.PUBLIC_APP_URL?.trim() || "https://pixelpix.com.br";
     const result = await fetch(deliveryUrl, {
       method: "POST",
       headers,
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        ...input,
+        redemptionUrl: `${redemptionUrl.replace(/\/+$/, "")}/resgatar?code=${encodeURIComponent(input.certificateCode)}#token=${encodeURIComponent(input.certificateToken)}`,
+      }),
     });
     if (!result.ok) {
       logger.warn(
@@ -162,6 +174,8 @@ async function sendCertificateEmail(input: {
 }
 
 export async function deliverCertificateForCell(cellId: number) {
+  const certificate = await ensureCertificateForCell(pool, cellId);
+  if (!certificate) return false;
   const claimed = await pool.query(
     `UPDATE cells
        SET certificate_attempts = certificate_attempts + 1,
@@ -184,6 +198,9 @@ export async function deliverCertificateForCell(cellId: number) {
     email: String(claimed.rows[0].email),
     cellId,
     prizeValueCents: Number(claimed.rows[0].prize_value_cents ?? 0),
+    certificateCode: certificate.certificateCode,
+    certificateToken: certificate.token,
+    issuedAt: certificate.issuedAt.toISOString(),
   });
   if (delivered) {
     await pool.query(
@@ -384,12 +401,13 @@ export async function processPaymentConfirmed(input: {
     );
     if (prize.releasedValueCents > 0) {
       await client.query(
-        `INSERT INTO cash_ledger (entry_type, cell_id, amount_cents)
-         VALUES ('prize_payout', $1, $2)
+       `INSERT INTO cash_ledger (entry_type, cell_id, amount_cents)
+          VALUES ('prize_commitment', $1, $2)
          ON CONFLICT (entry_type, cell_id) DO NOTHING`,
         [input.cellId, prize.releasedValueCents],
       );
     }
+    await ensureCertificateForCell(client, input.cellId);
     await client.query("COMMIT");
     releaseActiveReservationByCell(input.cellId);
     const updatedCell = await pool.query(
@@ -530,15 +548,15 @@ router.post("/webhook/payment-confirmed", async (request, response) => {
 });
 
 async function handleEfiWebhook(request: Request, response: Response) {
-  const txids = Array.isArray(request.body?.pix)
-    ? request.body.pix
-        .map((item: unknown) =>
-          item && typeof item === "object" && "txid" in item
-            ? item.txid
-            : null,
-        )
-        .filter((txid: unknown): txid is string => typeof txid === "string")
+  const pixItems: Array<Record<string, unknown>> = Array.isArray(request.body?.pix)
+    ? request.body.pix.filter(
+        (item: unknown): item is Record<string, unknown> =>
+          Boolean(item && typeof item === "object"),
+      )
     : [];
+  const txids = pixItems
+    .map((item) => item.txid)
+    .filter((txid): txid is string => typeof txid === "string");
   const firstPaymentId = txids[0] ?? "efi-webhook-test";
   const tokenValid = validEfiWebhookToken(request.query.hmac);
 
@@ -561,7 +579,35 @@ async function handleEfiWebhook(request: Request, response: Response) {
   }
 
   try {
-    for (const txid of txids) {
+    for (const pixItem of pixItems) {
+      const txid = typeof pixItem.txid === "string" ? pixItem.txid : null;
+      const endToEndId =
+        typeof pixItem.endToEndId === "string"
+          ? pixItem.endToEndId
+          : typeof pixItem.e2eId === "string"
+            ? pixItem.e2eId
+            : typeof pixItem.e2eid === "string"
+              ? pixItem.e2eid
+              : null;
+      const webhookReference = txid ?? endToEndId;
+      if (!webhookReference) continue;
+
+      const outgoingConfirmed = await confirmEfiPayout({
+        providerTransactionId: txid,
+        providerEndToEndId: endToEndId,
+        amountCents: centsFromAmount(pixItem.valor),
+      });
+      if (outgoingConfirmed) {
+        await safeRecordWebhookEvent(
+          webhookReference,
+          null,
+          request.body,
+          true,
+          "payout_confirmed",
+        );
+        continue;
+      }
+
       const paymentResult = await pool.query(
         `SELECT p.cell_id, p.amount_cents, p.status, p.external_reference,
                 c.reservation_token
@@ -573,7 +619,7 @@ async function handleEfiWebhook(request: Request, response: Response) {
       const payment = paymentResult.rows[0];
       if (!payment) {
         await safeRecordWebhookEvent(
-          txid,
+          webhookReference,
           null,
           request.body,
           true,
@@ -599,7 +645,7 @@ async function handleEfiWebhook(request: Request, response: Response) {
         !/^[0-9a-f-]{36}$/i.test(token)
       ) {
         await safeRecordWebhookEvent(
-          txid,
+          webhookReference,
           Number.isInteger(cellId) ? cellId : null,
           request.body,
           true,
@@ -608,6 +654,16 @@ async function handleEfiWebhook(request: Request, response: Response) {
         continue;
       }
 
+      if (!txid) {
+        await safeRecordWebhookEvent(
+          webhookReference,
+          null,
+          request.body,
+          true,
+          "invalid_reference",
+        );
+        continue;
+      }
       const charge = await getEfiCharge(txid);
       const chargedAmount = centsFromAmount(charge.valor?.original);
       if (

@@ -210,6 +210,62 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         "401": { description: Invalid HMAC signature }
         "500": { description: Provider should retry after an internal error }
+  /certificates/verify:
+    get:
+      operationId: verifyCertificate
+      tags: [redemptions]
+      summary: Validate a PIXELPIX certificate with its private token
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 80 }
+        - name: token
+          in: query
+          required: true
+          schema: { type: string, minLength: 32, maxLength: 4096 }
+      responses:
+        "200":
+          description: Valid certificate details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CertificateVerification" }
+        "400":
+          description: Missing certificate data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Invalid certificate
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /redemptions:
+    post:
+      operationId: createRedemption
+      tags: [redemptions]
+      summary: Create a prize redemption request from a verified certificate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RedemptionInput" }
+      responses:
+        "201":
+          description: Redemption request created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RedemptionCreated" }
+        "400":
+          description: Invalid certificate or redemption data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: A redemption is already in progress for the certificate
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /admin/overview:
     get:
       operationId: getAdminOverview
@@ -241,7 +297,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [pending, approved, paid, rejected, all]
+            enum: [pending, approved, payment_pending, paid, rejected, failed, all]
             default: all
         - name: search
           in: query
@@ -328,6 +384,73 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         "404":
           description: Redemption request not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/redemptions/{id}/payout:
+    post:
+      operationId: startAdminRedemptionPayout
+      tags: [admin]
+      summary: Start an Efí Pix payout for an approved redemption
+      security:
+        - AdminAccessKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPayoutInput" }
+      responses:
+        "202":
+          description: Pix transfer submitted and awaiting confirmation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPayoutResponse" }
+        "400":
+          description: Invalid payout request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "502":
+          description: Efí rejected the transfer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/redemptions/{id}/payout/confirm:
+    post:
+      operationId: confirmAdminRedemptionPayout
+      tags: [admin]
+      summary: Confirm a submitted prize payout and write the financial ledger
+      security:
+        - AdminAccessKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPayoutConfirmation" }
+      responses:
+        "200":
+          description: Payout confirmed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  status: { type: string, enum: [paid] }
+                  amountCents: { type: integer, minimum: 0 }
+                required: [ok, status, amountCents]
+        "400":
+          description: Invalid payout confirmation
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -560,13 +683,19 @@ components:
         wonAt: { type: string, format: date-time }
         status:
           type: string
-          enum: [pending, approved, paid, rejected]
+          enum: [pending, approved, payment_pending, paid, rejected, failed]
         requestedAt: { type: string, format: date-time }
         processedAt: { type: ["string", "null"], format: date-time }
         processedBy: { type: ["string", "null"] }
         rejectionReason: { type: ["string", "null"] }
         cellStatus: { type: ["string", "null"] }
         paymentStatus: { type: ["string", "null"] }
+        tokenVerifiedAt: { type: ["string", "null"], format: date-time }
+        approvedAmountCents: { type: ["integer", "null"], minimum: 0 }
+        reviewedAt: { type: ["string", "null"], format: date-time }
+        reviewedBy: { type: ["string", "null"] }
+        payoutStatus: { type: ["string", "null"] }
+        payoutProviderReference: { type: ["string", "null"] }
       required:
         - id
         - cellId
@@ -583,6 +712,12 @@ components:
         - rejectionReason
         - cellStatus
         - paymentStatus
+        - tokenVerifiedAt
+        - approvedAmountCents
+        - reviewedAt
+        - reviewedBy
+        - payoutStatus
+        - payoutProviderReference
     AdminRedemptionList:
       type: object
       properties:
@@ -596,9 +731,59 @@ components:
       properties:
         status:
           type: string
-          enum: [approved, paid, rejected]
+          enum: [approved, rejected]
         rejectionReason: { type: string, maxLength: 500 }
+        certificateToken: { type: string, minLength: 32, maxLength: 4096 }
       required: [status]
+    AdminPayoutInput:
+      type: object
+      properties:
+        certificateToken: { type: string, minLength: 32, maxLength: 4096 }
+        confirmPixKey: { type: boolean, const: true }
+      required: [certificateToken, confirmPixKey]
+    AdminPayoutResponse:
+      type: object
+      properties:
+        ok: { type: boolean }
+        status: { type: string, enum: [payment_pending] }
+        payoutId: { type: string, format: uuid }
+        providerReference: { type: ["string", "null"] }
+      required: [ok, status, payoutId, providerReference]
+    AdminPayoutConfirmation:
+      type: object
+      properties:
+        certificateToken: { type: string, minLength: 32, maxLength: 4096 }
+      required: [certificateToken]
+    CertificateVerification:
+      type: object
+      properties:
+        valid: { type: boolean, const: true }
+        certificateCode: { type: string }
+        cellId: { type: integer, minimum: 0, maximum: 999999 }
+        prizeValueCents: { type: integer, minimum: 0 }
+        email: { type: string }
+        issuedAt: { type: string, format: date-time }
+        status: { type: string, enum: [issued, redeemed, revoked] }
+        redemptionStatus: { type: ["string", "null"] }
+        canRedeem: { type: boolean }
+      required: [valid, certificateCode, cellId, prizeValueCents, email, issuedAt, status, redemptionStatus, canRedeem]
+    RedemptionInput:
+      type: object
+      properties:
+        certificateCode: { type: string, minLength: 8, maxLength: 80 }
+        token: { type: string, minLength: 32, maxLength: 4096 }
+        email: { type: string, format: email }
+        pixKey: { type: string, minLength: 1, maxLength: 120 }
+      required: [certificateCode, token, email, pixKey]
+    RedemptionCreated:
+      type: object
+      properties:
+        id: { type: integer, minimum: 1 }
+        status: { type: string, enum: [pending] }
+        certificateCode: { type: string }
+        prizeValueCents: { type: integer, minimum: 0 }
+        requestedAt: { type: string, format: date-time }
+      required: [id, status, certificateCode, prizeValueCents, requestedAt]
     AdminPrizeTier:
       type: object
       properties:

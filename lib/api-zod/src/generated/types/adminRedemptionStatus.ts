@@ -12,6 +12,8 @@ export type AdminRedemptionStatus = typeof AdminRedemptionStatus[keyof typeof Ad
 export const AdminRedemptionStatus = {
   pending: 'pending',
   approved: 'approved',
+  payment_pending: 'payment_pending',
   paid: 'paid',
   rejected: 'rejected',
+  failed: 'failed',
 } as const;

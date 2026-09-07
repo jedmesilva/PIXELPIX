@@ -88,7 +88,11 @@ export function AccessKeyPrompt({ onSaved, onCancel }: { onSaved: (key: string) 
   return <div className="key-prompt" data-testid="access-key-prompt">
     <div className="key-prompt-icon"><KeyRound size={19} /></div>
     <div className="min-w-0 flex-1"><div className="text-sm font-bold">Chave de acesso operacional</div><p className="mt-1 text-xs text-muted-foreground">A sessão é protegida e a chave fica apenas neste navegador.</p></div>
-    <div className="flex w-full gap-2 sm:w-auto"><input autoFocus type="password" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Chave de acesso" className="field min-w-0 flex-1 sm:w-48" data-testid="input-access-key" /><button className="button button-primary" disabled={!key.trim()} onClick={() => { saveAdminAccessKey(key.trim()); onSaved(key.trim()); }} data-testid="button-save-access-key">Entrar</button>{onCancel && <button className="button button-ghost" onClick={onCancel} aria-label="Fechar" data-testid="button-close-access-key"><X size={16} /></button>}</div>
+    <form className="flex w-full gap-2 sm:w-auto" onSubmit={(event) => { event.preventDefault(); if (!key.trim()) return; saveAdminAccessKey(key.trim()); onSaved(key.trim()); }}>
+      <input autoFocus autoComplete="off" type="password" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Chave de acesso" className="field min-w-0 flex-1 sm:w-48" data-testid="input-access-key" />
+      <button className="button button-primary" type="submit" disabled={!key.trim()} data-testid="button-save-access-key">Entrar</button>
+      {onCancel && <button className="button button-ghost" type="button" onClick={onCancel} aria-label="Fechar" data-testid="button-close-access-key"><X size={16} /></button>}
+    </form>
   </div>;
 }
 

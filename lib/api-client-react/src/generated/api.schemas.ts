@@ -218,8 +218,10 @@ export type AdminRedemptionStatus = typeof AdminRedemptionStatus[keyof typeof Ad
 export const AdminRedemptionStatus = {
   pending: 'pending',
   approved: 'approved',
+  payment_pending: 'payment_pending',
   paid: 'paid',
   rejected: 'rejected',
+  failed: 'failed',
 } as const;
 
 export interface AdminRedemption {
@@ -250,6 +252,21 @@ export interface AdminRedemption {
   cellStatus: string | null;
   /** @nullable */
   paymentStatus: string | null;
+  /** @nullable */
+  tokenVerifiedAt: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  approvedAmountCents: number | null;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  reviewedBy: string | null;
+  /** @nullable */
+  payoutStatus: string | null;
+  /** @nullable */
+  payoutProviderReference: string | null;
 }
 
 export interface AdminRedemptionList {
@@ -263,7 +280,6 @@ export type AdminRedemptionUpdateStatus = typeof AdminRedemptionUpdateStatus[key
 
 export const AdminRedemptionUpdateStatus = {
   approved: 'approved',
-  paid: 'paid',
   rejected: 'rejected',
 } as const;
 
@@ -271,6 +287,106 @@ export interface AdminRedemptionUpdate {
   status: AdminRedemptionUpdateStatus;
   /** @maxLength 500 */
   rejectionReason?: string;
+  /**
+     * @minLength 32
+     * @maxLength 4096
+     */
+  certificateToken?: string;
+}
+
+export interface AdminPayoutInput {
+  /**
+     * @minLength 32
+     * @maxLength 4096
+     */
+  certificateToken: string;
+  confirmPixKey: true;
+}
+
+export type AdminPayoutResponseStatus = typeof AdminPayoutResponseStatus[keyof typeof AdminPayoutResponseStatus];
+
+
+export const AdminPayoutResponseStatus = {
+  payment_pending: 'payment_pending',
+} as const;
+
+export interface AdminPayoutResponse {
+  ok: boolean;
+  status: AdminPayoutResponseStatus;
+  payoutId: string;
+  /** @nullable */
+  providerReference: string | null;
+}
+
+export interface AdminPayoutConfirmation {
+  /**
+     * @minLength 32
+     * @maxLength 4096
+     */
+  certificateToken: string;
+}
+
+export type CertificateVerificationStatus = typeof CertificateVerificationStatus[keyof typeof CertificateVerificationStatus];
+
+
+export const CertificateVerificationStatus = {
+  issued: 'issued',
+  redeemed: 'redeemed',
+  revoked: 'revoked',
+} as const;
+
+export interface CertificateVerification {
+  valid: true;
+  certificateCode: string;
+  /**
+     * @minimum 0
+     * @maximum 999999
+     */
+  cellId: number;
+  /** @minimum 0 */
+  prizeValueCents: number;
+  email: string;
+  issuedAt: string;
+  status: CertificateVerificationStatus;
+  /** @nullable */
+  redemptionStatus: string | null;
+  canRedeem: boolean;
+}
+
+export interface RedemptionInput {
+  /**
+     * @minLength 8
+     * @maxLength 80
+     */
+  certificateCode: string;
+  /**
+     * @minLength 32
+     * @maxLength 4096
+     */
+  token: string;
+  email: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  pixKey: string;
+}
+
+export type RedemptionCreatedStatus = typeof RedemptionCreatedStatus[keyof typeof RedemptionCreatedStatus];
+
+
+export const RedemptionCreatedStatus = {
+  pending: 'pending',
+} as const;
+
+export interface RedemptionCreated {
+  /** @minimum 1 */
+  id: number;
+  status: RedemptionCreatedStatus;
+  certificateCode: string;
+  /** @minimum 0 */
+  prizeValueCents: number;
+  requestedAt: string;
 }
 
 export interface AdminPrizeTier {
@@ -387,6 +503,19 @@ from: number;
 to: number;
 };
 
+export type VerifyCertificateParams = {
+/**
+ * @minLength 8
+ * @maxLength 80
+ */
+code: string;
+/**
+ * @minLength 32
+ * @maxLength 4096
+ */
+token: string;
+};
+
 export type ListAdminRedemptionsParams = {
 status?: ListAdminRedemptionsStatus;
 /**
@@ -410,10 +539,26 @@ export type ListAdminRedemptionsStatus = typeof ListAdminRedemptionsStatus[keyof
 export const ListAdminRedemptionsStatus = {
   pending: 'pending',
   approved: 'approved',
+  payment_pending: 'payment_pending',
   paid: 'paid',
   rejected: 'rejected',
+  failed: 'failed',
   all: 'all',
 } as const;
+
+export type ConfirmAdminRedemptionPayout200Status = typeof ConfirmAdminRedemptionPayout200Status[keyof typeof ConfirmAdminRedemptionPayout200Status];
+
+
+export const ConfirmAdminRedemptionPayout200Status = {
+  paid: 'paid',
+} as const;
+
+export type ConfirmAdminRedemptionPayout200 = {
+  ok: boolean;
+  status: ConfirmAdminRedemptionPayout200Status;
+  /** @minimum 0 */
+  amountCents: number;
+};
 
 export type ListAdminPrizePositionsParams = {
 status?: ListAdminPrizePositionsStatus;

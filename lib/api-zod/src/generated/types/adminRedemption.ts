@@ -35,4 +35,19 @@ export interface AdminRedemption {
   cellStatus: string | null;
   /** @nullable */
   paymentStatus: string | null;
+  /** @nullable */
+  tokenVerifiedAt: Date | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  approvedAmountCents: number | null;
+  /** @nullable */
+  reviewedAt: Date | null;
+  /** @nullable */
+  reviewedBy: string | null;
+  /** @nullable */
+  payoutStatus: string | null;
+  /** @nullable */
+  payoutProviderReference: string | null;
 }

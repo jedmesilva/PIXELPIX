@@ -21,6 +21,9 @@ import type {
 
 import type {
   AdminOverview,
+  AdminPayoutConfirmation,
+  AdminPayoutInput,
+  AdminPayoutResponse,
   AdminPrizePool,
   AdminPrizePositionList,
   AdminRedemption,
@@ -33,7 +36,9 @@ import type {
   CellReservation,
   CellReservationInput,
   CellSignatureInput,
+  CertificateVerification,
   CheckoutResponse,
+  ConfirmAdminRedemptionPayout200,
   ErrorResponse,
   HealthStatus,
   ListAdminPrizePositionsParams,
@@ -41,7 +46,10 @@ import type {
   ListCellsParams,
   PaymentWebhook,
   PublicStats,
-  SignatureResponse
+  RedemptionCreated,
+  RedemptionInput,
+  SignatureResponse,
+  VerifyCertificateParams
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -748,6 +756,161 @@ export const usePaymentConfirmedWebhook = <TError = ErrorType<ErrorResponse | vo
       return useMutation(getPaymentConfirmedWebhookMutationOptions(options));
     }
 
+export const getVerifyCertificateUrl = (params: VerifyCertificateParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/certificates/verify?${stringifiedParams}` : `/api/certificates/verify`
+}
+
+/**
+ * @summary Validate a PIXELPIX certificate with its private token
+ */
+export const verifyCertificate = async (params: VerifyCertificateParams, options?: Parameters<typeof customFetch>[1]): Promise<CertificateVerification> => {
+
+  return customFetch<CertificateVerification>(getVerifyCertificateUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyCertificateQueryKey = (params?: VerifyCertificateParams,) => {
+    return [
+    `/api/certificates/verify`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getVerifyCertificateQueryOptions = <TData = Awaited<ReturnType<typeof verifyCertificate>>, TError = ErrorType<ErrorResponse>>(params: VerifyCertificateParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyCertificate>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getVerifyCertificateQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifyCertificate>>> = ({ signal }) => verifyCertificate(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof verifyCertificate>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type VerifyCertificateQueryResult = NonNullable<Awaited<ReturnType<typeof verifyCertificate>>>
+export type VerifyCertificateQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Validate a PIXELPIX certificate with its private token
+ */
+
+export function useVerifyCertificate<TData = Awaited<ReturnType<typeof verifyCertificate>>, TError = ErrorType<ErrorResponse>>(
+ params: VerifyCertificateParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyCertificate>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getVerifyCertificateQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateRedemptionUrl = () => {
+
+
+
+
+  return `/api/redemptions`
+}
+
+/**
+ * @summary Create a prize redemption request from a verified certificate
+ */
+export const createRedemption = async (redemptionInput: RedemptionInput, options?: Parameters<typeof customFetch>[1]): Promise<RedemptionCreated> => {
+
+  return customFetch<RedemptionCreated>(getCreateRedemptionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(redemptionInput)
+  }
+);}
+
+
+
+
+
+export const getCreateRedemptionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRedemption>>, TError,{data: BodyType<RedemptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRedemption>>, TError,{data: BodyType<RedemptionInput>}, TContext> => {
+
+const mutationKey = ['createRedemption'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRedemption>>, {data: BodyType<RedemptionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createRedemption(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRedemptionMutationResult = NonNullable<Awaited<ReturnType<typeof createRedemption>>>
+    export type CreateRedemptionMutationBody = BodyType<RedemptionInput>
+    export type CreateRedemptionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Create a prize redemption request from a verified certificate
+ */
+export const useCreateRedemption = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRedemption>>, TError,{data: BodyType<RedemptionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRedemption>>,
+        TError,
+        {data: BodyType<RedemptionInput>},
+        TContext
+      > => {
+      return useMutation(getCreateRedemptionMutationOptions(options));
+    }
+
 export const getGetAdminOverviewUrl = () => {
 
 
@@ -1056,6 +1219,150 @@ export const useUpdateAdminRedemption = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getUpdateAdminRedemptionMutationOptions(options));
+    }
+
+export const getStartAdminRedemptionPayoutUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/redemptions/${id}/payout`
+}
+
+/**
+ * @summary Start an Efí Pix payout for an approved redemption
+ */
+export const startAdminRedemptionPayout = async (id: number,
+    adminPayoutInput: AdminPayoutInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminPayoutResponse> => {
+
+  return customFetch<AdminPayoutResponse>(getStartAdminRedemptionPayoutUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminPayoutInput)
+  }
+);}
+
+
+
+
+
+export const getStartAdminRedemptionPayoutMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startAdminRedemptionPayout>>, TError,{id: number;data: BodyType<AdminPayoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startAdminRedemptionPayout>>, TError,{id: number;data: BodyType<AdminPayoutInput>}, TContext> => {
+
+const mutationKey = ['startAdminRedemptionPayout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startAdminRedemptionPayout>>, {id: number;data: BodyType<AdminPayoutInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  startAdminRedemptionPayout(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartAdminRedemptionPayoutMutationResult = NonNullable<Awaited<ReturnType<typeof startAdminRedemptionPayout>>>
+    export type StartAdminRedemptionPayoutMutationBody = BodyType<AdminPayoutInput>
+    export type StartAdminRedemptionPayoutMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Start an Efí Pix payout for an approved redemption
+ */
+export const useStartAdminRedemptionPayout = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startAdminRedemptionPayout>>, TError,{id: number;data: BodyType<AdminPayoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startAdminRedemptionPayout>>,
+        TError,
+        {id: number;data: BodyType<AdminPayoutInput>},
+        TContext
+      > => {
+      return useMutation(getStartAdminRedemptionPayoutMutationOptions(options));
+    }
+
+export const getConfirmAdminRedemptionPayoutUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/redemptions/${id}/payout/confirm`
+}
+
+/**
+ * @summary Confirm a submitted prize payout and write the financial ledger
+ */
+export const confirmAdminRedemptionPayout = async (id: number,
+    adminPayoutConfirmation: AdminPayoutConfirmation, options?: Parameters<typeof customFetch>[1]): Promise<ConfirmAdminRedemptionPayout200> => {
+
+  return customFetch<ConfirmAdminRedemptionPayout200>(getConfirmAdminRedemptionPayoutUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminPayoutConfirmation)
+  }
+);}
+
+
+
+
+
+export const getConfirmAdminRedemptionPayoutMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAdminRedemptionPayout>>, TError,{id: number;data: BodyType<AdminPayoutConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmAdminRedemptionPayout>>, TError,{id: number;data: BodyType<AdminPayoutConfirmation>}, TContext> => {
+
+const mutationKey = ['confirmAdminRedemptionPayout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmAdminRedemptionPayout>>, {id: number;data: BodyType<AdminPayoutConfirmation>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  confirmAdminRedemptionPayout(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmAdminRedemptionPayoutMutationResult = NonNullable<Awaited<ReturnType<typeof confirmAdminRedemptionPayout>>>
+    export type ConfirmAdminRedemptionPayoutMutationBody = BodyType<AdminPayoutConfirmation>
+    export type ConfirmAdminRedemptionPayoutMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Confirm a submitted prize payout and write the financial ledger
+ */
+export const useConfirmAdminRedemptionPayout = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmAdminRedemptionPayout>>, TError,{id: number;data: BodyType<AdminPayoutConfirmation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmAdminRedemptionPayout>>,
+        TError,
+        {id: number;data: BodyType<AdminPayoutConfirmation>},
+        TContext
+      > => {
+      return useMutation(getConfirmAdminRedemptionPayoutMutationOptions(options));
     }
 
 export const getGetAdminPrizePoolUrl = () => {

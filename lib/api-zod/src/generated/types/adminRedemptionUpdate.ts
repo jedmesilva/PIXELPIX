@@ -11,4 +11,9 @@ export interface AdminRedemptionUpdate {
   status: AdminRedemptionUpdateStatus;
   /** @maxLength 500 */
   rejectionReason?: string;
+  /**
+     * @minLength 32
+     * @maxLength 4096
+     */
+  certificateToken?: string;
 }

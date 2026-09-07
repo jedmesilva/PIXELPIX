@@ -11,6 +11,5 @@ export type AdminRedemptionUpdateStatus = typeof AdminRedemptionUpdateStatus[key
 
 export const AdminRedemptionUpdateStatus = {
   approved: 'approved',
-  paid: 'paid',
   rejected: 'rejected',
 } as const;

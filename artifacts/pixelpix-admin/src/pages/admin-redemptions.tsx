@@ -6,9 +6,12 @@ import {
   getListAdminRedemptionsQueryKey,
   useGetAdminRedemption,
   useListAdminRedemptions,
+  useStartAdminRedemptionPayout,
+  useConfirmAdminRedemptionPayout,
   useUpdateAdminRedemption,
 } from '@workspace/api-client-react';
 import type { AdminRedemptionUpdateStatus } from '@workspace/api-client-react';
+import type { ListAdminRedemptionsStatus } from '@workspace/api-client-react';
 import { AdminShell, PageHeader } from '@/components/admin-shell';
 import {
   AccessKeyPrompt,
@@ -30,8 +33,10 @@ const statusOptions = [
   { value: 'all', label: 'Todos os status' },
   { value: 'pending', label: 'Pendentes' },
   { value: 'approved', label: 'Aprovados' },
+  { value: 'payment_pending', label: 'Pagamento pendente' },
   { value: 'paid', label: 'Pagos' },
   { value: 'rejected', label: 'Rejeitados' },
+  { value: 'failed', label: 'Falhos' },
 ];
 
 function RedemptionDetail({
@@ -62,17 +67,58 @@ function RedemptionDetail({
       },
     },
   });
+  const startPayout = useStartAdminRedemptionPayout({
+    request: { headers: { 'x-admin-access-key': accessKey } },
+    mutation: {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: getListAdminRedemptionsQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getGetAdminRedemptionQueryKey(id) });
+        onUpdated();
+      },
+    },
+  });
+  const confirmPayout = useConfirmAdminRedemptionPayout({
+    request: { headers: { 'x-admin-access-key': accessKey } },
+    mutation: {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: getListAdminRedemptionsQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getGetAdminRedemptionQueryKey(id) });
+        onUpdated();
+      },
+    },
+  });
   const [rejectionReason, setRejectionReason] = useState('');
+  const [certificateToken, setCertificateToken] = useState('');
   const item = detail.data;
 
   const updateStatus = (status: AdminRedemptionUpdateStatus) => {
     if (status === 'rejected' && !rejectionReason.trim()) return;
+    if (status === 'approved' && !certificateToken.trim()) return;
     update.mutate({
       id,
       data: {
         status,
+        ...(status === 'approved' ? { certificateToken: certificateToken.trim() } : {}),
         ...(status === 'rejected' ? { rejectionReason: rejectionReason.trim() } : {}),
       },
+    });
+  };
+
+  const startPayment = () => {
+    if (!certificateToken.trim()) return;
+    if (!window.confirm('Confirma a chave Pix e o envio deste prêmio pela Efí?')) return;
+    startPayout.mutate({
+      id,
+      data: { certificateToken: certificateToken.trim(), confirmPixKey: true },
+    });
+  };
+
+  const confirmPayment = () => {
+    if (!certificateToken.trim()) return;
+    if (!window.confirm('Confirma que a transferência Pix foi concluída?')) return;
+    confirmPayout.mutate({
+      id,
+      data: { certificateToken: certificateToken.trim() },
     });
   };
 
@@ -213,23 +259,38 @@ function RedemptionDetail({
             {item.status !== 'paid' && item.status !== 'rejected' && (
               <div className="detail-actions">
                 <div className="detail-label">Próxima ação</div>
-                {item.status === 'pending' ? (
+                {item.status === 'pending' || item.status === 'failed' ? (
                   <>
                     <div className="action-callout">
                       <div className="action-callout-icon">!</div>
                       <div>
-                        <strong>Esta solicitação aguarda análise</strong>
-                        <p>Confira a chave Pix e o certificado antes de liberar o pagamento.</p>
+                        <strong>
+                          {item.status === 'failed'
+                            ? 'O pagamento anterior falhou'
+                            : 'Esta solicitação aguarda análise'}
+                        </strong>
+                        <p>Confira a chave Pix e informe o token presente no certificado.</p>
                       </div>
                     </div>
+                    <label className="field-label" htmlFor="certificate-token">
+                      Token do certificado
+                    </label>
+                    <input
+                      id="certificate-token"
+                      className="field font-mono-ui text-xs"
+                      value={certificateToken}
+                      onChange={(event) => setCertificateToken(event.target.value)}
+                      placeholder="Cole o token ou leia o QR Code do certificado"
+                      data-testid="input-certificate-token"
+                    />
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <button
                         className="button button-primary flex-1 justify-center"
-                        disabled={update.isPending}
+                        disabled={update.isPending || !certificateToken.trim()}
                         onClick={() => updateStatus('approved')}
                         data-testid="button-approve-redemption"
                       >
-                        <CheckCircle2 size={15} /> Aprovar resgate
+                        <CheckCircle2 size={15} /> {item.status === 'failed' ? 'Reaprovar resgate' : 'Aprovar resgate'}
                       </button>
                       <button
                         className="button button-danger flex-1 justify-center"
@@ -255,65 +316,65 @@ function RedemptionDetail({
                       />
                     </div>
                   </>
+                ) : item.status === 'approved' ? (
+                  <>
+                    <label className="field-label" htmlFor="certificate-token">
+                      Token do certificado
+                    </label>
+                    <input
+                      id="certificate-token"
+                      className="field font-mono-ui text-xs"
+                      value={certificateToken}
+                      onChange={(event) => setCertificateToken(event.target.value)}
+                      placeholder="Cole o token ou leia o QR Code do certificado"
+                      data-testid="input-certificate-token"
+                    />
+                    <button
+                      className="button button-coral"
+                      disabled={startPayout.isPending || !certificateToken.trim()}
+                      onClick={startPayment}
+                      data-testid="button-pay-redemption"
+                    >
+                      <ExternalLink size={15} /> Enviar Pix pela Efí
+                    </button>
+                  </>
                 ) : (
-                  <button
-                    className="button button-coral"
-                    disabled={update.isPending}
-                    onClick={() => updateStatus('paid')}
-                    data-testid="button-pay-redemption"
-                  >
-                    <ExternalLink size={15} /> Marcar pagamento como concluído
-                  </button>
+                  <>
+                    <div className="action-callout">
+                      <div className="action-callout-icon">✓</div>
+                      <div>
+                        <strong>Transferência enviada</strong>
+                        <p>Confirme a conclusão no provedor para registrar a saída no ledger.</p>
+                      </div>
+                    </div>
+                    <label className="field-label" htmlFor="certificate-token">
+                      Token do certificado
+                    </label>
+                    <input
+                      id="certificate-token"
+                      className="field font-mono-ui text-xs"
+                      value={certificateToken}
+                      onChange={(event) => setCertificateToken(event.target.value)}
+                      placeholder="Cole o token ou leia o QR Code do certificado"
+                      data-testid="input-certificate-token"
+                    />
+                    <button
+                      className="button button-coral"
+                      disabled={confirmPayout.isPending || !certificateToken.trim()}
+                      onClick={confirmPayment}
+                      data-testid="button-confirm-payment"
+                    >
+                      <CheckCircle2 size={15} /> Confirmar pagamento concluído
+                    </button>
+                  </>
                 )}
               </div>
             )}
-            <SavingIndicator pending={update.isPending} />
+            <SavingIndicator pending={update.isPending || startPayout.isPending || confirmPayout.isPending} />
           </div>
         )}
       </aside>
     </div>
-  );
-}
-
-function QuickStatusAction({
-  item,
-  accessKey,
-  onUpdated,
-}: {
-  item: { id: number; status: string };
-  accessKey: string;
-  onUpdated: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const update = useUpdateAdminRedemption({
-    request: { headers: { 'x-admin-access-key': accessKey } },
-    mutation: {
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({ queryKey: getListAdminRedemptionsQueryKey() });
-        await queryClient.invalidateQueries({ queryKey: getGetAdminRedemptionQueryKey(item.id) });
-        onUpdated();
-      },
-    },
-  });
-
-  if (item.status !== 'pending' && item.status !== 'approved') return null;
-  const nextStatus = item.status === 'pending' ? 'approved' : 'paid';
-  const label = nextStatus === 'approved' ? 'Aprovar' : 'Marcar pago';
-  const Icon = nextStatus === 'approved' ? Check : CheckCircle2;
-
-  return (
-    <button
-      className={`button button-compact ${nextStatus === 'approved' ? 'button-primary' : 'button-coral'}`}
-      disabled={update.isPending}
-      onClick={(event) => {
-        event.stopPropagation();
-        if (nextStatus === 'approved' && !window.confirm('Aprovar este resgate para pagamento?')) return;
-        update.mutate({ id: item.id, data: { status: nextStatus } });
-      }}
-      data-testid={`button-quick-${nextStatus}-${item.id}`}
-    >
-      <Icon size={13} /> {label}
-    </button>
   );
 }
 
@@ -358,7 +419,6 @@ function RedemptionCard({
         </div>
       </div>
       <div className="redemption-card-actions">
-        <QuickStatusAction item={item} accessKey={accessKey} onUpdated={onUpdated} />
         <button className="button button-secondary flex-1 justify-center" onClick={onOpen}>
           <ExternalLink size={14} /> Abrir detalhes
         </button>
@@ -376,7 +436,7 @@ function RedemptionsContent() {
   const params = useMemo(
     () => ({
       ...(status !== 'all'
-        ? { status: status as 'pending' | 'approved' | 'paid' | 'rejected' }
+        ? { status: status as ListAdminRedemptionsStatus }
         : {}),
       ...(search.trim() ? { search: search.trim() } : {}),
       limit: 50,
@@ -569,11 +629,6 @@ function RedemptionsContent() {
                       </td>
                       <td>
                         <div className="flex flex-wrap items-center gap-2">
-                          <QuickStatusAction
-                            item={item}
-                            accessKey={accessKey}
-                            onUpdated={() => list.refetch()}
-                          />
                           <DrillLink onClick={() => setSelectedId(item.id)}>Detalhes</DrillLink>
                         </div>
                       </td>

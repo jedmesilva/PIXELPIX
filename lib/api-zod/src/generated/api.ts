@@ -199,6 +199,76 @@ export const PaymentConfirmedWebhookResponse = zod.unknown()
 
 
 /**
+ * @summary Validate a PIXELPIX certificate with its private token
+ */
+export const verifyCertificateQueryCodeMin = 8;
+export const verifyCertificateQueryCodeMax = 80;
+
+export const verifyCertificateQueryTokenMin = 32;
+export const verifyCertificateQueryTokenMax = 4096;
+
+
+
+export const VerifyCertificateQueryParams = zod.object({
+  "code": zod.coerce.string().min(verifyCertificateQueryCodeMin).max(verifyCertificateQueryCodeMax),
+  "token": zod.coerce.string().min(verifyCertificateQueryTokenMin).max(verifyCertificateQueryTokenMax)
+})
+
+export const verifyCertificateResponseCellIdMin = 0;
+export const verifyCertificateResponseCellIdMax = 999999;
+
+export const verifyCertificateResponsePrizeValueCentsMin = 0;
+
+
+
+export const VerifyCertificateResponse = zod.object({
+  "valid": zod.literal(true),
+  "certificateCode": zod.string(),
+  "cellId": zod.int().min(verifyCertificateResponseCellIdMin).max(verifyCertificateResponseCellIdMax),
+  "prizeValueCents": zod.int().min(verifyCertificateResponsePrizeValueCentsMin),
+  "email": zod.string(),
+  "issuedAt": zod.coerce.date(),
+  "status": zod.enum(['issued', 'redeemed', 'revoked']),
+  "redemptionStatus": zod.string().nullable(),
+  "canRedeem": zod.boolean()
+})
+
+
+/**
+ * @summary Create a prize redemption request from a verified certificate
+ */
+export const createRedemptionBodyCertificateCodeMin = 8;
+export const createRedemptionBodyCertificateCodeMax = 80;
+
+export const createRedemptionBodyTokenMin = 32;
+export const createRedemptionBodyTokenMax = 4096;
+
+export const createRedemptionBodyPixKeyMax = 120;
+
+
+
+export const CreateRedemptionBody = zod.object({
+  "certificateCode": zod.string().min(createRedemptionBodyCertificateCodeMin).max(createRedemptionBodyCertificateCodeMax),
+  "token": zod.string().min(createRedemptionBodyTokenMin).max(createRedemptionBodyTokenMax),
+  "email": zod.email(),
+  "pixKey": zod.string().min(1).max(createRedemptionBodyPixKeyMax)
+})
+
+
+export const createRedemptionResponsePrizeValueCentsMin = 0;
+
+
+
+export const CreateRedemptionResponse = zod.object({
+  "id": zod.int().min(1),
+  "status": zod.enum(['pending']),
+  "certificateCode": zod.string(),
+  "prizeValueCents": zod.int().min(createRedemptionResponsePrizeValueCentsMin),
+  "requestedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Read the prize operation overview
  */
 export const getAdminOverviewResponseAvailablePrizeBalanceCentsMin = 0;
@@ -262,7 +332,7 @@ export const listAdminRedemptionsQueryOffsetMin = 0;
 
 
 export const ListAdminRedemptionsQueryParams = zod.object({
-  "status": zod.enum(['pending', 'approved', 'paid', 'rejected', 'all']).default(listAdminRedemptionsQueryStatusDefault),
+  "status": zod.enum(['pending', 'approved', 'payment_pending', 'paid', 'rejected', 'failed', 'all']).default(listAdminRedemptionsQueryStatusDefault),
   "search": zod.coerce.string().max(listAdminRedemptionsQuerySearchMax).optional(),
   "limit": zod.coerce.number().int().min(1).max(listAdminRedemptionsQueryLimitMax).default(listAdminRedemptionsQueryLimitDefault),
   "offset": zod.coerce.number().int().min(listAdminRedemptionsQueryOffsetMin).default(listAdminRedemptionsQueryOffsetDefault)
@@ -275,6 +345,8 @@ export const listAdminRedemptionsResponseItemsItemCellIdMax = 999999;
 export const listAdminRedemptionsResponseItemsItemRequestedAmountCentsMin = 0;
 
 export const listAdminRedemptionsResponseItemsItemPrizeValueCentsMin = 0;
+
+export const listAdminRedemptionsResponseItemsItemApprovedAmountCentsMin = 0;
 
 export const listAdminRedemptionsResponseTotalMin = 0;
 
@@ -290,13 +362,19 @@ export const ListAdminRedemptionsResponse = zod.object({
   "requestedAmountCents": zod.int().min(listAdminRedemptionsResponseItemsItemRequestedAmountCentsMin),
   "prizeValueCents": zod.int().min(listAdminRedemptionsResponseItemsItemPrizeValueCentsMin),
   "wonAt": zod.coerce.date(),
-  "status": zod.enum(['pending', 'approved', 'paid', 'rejected']),
+  "status": zod.enum(['pending', 'approved', 'payment_pending', 'paid', 'rejected', 'failed']),
   "requestedAt": zod.coerce.date(),
   "processedAt": zod.coerce.date().nullable(),
   "processedBy": zod.string().nullable(),
   "rejectionReason": zod.string().nullable(),
   "cellStatus": zod.string().nullable(),
-  "paymentStatus": zod.string().nullable()
+  "paymentStatus": zod.string().nullable(),
+  "tokenVerifiedAt": zod.coerce.date().nullable(),
+  "approvedAmountCents": zod.int().min(listAdminRedemptionsResponseItemsItemApprovedAmountCentsMin).nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "payoutStatus": zod.string().nullable(),
+  "payoutProviderReference": zod.string().nullable()
 })),
   "total": zod.int().min(listAdminRedemptionsResponseTotalMin)
 })
@@ -320,6 +398,8 @@ export const getAdminRedemptionResponseRequestedAmountCentsMin = 0;
 
 export const getAdminRedemptionResponsePrizeValueCentsMin = 0;
 
+export const getAdminRedemptionResponseApprovedAmountCentsMin = 0;
+
 
 
 export const GetAdminRedemptionResponse = zod.object({
@@ -331,13 +411,19 @@ export const GetAdminRedemptionResponse = zod.object({
   "requestedAmountCents": zod.int().min(getAdminRedemptionResponseRequestedAmountCentsMin),
   "prizeValueCents": zod.int().min(getAdminRedemptionResponsePrizeValueCentsMin),
   "wonAt": zod.coerce.date(),
-  "status": zod.enum(['pending', 'approved', 'paid', 'rejected']),
+  "status": zod.enum(['pending', 'approved', 'payment_pending', 'paid', 'rejected', 'failed']),
   "requestedAt": zod.coerce.date(),
   "processedAt": zod.coerce.date().nullable(),
   "processedBy": zod.string().nullable(),
   "rejectionReason": zod.string().nullable(),
   "cellStatus": zod.string().nullable(),
-  "paymentStatus": zod.string().nullable()
+  "paymentStatus": zod.string().nullable(),
+  "tokenVerifiedAt": zod.coerce.date().nullable(),
+  "approvedAmountCents": zod.int().min(getAdminRedemptionResponseApprovedAmountCentsMin).nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "payoutStatus": zod.string().nullable(),
+  "payoutProviderReference": zod.string().nullable()
 })
 
 
@@ -353,11 +439,15 @@ export const UpdateAdminRedemptionParams = zod.object({
 
 export const updateAdminRedemptionBodyRejectionReasonMax = 500;
 
+export const updateAdminRedemptionBodyCertificateTokenMin = 32;
+export const updateAdminRedemptionBodyCertificateTokenMax = 4096;
+
 
 
 export const UpdateAdminRedemptionBody = zod.object({
-  "status": zod.enum(['approved', 'paid', 'rejected']),
-  "rejectionReason": zod.string().max(updateAdminRedemptionBodyRejectionReasonMax).optional()
+  "status": zod.enum(['approved', 'rejected']),
+  "rejectionReason": zod.string().max(updateAdminRedemptionBodyRejectionReasonMax).optional(),
+  "certificateToken": zod.string().min(updateAdminRedemptionBodyCertificateTokenMin).max(updateAdminRedemptionBodyCertificateTokenMax).optional()
 })
 
 
@@ -367,6 +457,8 @@ export const updateAdminRedemptionResponseCellIdMax = 999999;
 export const updateAdminRedemptionResponseRequestedAmountCentsMin = 0;
 
 export const updateAdminRedemptionResponsePrizeValueCentsMin = 0;
+
+export const updateAdminRedemptionResponseApprovedAmountCentsMin = 0;
 
 
 
@@ -379,13 +471,77 @@ export const UpdateAdminRedemptionResponse = zod.object({
   "requestedAmountCents": zod.int().min(updateAdminRedemptionResponseRequestedAmountCentsMin),
   "prizeValueCents": zod.int().min(updateAdminRedemptionResponsePrizeValueCentsMin),
   "wonAt": zod.coerce.date(),
-  "status": zod.enum(['pending', 'approved', 'paid', 'rejected']),
+  "status": zod.enum(['pending', 'approved', 'payment_pending', 'paid', 'rejected', 'failed']),
   "requestedAt": zod.coerce.date(),
   "processedAt": zod.coerce.date().nullable(),
   "processedBy": zod.string().nullable(),
   "rejectionReason": zod.string().nullable(),
   "cellStatus": zod.string().nullable(),
-  "paymentStatus": zod.string().nullable()
+  "paymentStatus": zod.string().nullable(),
+  "tokenVerifiedAt": zod.coerce.date().nullable(),
+  "approvedAmountCents": zod.int().min(updateAdminRedemptionResponseApprovedAmountCentsMin).nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedBy": zod.string().nullable(),
+  "payoutStatus": zod.string().nullable(),
+  "payoutProviderReference": zod.string().nullable()
+})
+
+
+/**
+ * @summary Start an Efí Pix payout for an approved redemption
+ */
+
+
+
+export const StartAdminRedemptionPayoutParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const startAdminRedemptionPayoutBodyCertificateTokenMin = 32;
+export const startAdminRedemptionPayoutBodyCertificateTokenMax = 4096;
+
+
+
+export const StartAdminRedemptionPayoutBody = zod.object({
+  "certificateToken": zod.string().min(startAdminRedemptionPayoutBodyCertificateTokenMin).max(startAdminRedemptionPayoutBodyCertificateTokenMax),
+  "confirmPixKey": zod.literal(true)
+})
+
+export const StartAdminRedemptionPayoutResponse = zod.object({
+  "ok": zod.boolean(),
+  "status": zod.enum(['payment_pending']),
+  "payoutId": zod.uuid(),
+  "providerReference": zod.string().nullable()
+})
+
+
+/**
+ * @summary Confirm a submitted prize payout and write the financial ledger
+ */
+
+
+
+export const ConfirmAdminRedemptionPayoutParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const confirmAdminRedemptionPayoutBodyCertificateTokenMin = 32;
+export const confirmAdminRedemptionPayoutBodyCertificateTokenMax = 4096;
+
+
+
+export const ConfirmAdminRedemptionPayoutBody = zod.object({
+  "certificateToken": zod.string().min(confirmAdminRedemptionPayoutBodyCertificateTokenMin).max(confirmAdminRedemptionPayoutBodyCertificateTokenMax)
+})
+
+export const confirmAdminRedemptionPayoutResponseAmountCentsMin = 0;
+
+
+
+export const ConfirmAdminRedemptionPayoutResponse = zod.object({
+  "ok": zod.boolean(),
+  "status": zod.enum(['paid']),
+  "amountCents": zod.int().min(confirmAdminRedemptionPayoutResponseAmountCentsMin)
 })
 
 

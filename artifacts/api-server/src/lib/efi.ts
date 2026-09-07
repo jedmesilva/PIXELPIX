@@ -24,6 +24,14 @@ export type EfiCharge = {
   pixCopiaECola?: string;
 };
 
+export type EfiPixTransfer = {
+  idEnvio?: string;
+  e2eId?: string;
+  endToEndId?: string;
+  status?: string;
+  mensagem?: string;
+};
+
 export class EfiConfigurationError extends Error {
   constructor(message: string) {
     super(message);
@@ -210,7 +218,7 @@ async function getAccessToken(config: EfiConfig) {
 async function authenticatedRequest<T>(
   path: string,
   input: {
-    method: "GET" | "PUT";
+    method: "GET" | "POST" | "PUT";
     body?: unknown;
   },
 ) {
@@ -273,6 +281,27 @@ export function getEfiCharge(txid: string) {
   return authenticatedRequest<EfiCharge>(
     `/v2/cob/${encodeURIComponent(txid)}`,
     { method: "GET" },
+  );
+}
+
+export async function sendPixTransfer(input: {
+  idEnvio: string;
+  amountCents: number;
+  pixKey: string;
+  description: string;
+}) {
+  return authenticatedRequest<EfiPixTransfer>(
+    `/v2/gn/pix/${encodeURIComponent(input.idEnvio)}`,
+    {
+      method: "PUT",
+      body: {
+        valor: (input.amountCents / 100).toFixed(2),
+        favorecido: {
+          chave: input.pixKey,
+        },
+        infoPagador: input.description.slice(0, 140),
+      },
+    },
   );
 }
 
