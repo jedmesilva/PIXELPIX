@@ -7,6 +7,7 @@ import NotFound from '@/pages/not-found';
 import AdminOverview from '@/pages/admin-overview';
 import AdminRedemptions from '@/pages/admin-redemptions';
 import AdminPrizePool from '@/pages/admin-prize-pool';
+import AdminManual from '@/pages/admin-manual';
 import {
   Route,
   Switch,
@@ -29,6 +30,8 @@ function Router() {
         <Route path="/admin/redemptions" component={AdminRedemptions} />
         <Route path="/prize-pool" component={AdminPrizePool} />
         <Route path="/admin/prize-pool" component={AdminPrizePool} />
+        <Route path="/manual" component={AdminManual} />
+        <Route path="/admin/manual" component={AdminManual} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>

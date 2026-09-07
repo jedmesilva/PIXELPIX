@@ -1,4 +1,4 @@
-import { Activity, Boxes, LayoutDashboard, LogOut, Menu, ShieldCheck, Sparkles, TicketCheck, X } from 'lucide-react';
+import { Activity, BookOpen, Boxes, LayoutDashboard, LogOut, Menu, ShieldCheck, Sparkles, TicketCheck, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 
@@ -6,6 +6,7 @@ const navigation = [
   { href: '/admin/', label: 'Visão geral', icon: LayoutDashboard },
   { href: '/admin/redemptions', label: 'Resgates', icon: TicketCheck },
   { href: '/admin/prize-pool', label: 'Prize pool', icon: Boxes },
+  { href: '/admin/manual', label: 'Manual', icon: BookOpen },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
