@@ -435,6 +435,45 @@ export interface AdminPrizePool {
   safetyMarginBps: number | null;
 }
 
+export interface AdminPrizeBatchTier {
+  /** @minimum 1 */
+  id: number;
+  label: string;
+  /** @minimum 0 */
+  quantity: number;
+  /** @minimum 0 */
+  nominalValueCents: number;
+  /** @minimum 0 */
+  totalValueCents: number;
+}
+
+export type AdminPrizeBatchStatus = typeof AdminPrizeBatchStatus[keyof typeof AdminPrizeBatchStatus];
+
+
+export const AdminPrizeBatchStatus = {
+  not_generated: 'not_generated',
+  generated: 'generated',
+} as const;
+
+export interface AdminPrizeBatch {
+  status: AdminPrizeBatchStatus;
+  /** @nullable */
+  commitHash: string | null;
+  /** @nullable */
+  createdAt: string | null;
+  /** @minimum 0 */
+  totalPositions: number;
+  /** @minimum 0 */
+  totalValueCents: number;
+  tiers: AdminPrizeBatchTier[];
+  canGenerate: boolean;
+}
+
+export const AdminPrizeBatchGenerateInputValue = {
+  confirm: true,
+} as const;
+export type AdminPrizeBatchGenerateInput = typeof AdminPrizeBatchGenerateInputValue;
+
 export type AdminPrizePositionPositionStatus = typeof AdminPrizePositionPositionStatus[keyof typeof AdminPrizePositionPositionStatus];
 
 

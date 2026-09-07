@@ -174,7 +174,26 @@ async function sendCertificateEmail(input: {
 }
 
 export async function deliverCertificateForCell(cellId: number) {
-  const certificate = await ensureCertificateForCell(pool, cellId);
+  let certificate;
+  try {
+    certificate = await ensureCertificateForCell(pool, cellId);
+  } catch (error) {
+    await pool.query(
+      `UPDATE cells
+          SET certificate_attempts = certificate_attempts + 1,
+              certificate_last_attempt_at = NOW(),
+              certificate_last_error = 'certificate_unavailable'
+        WHERE id = $1
+          AND status = 'paid'
+          AND certificate_sent_at IS NULL`,
+      [cellId],
+    );
+    logger.error(
+      { error, cellId },
+      "Certificate token could not be decrypted; delivery deferred",
+    );
+    return false;
+  }
   if (!certificate) return false;
   const claimed = await pool.query(
     `UPDATE cells
@@ -230,7 +249,14 @@ export async function processPendingCertificates() {
       LIMIT 25`,
   );
   for (const row of pending.rows) {
-    await deliverCertificateForCell(Number(row.id));
+    try {
+      await deliverCertificateForCell(Number(row.id));
+    } catch (error) {
+      logger.error(
+        { error, cellId: Number(row.id) },
+        "Pending certificate processing failed",
+      );
+    }
   }
 }
 

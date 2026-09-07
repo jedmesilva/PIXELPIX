@@ -472,6 +472,58 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/prize-batch:
+    get:
+      operationId: getAdminPrizeBatch
+      tags: [admin]
+      summary: Read the configured or sealed prize batch
+      security:
+        - AdminAccessKey: []
+      responses:
+        "200":
+          description: Current prize batch configuration and generation status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPrizeBatch" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/prize-batch/generate:
+    post:
+      operationId: generateAdminPrizeBatch
+      tags: [admin]
+      summary: Cryptographically generate and seal the one-time prize batch
+      description: This operation is irreversible and can only succeed once.
+      security:
+        - AdminAccessKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPrizeBatchGenerateInput" }
+      responses:
+        "201":
+          description: Prize batch generated and sealed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPrizeBatch" }
+        "400":
+          description: Explicit confirmation is missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: A prize batch already exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /admin/prize-positions:
     get:
       operationId: listAdminPrizePositions
@@ -829,6 +881,36 @@ components:
         batchRevealedAt: { type: ["string", "null"], format: date-time }
         safetyMarginBps: { type: ["integer", "null"], minimum: 0 }
       required: [tiers, commitHash, batchCreatedAt, batchRevealedAt, safetyMarginBps]
+    AdminPrizeBatchTier:
+      type: object
+      properties:
+        id: { type: integer, minimum: 1 }
+        label: { type: string }
+        quantity: { type: integer, minimum: 0 }
+        nominalValueCents: { type: integer, minimum: 0 }
+        totalValueCents: { type: integer, minimum: 0 }
+      required: [id, label, quantity, nominalValueCents, totalValueCents]
+    AdminPrizeBatch:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [not_generated, generated]
+        commitHash: { type: ["string", "null"] }
+        createdAt: { type: ["string", "null"], format: date-time }
+        totalPositions: { type: integer, minimum: 0 }
+        totalValueCents: { type: integer, minimum: 0 }
+        tiers:
+          type: array
+          items: { $ref: "#/components/schemas/AdminPrizeBatchTier" }
+        canGenerate: { type: boolean }
+      required:
+        [status, commitHash, createdAt, totalPositions, totalValueCents, tiers, canGenerate]
+    AdminPrizeBatchGenerateInput:
+      type: object
+      properties:
+        confirm: { type: boolean, const: true }
+      required: [confirm]
     AdminPrizePosition:
       type: object
       properties:

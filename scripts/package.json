@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@workspace/prize-engine": "workspace:*",
     "pg": "^8.22.0"
   },
   "devDependencies": {

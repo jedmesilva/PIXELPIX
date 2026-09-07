@@ -604,6 +604,77 @@ export const GetAdminPrizePoolResponse = zod.object({
 
 
 /**
+ * @summary Read the configured or sealed prize batch
+ */
+export const getAdminPrizeBatchResponseTotalPositionsMin = 0;
+
+export const getAdminPrizeBatchResponseTotalValueCentsMin = 0;
+
+
+export const getAdminPrizeBatchResponseTiersItemQuantityMin = 0;
+
+export const getAdminPrizeBatchResponseTiersItemNominalValueCentsMin = 0;
+
+export const getAdminPrizeBatchResponseTiersItemTotalValueCentsMin = 0;
+
+
+
+export const GetAdminPrizeBatchResponse = zod.object({
+  "status": zod.enum(['not_generated', 'generated']),
+  "commitHash": zod.string().nullable(),
+  "createdAt": zod.coerce.date().nullable(),
+  "totalPositions": zod.int().min(getAdminPrizeBatchResponseTotalPositionsMin),
+  "totalValueCents": zod.int().min(getAdminPrizeBatchResponseTotalValueCentsMin),
+  "tiers": zod.array(zod.object({
+  "id": zod.int().min(1),
+  "label": zod.string(),
+  "quantity": zod.int().min(getAdminPrizeBatchResponseTiersItemQuantityMin),
+  "nominalValueCents": zod.int().min(getAdminPrizeBatchResponseTiersItemNominalValueCentsMin),
+  "totalValueCents": zod.int().min(getAdminPrizeBatchResponseTiersItemTotalValueCentsMin)
+})),
+  "canGenerate": zod.boolean()
+})
+
+
+/**
+ * This operation is irreversible and can only succeed once.
+ * @summary Cryptographically generate and seal the one-time prize batch
+ */
+export const GenerateAdminPrizeBatchBody = zod.object({
+  "confirm": zod.literal(true)
+})
+
+export const generateAdminPrizeBatchResponseTotalPositionsMin = 0;
+
+export const generateAdminPrizeBatchResponseTotalValueCentsMin = 0;
+
+
+export const generateAdminPrizeBatchResponseTiersItemQuantityMin = 0;
+
+export const generateAdminPrizeBatchResponseTiersItemNominalValueCentsMin = 0;
+
+export const generateAdminPrizeBatchResponseTiersItemTotalValueCentsMin = 0;
+
+
+
+export const GenerateAdminPrizeBatchResponse = zod.object({
+  "status": zod.enum(['not_generated', 'generated']),
+  "commitHash": zod.string().nullable(),
+  "createdAt": zod.coerce.date().nullable(),
+  "totalPositions": zod.int().min(generateAdminPrizeBatchResponseTotalPositionsMin),
+  "totalValueCents": zod.int().min(generateAdminPrizeBatchResponseTotalValueCentsMin),
+  "tiers": zod.array(zod.object({
+  "id": zod.int().min(1),
+  "label": zod.string(),
+  "quantity": zod.int().min(generateAdminPrizeBatchResponseTiersItemQuantityMin),
+  "nominalValueCents": zod.int().min(generateAdminPrizeBatchResponseTiersItemNominalValueCentsMin),
+  "totalValueCents": zod.int().min(generateAdminPrizeBatchResponseTiersItemTotalValueCentsMin)
+})),
+  "canGenerate": zod.boolean()
+})
+
+
+/**
  * @summary List awarded positions with planned and distributed prize values
  */
 export const listAdminPrizePositionsQueryStatusDefault = `all`;

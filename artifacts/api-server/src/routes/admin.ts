@@ -20,6 +20,11 @@ import {
   verifyCertificateToken,
 } from "../lib/certificates";
 import { sendPixTransfer } from "../lib/efi";
+import {
+  generatePrizeBatch,
+  getPrizeBatchStatus,
+  PrizeBatchAlreadyExistsError,
+} from "@workspace/prize-engine";
 
 const router: IRouter = Router();
 
@@ -65,6 +70,37 @@ function mapRedemption(row: Record<string, unknown>) {
 // authentication boundary here means every administrative endpoint is
 // protected before it reaches a handler.
 router.use(requireAdminAccess);
+
+router.get("/prize-batch", async (_request, response): Promise<void> => {
+  const batch = await getPrizeBatchStatus(pool);
+  response.json(batch);
+});
+
+router.post("/prize-batch/generate", async (request, response): Promise<void> => {
+  if (request.body?.confirm !== true) {
+    response.status(400).json({
+      error: "A confirmação explícita é obrigatória para gerar o lote.",
+    });
+    return;
+  }
+
+  try {
+    const batch = await generatePrizeBatch(pool);
+    response.status(201).json(batch);
+  } catch (error) {
+    if (error instanceof PrizeBatchAlreadyExistsError) {
+      response.status(409).json({
+        error: error.message,
+        code: "prize_batch_already_generated",
+      });
+      return;
+    }
+    request.log.error({ error }, "Prize batch generation failed");
+    response.status(500).json({
+      error: "Não foi possível gerar o lote de prêmios.",
+    });
+  }
+});
 
 router.get("/overview", async (_request, response): Promise<void> => {
   const result = await pool.query(`

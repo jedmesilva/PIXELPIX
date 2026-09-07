@@ -176,6 +176,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/prize-engine':
+        specifier: workspace:*
+        version: link:../../lib/prize-engine
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -837,8 +840,24 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
 
+  lib/prize-engine:
+    dependencies:
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.5
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
+
   scripts:
     dependencies:
+      '@workspace/prize-engine':
+        specifier: workspace:*
+        version: link:../lib/prize-engine
       pg:
         specifier: ^8.22.0
         version: 8.22.0

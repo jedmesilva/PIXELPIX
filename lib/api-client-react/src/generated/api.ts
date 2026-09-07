@@ -24,6 +24,8 @@ import type {
   AdminPayoutConfirmation,
   AdminPayoutInput,
   AdminPayoutResponse,
+  AdminPrizeBatch,
+  AdminPrizeBatchGenerateInput,
   AdminPrizePool,
   AdminPrizePositionList,
   AdminRedemption,
@@ -1441,6 +1443,155 @@ export function useGetAdminPrizePool<TData = Awaited<ReturnType<typeof getAdminP
 
 
 
+
+export const getGetAdminPrizeBatchUrl = () => {
+
+
+
+
+  return `/api/admin/prize-batch`
+}
+
+/**
+ * @summary Read the configured or sealed prize batch
+ */
+export const getAdminPrizeBatch = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminPrizeBatch> => {
+
+  return customFetch<AdminPrizeBatch>(getGetAdminPrizeBatchUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminPrizeBatchQueryKey = () => {
+    return [
+    `/api/admin/prize-batch`
+    ] as const;
+    }
+
+
+export const getGetAdminPrizeBatchQueryOptions = <TData = Awaited<ReturnType<typeof getAdminPrizeBatch>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminPrizeBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminPrizeBatchQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminPrizeBatch>>> = ({ signal }) => getAdminPrizeBatch({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminPrizeBatch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminPrizeBatchQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminPrizeBatch>>>
+export type GetAdminPrizeBatchQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the configured or sealed prize batch
+ */
+
+export function useGetAdminPrizeBatch<TData = Awaited<ReturnType<typeof getAdminPrizeBatch>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminPrizeBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminPrizeBatchQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGenerateAdminPrizeBatchUrl = () => {
+
+
+
+
+  return `/api/admin/prize-batch/generate`
+}
+
+/**
+ * This operation is irreversible and can only succeed once.
+ * @summary Cryptographically generate and seal the one-time prize batch
+ */
+export const generateAdminPrizeBatch = async (adminPrizeBatchGenerateInput: AdminPrizeBatchGenerateInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminPrizeBatch> => {
+
+  return customFetch<AdminPrizeBatch>(getGenerateAdminPrizeBatchUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminPrizeBatchGenerateInput)
+  }
+);}
+
+
+
+
+
+export const getGenerateAdminPrizeBatchMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateAdminPrizeBatch>>, TError,{data: BodyType<AdminPrizeBatchGenerateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateAdminPrizeBatch>>, TError,{data: BodyType<AdminPrizeBatchGenerateInput>}, TContext> => {
+
+const mutationKey = ['generateAdminPrizeBatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateAdminPrizeBatch>>, {data: BodyType<AdminPrizeBatchGenerateInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  generateAdminPrizeBatch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateAdminPrizeBatchMutationResult = NonNullable<Awaited<ReturnType<typeof generateAdminPrizeBatch>>>
+    export type GenerateAdminPrizeBatchMutationBody = BodyType<AdminPrizeBatchGenerateInput>
+    export type GenerateAdminPrizeBatchMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Cryptographically generate and seal the one-time prize batch
+ */
+export const useGenerateAdminPrizeBatch = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateAdminPrizeBatch>>, TError,{data: BodyType<AdminPrizeBatchGenerateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateAdminPrizeBatch>>,
+        TError,
+        {data: BodyType<AdminPrizeBatchGenerateInput>},
+        TContext
+      > => {
+      return useMutation(getGenerateAdminPrizeBatchMutationOptions(options));
+    }
 
 export const getListAdminPrizePositionsUrl = (params?: ListAdminPrizePositionsParams,) => {
   const normalizedParams = new URLSearchParams();
