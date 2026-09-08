@@ -100,6 +100,7 @@ button:focus-visible {
 .pixelpix-header-compact-content {
   display: flex;
   width: 100%;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -168,6 +169,9 @@ button:focus-visible {
 
 .pixelpix-remaining-copy {
   flex: 0 1 auto;
+  width: max-content;
+  max-width: 100%;
+  justify-content: flex-end;
   flex-wrap: wrap;
   align-items: center;
   column-gap: 4px;
@@ -261,12 +265,14 @@ button:focus-visible {
 .pixelpix-remaining-badge {
   display: flex;
   flex: 0 1 auto;
-  width: fit-content;
+  width: max-content;
   max-width: 100%;
   box-sizing: border-box;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
+  margin-left: auto;
   padding: 6px 12px;
   border: 1px solid var(--pixelpix-border-strong);
   background: var(--pixelpix-surface-raised);
