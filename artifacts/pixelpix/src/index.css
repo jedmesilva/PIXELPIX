@@ -152,6 +152,7 @@ button:focus-visible {
 }
 
 .pixelpix-remaining-dot-container,
+.pixelpix-remaining-copy,
 .pixelpix-remaining-amount-container,
 .pixelpix-remaining-label-container {
   display: flex;
@@ -165,9 +166,26 @@ button:focus-visible {
   line-height: 0;
 }
 
+.pixelpix-remaining-copy {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 4px;
+  row-gap: 2px;
+}
+
 .pixelpix-remaining-amount-container,
 .pixelpix-remaining-label-container {
   line-height: 1.15;
+}
+
+.pixelpix-remaining-copy .pixelpix-remaining-amount-container,
+.pixelpix-remaining-copy .pixelpix-remaining-label-container {
+  flex: 0 0 auto;
+}
+
+.pixelpix-remaining-copy .pixelpix-remaining-label-container {
+  min-width: max-content;
 }
 
 .pixelpix-large-remaining-dot-container {
