@@ -263,7 +263,7 @@ button:focus-visible {
 }
 
 .pixelpix-remaining-badge {
-  display: flex;
+  display: none;
   flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
@@ -309,6 +309,7 @@ button:focus-visible {
 }
 
 .pixelpix-compact-header.is-compact .pixelpix-remaining-badge {
+  display: flex;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
