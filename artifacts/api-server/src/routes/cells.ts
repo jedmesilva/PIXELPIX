@@ -87,18 +87,12 @@ function publicStatus(status: string): "available" | "reserved" | "paid" {
 }
 
 function generatedCellEmojiSql(cellIdExpression: string) {
-  return `CASE
-    WHEN EXISTS (
-      SELECT 1 FROM winning_positions
-      WHERE winning_positions.cell_id = ${cellIdExpression}
-    ) THEN '💰'
-    ELSE (${CELL_EMOJIS_SQL})[
-      1 + mod(
-        mod(${cellIdExpression}::bigint * 1103515245 + 12345, 2147483647),
-        ${CELL_EMOJIS.length}
-      )
-    ]
-  END`;
+  return `(${CELL_EMOJIS_SQL})[
+    1 + mod(
+      mod(${cellIdExpression}::bigint * 1103515245 + 12345, 2147483647),
+      ${CELL_EMOJIS.length}
+    )
+  ]`;
 }
 
 function generatedCellBackgroundSql(cellIdExpression: string) {
@@ -111,25 +105,34 @@ export async function ensureCellRecords() {
   // upsert on every API restart blocks the server before it can serve the
   // public grid.
   const existing = await pool.query("SELECT 1 FROM cells LIMIT 1");
-  if (existing.rows.length > 0) return;
+  if (existing.rows.length === 0) {
+    await pool.query(`
+      INSERT INTO cells (id, status, emoji, background_color)
+      SELECT
+        generated.cell_id,
+        'available',
+        ${generatedCellEmojiSql("generated.cell_id")},
+        ${generatedCellBackgroundSql("generated.cell_id")}
+      FROM generate_series(0, ${TOTAL_CELL_SEED - 1}) AS generated(cell_id)
+      ON CONFLICT (id) DO UPDATE
+        SET emoji = COALESCE(cells.emoji, EXCLUDED.emoji),
+            background_color = COALESCE(cells.background_color, EXCLUDED.background_color)
+    `);
+  }
 
+  // A prize position is secret until payment confirmation reveals it. Repair
+  // old batches that persisted the prize marker before the reveal and keep
+  // the persisted visual indistinguishable from an ordinary cell.
   await pool.query(`
-    INSERT INTO cells (id, status, emoji, background_color)
-    SELECT
-      generated.cell_id,
-      'available',
-      ${generatedCellEmojiSql("generated.cell_id")},
-      ${generatedCellBackgroundSql("generated.cell_id")}
-    FROM generate_series(0, ${TOTAL_CELL_SEED - 1}) AS generated(cell_id)
-    ON CONFLICT (id) DO UPDATE
-      SET emoji = CASE
-        WHEN EXISTS (
-          SELECT 1 FROM winning_positions
-          WHERE winning_positions.cell_id = cells.id
-        ) THEN '💰'
-        ELSE COALESCE(cells.emoji, EXCLUDED.emoji)
-      END,
-      background_color = COALESCE(cells.background_color, EXCLUDED.background_color)
+    UPDATE cells AS c
+       SET emoji = ${generatedCellEmojiSql("c.id")}
+     WHERE c.status <> 'paid'
+       AND EXISTS (
+         SELECT 1
+           FROM winning_positions AS wp
+          WHERE wp.cell_id = c.id
+            AND wp.claimed = false
+       )
   `);
 }
 
@@ -358,7 +361,7 @@ router.get("/cells", async (request, response) => {
       }) => ({
         id: row.id,
         status: publicStatus(row.status),
-        emoji: row.emoji,
+        emoji: publicStatus(row.status) === "paid" ? row.emoji : null,
         backgroundColor: row.background_color,
         expiresAt:
           publicStatus(row.status) === "reserved" && row.reserved_at
@@ -410,7 +413,7 @@ router.get("/cells/:id", async (request, response) => {
     response.json({
       id,
       status: "available",
-      emoji: cell.emoji,
+       emoji: null,
       backgroundColor: cell.background_color,
       expiresAt: null,
       reservationOwned: false,
@@ -421,7 +424,7 @@ router.get("/cells/:id", async (request, response) => {
     response.json({
       id,
       status: publicStatus(cell.status),
-      emoji: cell.emoji,
+       emoji: null,
       backgroundColor: cell.background_color,
       expiresAt:
         publicStatus(cell.status) === "reserved" && cell.reserved_at

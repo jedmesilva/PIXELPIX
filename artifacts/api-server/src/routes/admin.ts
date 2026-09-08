@@ -90,14 +90,20 @@ router.post("/prize-batch/generate", async (request, response): Promise<void> =>
   } catch (error) {
     if (error instanceof PrizeBatchAlreadyExistsError) {
       response.status(409).json({
-        error: error.message,
+        error:
+          error instanceof Error
+            ? error.message
+            : "O lote de prêmios já foi gerado e não pode ser substituído.",
         code: "prize_batch_already_generated",
       });
       return;
     }
     request.log.error({ error }, "Prize batch generation failed");
     response.status(500).json({
-      error: "Não foi possível gerar o lote de prêmios.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Não foi possível gerar o lote de prêmios.",
     });
   }
 });

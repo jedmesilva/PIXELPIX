@@ -1588,7 +1588,7 @@ function PixelGrid() {
         Array<{
           id: number;
           status: "available" | "reserved" | "paid";
-          emoji: string;
+          emoji: string | null;
           backgroundColor: string;
           expiresAt?: string | null;
         }>
@@ -1726,7 +1726,7 @@ function PixelGrid() {
     void fetchJson<{
       id: number;
       status: "available" | "reserved" | "paid";
-      emoji: string;
+      emoji: string | null;
       backgroundColor: string;
       expiresAt?: string | null;
       reservationOwned: boolean;
@@ -1929,7 +1929,7 @@ function PixelGrid() {
                       : `Pixel ${id}, ${statusLabel}`
                 }
               >
-                {pixel.revealed || pixel.emoji === "💰" ? (
+                {pixel.revealed ? (
                   <span style={{ fontSize: emojiSize }}>{pixel.emoji}</span>
                 ) : (
                   <Lock size={iconSize} color="rgba(255,255,255,.75)" />
