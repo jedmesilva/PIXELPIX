@@ -486,7 +486,7 @@ router.post("/cells/reserve", async (request, response) => {
     const result = await pool.query(
       `INSERT INTO cells (id, status, emoji, background_color)
        SELECT $1, 'reserved',
-              ${generatedCellEmojiSql("$1")},
+              ${generatedCellEmojiSql("($1::integer)")},
               ${generatedCellBackgroundSql("$1")}
        ON CONFLICT (id) DO UPDATE
          SET reservation_token = gen_random_uuid(),
