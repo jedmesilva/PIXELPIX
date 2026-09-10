@@ -35,7 +35,12 @@ export type PrizeBatchSummary = {
   canGenerate: boolean;
 };
 
-export type PrizeTierDraft = PrizeBatchTier & {
+export type PrizeTierDraft = {
+  tierId: number;
+  label: string;
+  quantity: number;
+  nominalValueCents: number;
+  totalValueCents: number;
   status: "draft";
   createdAt: string;
 };
@@ -250,7 +255,7 @@ export async function getPrizeBatchStatus(pool: Pool): Promise<PrizeBatchSummary
 
   const batchRow = batch.rows[0];
   const draftTiers: PrizeTierDraft[] = drafts.rows.map((row) => ({
-    id: Number(row.tier_id),
+    tierId: Number(row.tier_id),
     label: String(row.label),
     quantity: Number(row.total_positions),
     nominalValueCents: Number(row.nominal_value_cents),
@@ -457,6 +462,47 @@ export async function addPrizeTier(
       remainingCells,
       status: "draft",
     };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deletePrizeTier(
+  pool: Pool,
+  tierId: number,
+): Promise<void> {
+  if (!Number.isInteger(tierId) || tierId <= 0) {
+    throw new PrizeTierConfigurationError("Tier inválido.");
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock($1)", [PRIZE_BATCH_LOCK_KEY]);
+
+    const draftResult = await client.query(
+      `SELECT status
+         FROM prize_tier_drafts
+        WHERE tier_id = $1
+        FOR UPDATE`,
+      [tierId],
+    );
+    const draft = draftResult.rows[0];
+    if (!draft || draft.status !== "draft") {
+      throw new PrizeTierConfigurationError(
+        "Somente tiers em rascunho podem ser apagados.",
+      );
+    }
+
+    await client.query(
+      `DELETE FROM prize_tier_drafts
+        WHERE tier_id = $1 AND status = 'draft'`,
+      [tierId],
+    );
+    await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

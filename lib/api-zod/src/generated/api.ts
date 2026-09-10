@@ -800,6 +800,20 @@ export const DrawAdminPrizeTierResponse = zod.object({
 
 
 /**
+ * Only a configured tier that has not been drawn can be deleted.
+ * @summary Delete a prize tier that is still a draft
+ */
+
+
+
+export const DeleteAdminPrizeTierParams = zod.object({
+  "tierId": zod.coerce.number().int().min(1)
+})
+
+export const DeleteAdminPrizeTierResponse = zod.void()
+
+
+/**
  * @summary List awarded positions with planned and distributed prize values
  */
 export const listAdminPrizePositionsQueryStatusDefault = `all`;

@@ -1,7 +1,7 @@
-import { ArrowLeft, ArrowRight, BadgeCheck, Check, Copy, Database, Fingerprint, LockKeyhole, RefreshCw, Search, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, Check, Copy, Database, Fingerprint, LockKeyhole, RefreshCw, Search, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAddAdminPrizeTier, useDrawAdminPrizeTier, useGenerateAdminPrizeBatch, useGetAdminPrizeBatch, useGetAdminPrizePool, useListAdminPrizePositions, getGetAdminPrizeBatchQueryKey, getGetAdminPrizePoolQueryKey, getListAdminPrizePositionsQueryKey } from '@workspace/api-client-react';
+import { useAddAdminPrizeTier, useDeleteAdminPrizeTier, useDrawAdminPrizeTier, useGenerateAdminPrizeBatch, useGetAdminPrizeBatch, useGetAdminPrizePool, useListAdminPrizePositions, getGetAdminPrizeBatchQueryKey, getGetAdminPrizePoolQueryKey, getListAdminPrizePositionsQueryKey } from '@workspace/api-client-react';
 import { AdminShell, PageHeader } from '@/components/admin-shell';
 import { AccessKeyPrompt, EmptyState, ErrorState, LoadingPanel, SectionHeading, formatBRL, formatDate, isAccessError, useAdminAccess, withAdminAuthRevision } from '@/components/admin-ui';
 
@@ -37,6 +37,8 @@ function PrizeBatchControl() {
   const [tierSuccess, setTierSuccess] = useState('');
   const [drawTierId, setDrawTierId] = useState<number | null>(null);
   const [drawError, setDrawError] = useState('');
+  const [deleteTierId, setDeleteTierId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState('');
   const batch = useGetAdminPrizeBatch({
     request: { headers: { 'x-admin-access-key': accessKey } },
     query: {
@@ -96,6 +98,22 @@ function PrizeBatchControl() {
       onError: (error) => {
         setDrawError(error instanceof Error ? error.message : 'Não foi possível sortear este tier.');
         setDrawTierId(null);
+      },
+    },
+  });
+  const deleteTier = useDeleteAdminPrizeTier({
+    request: { headers: { 'x-admin-access-key': accessKey } },
+    mutation: {
+      onSuccess: async () => {
+        setDeleteTierId(null);
+        setDeleteError('');
+        setTierSuccess('Tier em rascunho apagado. As células planejadas voltaram a ficar disponíveis.');
+        await queryClient.invalidateQueries({ queryKey: getGetAdminPrizeBatchQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getGetAdminPrizePoolQueryKey() });
+      },
+      onError: (error) => {
+        setDeleteTierId(null);
+        setDeleteError(error instanceof Error ? error.message : 'Não foi possível apagar este tier.');
       },
     },
   });
@@ -204,7 +222,8 @@ function PrizeBatchControl() {
             <button className="button button-ghost" disabled={addTier.isPending} onClick={() => { setAddTierOpen(false); setTierError(''); }}>Cancelar</button>
           </div>
          </div>}
-         {drawError && <div className="mt-3 rounded-lg border border-[#e7b5a8] bg-[#fff6f2] px-3 py-2 text-xs font-semibold text-[#a83d2f]">{drawError}</div>}
+          {drawError && <div className="mt-3 rounded-lg border border-[#e7b5a8] bg-[#fff6f2] px-3 py-2 text-xs font-semibold text-[#a83d2f]">{drawError}</div>}
+          {deleteError && <div className="mt-3 rounded-lg border border-[#e7b5a8] bg-[#fff6f2] px-3 py-2 text-xs font-semibold text-[#a83d2f]">{deleteError}</div>}
          {data.draftTiers.length > 0 && <div className="mt-5 border-t border-border/70 pt-5">
            <div className="section-kicker">Tiers aguardando sorteio</div>
            <p className="mt-1 text-sm text-muted-foreground">Os tiers abaixo estão configurados, mas ainda não fazem parte do grid premiado.</p>
@@ -219,7 +238,10 @@ function PrizeBatchControl() {
                      <div><span className="block text-muted-foreground">Valor nominal</span><strong className="font-mono-ui">{formatBRL(draft.totalValueCents)}</strong></div>
                    </div>
                  </div>
-                 <button className="button button-coral shrink-0" disabled={drawTier.isPending} onClick={() => { if (window.confirm(`Sortear ${draft.quantity.toLocaleString('pt-BR')} células para o tier ${draft.label}? Esta ação é irreversível.`)) { setDrawError(''); setDrawTierId(draft.tierId); drawTier.mutate({ tierId: draft.tierId, data: { confirm: true } }); } }}>{drawTierId === draft.tierId ? 'Sorteando…' : 'Sortear células'}</button>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                    <button className="button button-ghost" disabled={drawTier.isPending || deleteTier.isPending} onClick={() => { if (window.confirm(`Apagar o tier ${draft.label}? O orçamento reservado voltará a ficar disponível e nenhum sorteio será feito.`)) { setDeleteError(''); setDeleteTierId(draft.tierId); deleteTier.mutate({ tierId: draft.tierId }); } }}>{deleteTierId === draft.tierId ? 'Apagando…' : <><Trash2 size={14} /> Apagar</>}</button>
+                    <button className="button button-coral" disabled={drawTier.isPending || deleteTier.isPending} onClick={() => { if (window.confirm(`Sortear ${draft.quantity.toLocaleString('pt-BR')} células para o tier ${draft.label}? Esta ação é irreversível.`)) { setDrawError(''); setDeleteError(''); setDrawTierId(draft.tierId); drawTier.mutate({ tierId: draft.tierId, data: { confirm: true } }); } }}>{drawTierId === draft.tierId ? 'Sorteando…' : 'Sortear células'}</button>
+                  </div>
                </div>
              ))}
            </div>

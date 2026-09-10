@@ -596,6 +596,37 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/prize-tiers/{tierId}:
+    delete:
+      operationId: deleteAdminPrizeTier
+      tags: [admin]
+      summary: Delete a prize tier that is still a draft
+      description: Only a configured tier that has not been drawn can be deleted.
+      security:
+        - AdminAccessKey: []
+      parameters:
+        - name: tierId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204":
+          description: Draft prize tier deleted
+        "400":
+          description: Invalid tier identifier
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Tier is not a deletable draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /admin/prize-positions:
     get:
       operationId: listAdminPrizePositions

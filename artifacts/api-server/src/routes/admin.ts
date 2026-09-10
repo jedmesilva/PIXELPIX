@@ -9,6 +9,7 @@ import {
   GetAdminOverviewResponse,
   AddAdminPrizeTierBody,
   AddAdminPrizeTierResponse,
+  DeleteAdminPrizeTierParams,
   DrawAdminPrizeTierBody,
   ListAdminRedemptionsQueryParams,
   ListAdminRedemptionsResponse,
@@ -26,6 +27,7 @@ import { sendPixTransfer } from "../lib/efi";
 import {
   generatePrizeBatch,
   addPrizeTier,
+  deletePrizeTier,
   drawPrizeTier,
   getPrizeBatchStatus,
   PrizeBatchAlreadyExistsError,
@@ -162,6 +164,26 @@ router.post("/prize-tiers/:tierId/draw", async (request, response): Promise<void
       return;
     }
     request.log.error({ error }, "Admin prize tier draw failed");
+    throw error;
+  }
+});
+
+router.delete("/prize-tiers/:tierId", async (request, response): Promise<void> => {
+  const parsed = DeleteAdminPrizeTierParams.safeParse(request.params);
+  if (!parsed.success) {
+    response.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  try {
+    await deletePrizeTier(pool, parsed.data.tierId);
+    response.sendStatus(204);
+  } catch (error) {
+    if (error instanceof PrizeTierConfigurationError) {
+      response.status(409).json({ error: error.message });
+      return;
+    }
+    request.log.error({ error }, "Admin prize tier deletion failed");
     throw error;
   }
 });

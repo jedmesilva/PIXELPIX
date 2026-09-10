@@ -1740,6 +1740,78 @@ export const useDrawAdminPrizeTier = <TError = ErrorType<ErrorResponse>,
       return useMutation(getDrawAdminPrizeTierMutationOptions(options));
     }
 
+export const getDeleteAdminPrizeTierUrl = (tierId: number,) => {
+
+
+
+
+  return `/api/admin/prize-tiers/${tierId}`
+}
+
+/**
+ * Only a configured tier that has not been drawn can be deleted.
+ * @summary Delete a prize tier that is still a draft
+ */
+export const deleteAdminPrizeTier = async (tierId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteAdminPrizeTierUrl(tierId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteAdminPrizeTierMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminPrizeTier>>, TError,{tierId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminPrizeTier>>, TError,{tierId: number}, TContext> => {
+
+const mutationKey = ['deleteAdminPrizeTier'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminPrizeTier>>, {tierId: number}> = (props) => {
+          const {tierId} = props ?? {};
+
+          return  deleteAdminPrizeTier(tierId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAdminPrizeTierMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAdminPrizeTier>>>
+
+    export type DeleteAdminPrizeTierMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete a prize tier that is still a draft
+ */
+export const useDeleteAdminPrizeTier = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminPrizeTier>>, TError,{tierId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAdminPrizeTier>>,
+        TError,
+        {tierId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteAdminPrizeTierMutationOptions(options));
+    }
+
 export const getListAdminPrizePositionsUrl = (params?: ListAdminPrizePositionsParams,) => {
   const normalizedParams = new URLSearchParams();
 
