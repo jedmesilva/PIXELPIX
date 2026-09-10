@@ -8,6 +8,7 @@ import AdminOverview from '@/pages/admin-overview';
 import AdminRedemptions from '@/pages/admin-redemptions';
 import AdminPrizePool from '@/pages/admin-prize-pool';
 import AdminManual from '@/pages/admin-manual';
+import { adminRoutes } from '@/lib/routes';
 import {
   Route,
   Switch,
@@ -23,15 +24,10 @@ function Router() {
     // survives a page crash.
     <RoutedErrorBoundary>
       <Switch>
-        <Route path="/" component={AdminOverview} />
-        <Route path="/admin" component={AdminOverview} />
-        <Route path="/admin/" component={AdminOverview} />
-        <Route path="/redemptions" component={AdminRedemptions} />
-        <Route path="/admin/redemptions" component={AdminRedemptions} />
-        <Route path="/prize-pool" component={AdminPrizePool} />
-        <Route path="/admin/prize-pool" component={AdminPrizePool} />
-        <Route path="/manual" component={AdminManual} />
-        <Route path="/admin/manual" component={AdminManual} />
+        <Route path={adminRoutes.overview} component={AdminOverview} />
+        <Route path={adminRoutes.redemptions} component={AdminRedemptions} />
+        <Route path={adminRoutes.prizePool} component={AdminPrizePool} />
+        <Route path={adminRoutes.manual} component={AdminManual} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>

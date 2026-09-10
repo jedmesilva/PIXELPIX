@@ -1,8 +1,10 @@
 import { ArrowDownToLine, ArrowUpFromLine, CircleDollarSign, Grid3X3, RefreshCw, Trophy, Users } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { useGetAdminOverview, useListAdminRedemptions, getGetAdminOverviewQueryKey, getListAdminRedemptionsQueryKey } from '@workspace/api-client-react';
 import { AdminShell, MetricCard, PageHeader } from '@/components/admin-shell';
 import { AccessKeyPrompt, ErrorState, EmptyState, LoadingPanel, StatusBadge, formatBRL, formatCompact, formatDate, isAccessError, SectionHeading, useAdminAccess, withAdminAuthRevision } from '@/components/admin-ui';
+import { adminRoutes } from '@/lib/routes';
 
 function OverviewContent() {
   const { accessKey, authRevision, saveAccessKey } = useAdminAccess();
@@ -53,7 +55,7 @@ function OverviewContent() {
       </section>
     </div>
     <section className="panel overflow-hidden" data-testid="panel-recent-redemptions">
-       <SectionHeading kicker="C — precisa de ação" title="Última atividade de resgates" detail="As solicitações mais novas que podem exigir análise." action={<a href="/admin/redemptions" className="drill-link" data-testid="link-all-redemptions">Abrir fila completa <span>→</span></a>} />
+       <SectionHeading kicker="C — precisa de ação" title="Última atividade de resgates" detail="As solicitações mais novas que podem exigir análise." action={<Link href={adminRoutes.redemptions} className="drill-link" data-testid="link-all-redemptions">Abrir fila completa <span>→</span></Link>} />
       {recent.data?.items?.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Solicitante</th><th>Certificado</th><th>Valor</th><th>Solicitado em</th><th>Status</th></tr></thead><tbody>{recent.data.items.map((item) => <tr key={item.id} data-testid={`row-recent-redemption-${item.id}`}><td><div className="font-semibold">{item.email}</div><div className="mt-0.5 text-xs text-muted-foreground">célula #{item.cellId}</div></td><td className="font-mono-ui text-xs">{item.certificateCode}</td><td className="font-mono-ui text-sm font-bold">{formatBRL(item.requestedAmountCents)}</td><td className="text-xs text-muted-foreground">{formatDate(item.requestedAt, true)}</td><td><StatusBadge status={item.status} /></td></tr>)}</tbody></table></div> : <EmptyState title="Nenhum resgate recente" detail="A fila está limpa por enquanto." />}
     </section>
     <div className="flex items-center justify-end gap-2 text-[11px] text-muted-foreground"><span className="pulse-dot size-1.5 rounded-full bg-[#789a31]" /> Dados gerados em {formatDate(data.generatedAt, true)}</div>

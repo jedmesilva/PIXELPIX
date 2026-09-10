@@ -1,12 +1,13 @@
 import { Activity, BookOpen, Boxes, LayoutDashboard, LogOut, Menu, ShieldCheck, Sparkles, TicketCheck, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
+import { adminRoutes } from '@/lib/routes';
 
 const navigation = [
-  { href: '/admin/', label: 'Visão geral', icon: LayoutDashboard },
-  { href: '/admin/prize-pool', label: 'Prêmios e sorteios', icon: Boxes },
-  { href: '/admin/redemptions', label: 'Fila de resgates', icon: TicketCheck },
-  { href: '/admin/manual', label: 'Manual', icon: BookOpen },
+  { href: adminRoutes.overview, label: 'Visão geral', icon: LayoutDashboard },
+  { href: adminRoutes.prizePool, label: 'Prêmios e sorteios', icon: Boxes },
+  { href: adminRoutes.redemptions, label: 'Fila de resgates', icon: TicketCheck },
+  { href: adminRoutes.manual, label: 'Manual', icon: BookOpen },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -15,7 +16,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const sidebar = (
     <aside className="flex h-full w-[248px] shrink-0 flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-[76px] items-center border-b border-sidebar-border px-6">
-        <Link href="/admin/" className="flex items-center gap-3" data-testid="link-admin-home">
+        <Link href={adminRoutes.overview} className="flex items-center gap-3" data-testid="link-admin-home">
           <span className="grid size-9 place-items-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
             <Sparkles size={17} strokeWidth={2.5} />
           </span>
@@ -29,7 +30,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <div className="mb-3 px-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/45">Operação</div>
         <nav className="space-y-1">
           {navigation.map(({ href, label, icon: Icon }) => {
-            const active = href === '/admin/' ? location === href || location === '/admin' : location.startsWith(href);
+            const active = href === adminRoutes.overview
+              ? location === href
+              : location === href || location.startsWith(`${href}/`);
             return (
               <Link href={href} key={href} onClick={() => setMobileOpen(false)} className={`group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold ${active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground/68 hover:bg-sidebar-accent hover:text-sidebar-foreground'}`} data-testid={`link-nav-${label.toLowerCase().replace(' ', '-')}`}>
                 <Icon size={17} />
