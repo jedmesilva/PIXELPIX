@@ -18,6 +18,20 @@ const cellStatusLabels: Record<string, string> = {
   expired: 'Expirada',
 };
 
+type DraftTierWithLegacyId = {
+  tierId?: number;
+  id?: number;
+  label: string;
+  quantity: number;
+};
+
+function getDraftTierId(draft: DraftTierWithLegacyId) {
+  const tierId = draft.tierId ?? draft.id;
+  return typeof tierId === 'number' && Number.isInteger(tierId) && tierId > 0
+    ? tierId
+    : undefined;
+}
+
 function parseMoneyInput(value: string) {
   const normalized = value.trim().replace(",", ".");
   const amount = Number(normalized);
@@ -229,9 +243,13 @@ function PrizeBatchControl() {
            <p className="mt-1 text-sm text-muted-foreground">Os tiers abaixo estão configurados, mas ainda não fazem parte do grid premiado.</p>
            <div className="mt-3 grid gap-3 lg:grid-cols-2">
              {data.draftTiers.map((draft) => (
-               <div className="tier-draft-card" key={draft.tierId}>
+                (() => {
+                  const draftTierId = getDraftTierId(draft);
+                  const draftKey = draftTierId ? `draft-${draftTierId}` : `draft-${draft.label}-${draft.createdAt}`;
+                  const missingDraftId = !draftTierId;
+                  return <div className="tier-draft-card" key={draftKey}>
                  <div className="min-w-0">
-                   <div className="flex items-center gap-2"><span className="tier-index">{String(draft.tierId).padStart(2, '0')}</span><strong>{draft.label}</strong><span className="status-badge status-pending">Rascunho</span></div>
+                    <div className="flex items-center gap-2"><span className="tier-index">{draftTierId ? String(draftTierId).padStart(2, '0') : '—'}</span><strong>{draft.label}</strong><span className="status-badge status-pending">Rascunho</span></div>
                    <div className="mt-2 grid grid-cols-3 gap-3 text-xs">
                      <div><span className="block text-muted-foreground">Por célula</span><strong className="font-mono-ui">{formatBRL(draft.nominalValueCents)}</strong></div>
                      <div><span className="block text-muted-foreground">Células</span><strong className="font-mono-ui">{draft.quantity.toLocaleString('pt-BR')}</strong></div>
@@ -239,10 +257,11 @@ function PrizeBatchControl() {
                    </div>
                  </div>
                   <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                    <button className="button button-ghost" disabled={drawTier.isPending || deleteTier.isPending} onClick={() => { if (window.confirm(`Apagar o tier ${draft.label}? O orçamento reservado voltará a ficar disponível e nenhum sorteio será feito.`)) { setDeleteError(''); setDeleteTierId(draft.tierId); deleteTier.mutate({ tierId: draft.tierId }); } }}>{deleteTierId === draft.tierId ? 'Apagando…' : <><Trash2 size={14} /> Apagar</>}</button>
-                    <button className="button button-coral" disabled={drawTier.isPending || deleteTier.isPending} onClick={() => { if (window.confirm(`Sortear ${draft.quantity.toLocaleString('pt-BR')} células para o tier ${draft.label}? Esta ação é irreversível.`)) { setDrawError(''); setDeleteError(''); setDrawTierId(draft.tierId); drawTier.mutate({ tierId: draft.tierId, data: { confirm: true } }); } }}>{drawTierId === draft.tierId ? 'Sorteando…' : 'Sortear células'}</button>
+                    <button className="button button-ghost" disabled={missingDraftId || drawTier.isPending || deleteTier.isPending} onClick={() => { if (!draftTierId) { setDeleteError('Este rascunho não possui um identificador válido. Atualize o console antes de tentar novamente.'); return; } if (window.confirm(`Apagar o tier ${draft.label}? O orçamento reservado voltará a ficar disponível e nenhum sorteio será feito.`)) { setDeleteError(''); setDeleteTierId(draftTierId); deleteTier.mutate({ tierId: draftTierId }); } }}>{deleteTierId === draftTierId ? 'Apagando…' : <><Trash2 size={14} /> Apagar</>}</button>
+                    <button className="button button-coral" disabled={missingDraftId || drawTier.isPending || deleteTier.isPending} onClick={() => { if (!draftTierId) { setDrawError('Este rascunho não possui um identificador válido. Atualize o console antes de tentar novamente.'); return; } if (window.confirm(`Sortear ${draft.quantity.toLocaleString('pt-BR')} células para o tier ${draft.label}? Esta ação é irreversível.`)) { setDrawError(''); setDeleteError(''); setDrawTierId(draftTierId); drawTier.mutate({ tierId: draftTierId, data: { confirm: true } }); } }}>{drawTierId === draftTierId ? 'Sorteando…' : 'Sortear células'}</button>
                   </div>
-               </div>
+                  </div>;
+                })()
              ))}
            </div>
          </div>}
