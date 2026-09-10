@@ -22,6 +22,8 @@ export * from './adminPrizePositionCellStatus';
 export * from './adminPrizePositionList';
 export * from './adminPrizePositionPositionStatus';
 export * from './adminPrizeTier';
+export * from './adminPrizeTierCreated';
+export * from './adminPrizeTierInput';
 export * from './adminRedemption';
 export * from './adminRedemptionList';
 export * from './adminRedemptionStatus';

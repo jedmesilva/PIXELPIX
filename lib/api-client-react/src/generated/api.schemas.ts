@@ -476,6 +476,41 @@ export const AdminPrizeBatchGenerateInputValue = {
 } as const;
 export type AdminPrizeBatchGenerateInput = typeof AdminPrizeBatchGenerateInputValue;
 
+export interface AdminPrizeTierInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /** @minimum 1 */
+  totalValueCents: number;
+  /** @minimum 1 */
+  nominalValueCents: number;
+  confirm: true;
+}
+
+export interface AdminPrizeTierCreated {
+  /** @minimum 1 */
+  batchId: number;
+  /** @minimum 1 */
+  tierId: number;
+  label: string;
+  /** @minimum 1 */
+  quantity: number;
+  /** @minimum 1 */
+  nominalValueCents: number;
+  /** @minimum 1 */
+  totalValueCents: number;
+  /**
+     * @minLength 64
+     * @maxLength 64
+     */
+  commitHash: string;
+  createdAt: string;
+  /** @minimum 0 */
+  remainingCells: number;
+}
+
 export type AdminPrizePositionPositionStatus = typeof AdminPrizePositionPositionStatus[keyof typeof AdminPrizePositionPositionStatus];
 
 

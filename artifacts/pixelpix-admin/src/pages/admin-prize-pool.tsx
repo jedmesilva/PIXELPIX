@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, BadgeCheck, Check, Copy, Database, Fingerprint, LockKeyhole, RefreshCw, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useGenerateAdminPrizeBatch, useGetAdminPrizeBatch, useGetAdminPrizePool, useListAdminPrizePositions, getGetAdminPrizeBatchQueryKey, getGetAdminPrizePoolQueryKey, getListAdminPrizePositionsQueryKey } from '@workspace/api-client-react';
+import { useAddAdminPrizeTier, useGenerateAdminPrizeBatch, useGetAdminPrizeBatch, useGetAdminPrizePool, useListAdminPrizePositions, getGetAdminPrizeBatchQueryKey, getGetAdminPrizePoolQueryKey, getListAdminPrizePositionsQueryKey } from '@workspace/api-client-react';
 import { AdminShell, PageHeader } from '@/components/admin-shell';
 import { AccessKeyPrompt, EmptyState, ErrorState, LoadingPanel, SectionHeading, formatBRL, formatDate, isAccessError, useAdminAccess, withAdminAuthRevision } from '@/components/admin-ui';
 
@@ -18,11 +18,23 @@ const cellStatusLabels: Record<string, string> = {
   expired: 'Expirada',
 };
 
+function parseMoneyInput(value: string) {
+  const normalized = value.trim().replace(",", ".");
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) : 0;
+}
+
 function PrizeBatchControl() {
   const { accessKey, authRevision } = useAdminAccess();
   const queryClient = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [addTierOpen, setAddTierOpen] = useState(false);
+  const [tierLabel, setTierLabel] = useState('');
+  const [tierTotalValue, setTierTotalValue] = useState('');
+  const [tierUnitValue, setTierUnitValue] = useState('');
+  const [tierError, setTierError] = useState('');
+  const [tierSuccess, setTierSuccess] = useState('');
   const batch = useGetAdminPrizeBatch({
     request: { headers: { 'x-admin-access-key': accessKey } },
     query: {
@@ -41,6 +53,31 @@ function PrizeBatchControl() {
       },
     },
   });
+  const addTier = useAddAdminPrizeTier({
+    request: { headers: { 'x-admin-access-key': accessKey } },
+    mutation: {
+      onSuccess: async (result) => {
+        setAddTierOpen(false);
+        setTierLabel('');
+        setTierTotalValue('');
+        setTierUnitValue('');
+        setTierError('');
+        setTierSuccess(
+          `Tier ${result.label} criado com ${result.quantity.toLocaleString('pt-BR')} células. Commit: ${result.commitHash}`,
+        );
+        await queryClient.invalidateQueries({ queryKey: getGetAdminPrizeBatchQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getGetAdminPrizePoolQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getListAdminPrizePositionsQueryKey() });
+      },
+      onError: (error) => {
+        setTierError(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível adicionar o tier.',
+        );
+      },
+    },
+  });
 
   if (!accessKey || batch.isLoading) return null;
   if (batch.isError) {
@@ -51,14 +88,73 @@ function PrizeBatchControl() {
   if (!data) return null;
 
   if (data.status === 'generated') {
+    const totalValueCents = parseMoneyInput(tierTotalValue);
+    const nominalValueCents = parseMoneyInput(tierUnitValue);
+    const quantity =
+      totalValueCents > 0 &&
+      nominalValueCents > 0 &&
+      totalValueCents % nominalValueCents === 0
+        ? totalValueCents / nominalValueCents
+        : 0;
+
+    const submitTier = () => {
+      if (!tierLabel.trim()) {
+        setTierError('Informe um nome para o tier.');
+        return;
+      }
+      if (!totalValueCents || !nominalValueCents) {
+        setTierError('Informe o valor total e o valor por célula.');
+        return;
+      }
+      if (!quantity) {
+        setTierError('O valor total precisa ser divisível pelo valor por célula.');
+        return;
+      }
+      setTierError('');
+      addTier.mutate({
+        data: {
+          label: tierLabel.trim(),
+          totalValueCents,
+          nominalValueCents,
+          confirm: true,
+        },
+      });
+    };
+
     return <section className="panel overflow-hidden" data-testid="panel-prize-batch-generated">
       <div className="flex flex-col gap-4 border-b border-border/70 bg-[#eaf6d9] px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#789a31] text-white"><Check size={19} /></div><div><div className="section-kicker text-[#557a1d]">Lote selado</div><h2 className="mt-1 text-lg font-bold">Distribuição premiada ativa</h2><p className="mt-1 text-sm text-[#557a1d]">O lote único já foi criado e não pode ser substituído.</p></div></div>
+        <div className="flex items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#789a31] text-white"><Check size={19} /></div><div><div className="section-kicker text-[#557a1d]">Lote selado</div><h2 className="mt-1 text-lg font-bold">Distribuição premiada ativa</h2><p className="mt-1 text-sm text-[#557a1d]">O lote inicial é imutável, mas novos tiers podem ser adicionados em operações auditáveis.</p></div></div>
         <div className="text-left sm:text-right"><div className="text-[10px] font-bold uppercase tracking-[.14em] text-[#557a1d]">Criado em</div><div className="mt-1 font-mono-ui text-xs">{formatDate(data.createdAt, true)}</div></div>
       </div>
       <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.4fr]">
         <div><div className="section-kicker">Commit hash</div><div className="mt-2 flex items-start gap-2"><code className="min-w-0 break-all rounded-lg bg-muted px-3 py-2 font-mono-ui text-[11px] leading-5">{data.commitHash}</code>{data.commitHash && <button className="icon-button shrink-0" aria-label="Copiar commit hash" onClick={() => { void navigator.clipboard.writeText(data.commitHash!).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); }); }}><Copy size={14} /></button>}</div>{copied && <div className="mt-2 text-xs font-semibold text-[#557a1d]">Copiado.</div>}</div>
         <div className="grid gap-3 sm:grid-cols-3">{data.tiers.map((tier) => <div className="rounded-xl border border-border/70 bg-muted/30 p-3" key={tier.id}><div className="text-xs font-semibold">{tier.label}</div><div className="mt-2 font-mono-ui text-lg font-bold">{tier.quantity.toLocaleString('pt-BR')}</div><div className="text-[10px] text-muted-foreground">de {formatBRL(tier.nominalValueCents)}</div></div>)}</div>
+      </div>
+      <div className="border-t border-border/70 bg-muted/15 px-5 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div><div className="section-kicker">Expandir distribuição</div><p className="mt-1 text-sm text-muted-foreground">Adicione um novo tier sem alterar as posições já sorteadas.</p></div>
+          {!addTierOpen && <button className="button button-coral" onClick={() => { setAddTierOpen(true); setTierSuccess(''); setTierError(''); }}><Sparkles size={15} /> Adicionar tier</button>}
+        </div>
+        {tierSuccess && <div className="mt-3 rounded-lg border border-[#b9d993] bg-[#f1f9e8] px-3 py-2 text-xs font-semibold text-[#557a1d]">{tierSuccess}</div>}
+        {addTierOpen && <div className="mt-4 rounded-xl border border-border/70 bg-card p-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="field-label"><span>Nome do tier</span><input className="field" value={tierLabel} maxLength={80} onChange={(event) => setTierLabel(event.target.value)} placeholder="Ex.: R$25" /></label>
+            <label className="field-label"><span>Valor total do tier</span><input className="field" type="number" min="0.01" step="0.01" value={tierTotalValue} onChange={(event) => setTierTotalValue(event.target.value)} placeholder="1000.00" /></label>
+            <label className="field-label"><span>Valor por célula</span><input className="field" type="number" min="0.01" step="0.01" value={tierUnitValue} onChange={(event) => setTierUnitValue(event.target.value)} placeholder="25.00" /></label>
+          </div>
+          <div className="mt-4 rounded-lg bg-muted/40 px-3 py-3 text-sm">
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <span><strong>Quantidade calculada:</strong> {quantity ? quantity.toLocaleString('pt-BR') : '—'} células</span>
+              <span><strong>Valor total:</strong> {totalValueCents ? formatBRL(totalValueCents) : '—'}</span>
+            </div>
+            {totalValueCents > 0 && nominalValueCents > 0 && !quantity && <p className="mt-2 text-xs font-semibold text-[#a83d2f]">O valor total precisa ser divisível pelo valor por célula.</p>}
+          </div>
+          {tierError && <div className="mt-3 rounded-lg border border-[#e7b5a8] bg-[#fff6f2] px-3 py-2 text-xs font-semibold text-[#a83d2f]">{tierError}</div>}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button className="button button-danger" disabled={addTier.isPending} onClick={submitTier}>{addTier.isPending ? 'Criando tier…' : 'Confirmar e sortear células'}</button>
+            <button className="button button-ghost" disabled={addTier.isPending} onClick={() => { setAddTierOpen(false); setTierError(''); }}>Cancelar</button>
+          </div>
+        </div>}
       </div>
     </section>;
   }

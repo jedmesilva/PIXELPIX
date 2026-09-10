@@ -7,6 +7,8 @@ import {
   GetAdminRedemptionParams,
   GetAdminRedemptionResponse,
   GetAdminOverviewResponse,
+  AddAdminPrizeTierBody,
+  AddAdminPrizeTierResponse,
   ListAdminRedemptionsQueryParams,
   ListAdminRedemptionsResponse,
   UpdateAdminRedemptionBody,
@@ -22,8 +24,11 @@ import {
 import { sendPixTransfer } from "../lib/efi";
 import {
   generatePrizeBatch,
+  addPrizeTier,
   getPrizeBatchStatus,
   PrizeBatchAlreadyExistsError,
+  PrizeBatchNotGeneratedError,
+  PrizeTierConfigurationError,
 } from "@workspace/prize-engine";
 
 const router: IRouter = Router();
@@ -105,6 +110,34 @@ router.post("/prize-batch/generate", async (request, response): Promise<void> =>
           ? error.message
           : "Não foi possível gerar o lote de prêmios.",
     });
+  }
+});
+
+router.post("/prize-tiers", async (request, response): Promise<void> => {
+  const parsed = AddAdminPrizeTierBody.safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  try {
+    const tier = await addPrizeTier(pool, {
+      label: parsed.data.label,
+      totalValueCents: parsed.data.totalValueCents,
+      nominalValueCents: parsed.data.nominalValueCents,
+    });
+    response.status(201).json(AddAdminPrizeTierResponse.parse(tier));
+  } catch (error) {
+    if (error instanceof PrizeBatchNotGeneratedError) {
+      response.status(409).json({ error: error.message });
+      return;
+    }
+    if (error instanceof PrizeTierConfigurationError) {
+      response.status(400).json({ error: error.message });
+      return;
+    }
+    request.log.error({ error }, "Admin prize tier creation failed");
+    throw error;
   }
 });
 

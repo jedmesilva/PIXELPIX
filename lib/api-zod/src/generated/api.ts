@@ -678,6 +678,47 @@ export const GenerateAdminPrizeBatchResponse = zod.object({
 
 
 /**
+ * @summary Add a new auditable prize tier to the existing distribution
+ */
+export const addAdminPrizeTierBodyLabelMax = 80;
+
+
+
+
+
+export const AddAdminPrizeTierBody = zod.object({
+  "label": zod.string().min(1).max(addAdminPrizeTierBodyLabelMax),
+  "totalValueCents": zod.int().min(1),
+  "nominalValueCents": zod.int().min(1),
+  "confirm": zod.literal(true)
+})
+
+
+
+
+
+
+export const addAdminPrizeTierResponseCommitHashMin = 64;
+export const addAdminPrizeTierResponseCommitHashMax = 64;
+
+export const addAdminPrizeTierResponseRemainingCellsMin = 0;
+
+
+
+export const AddAdminPrizeTierResponse = zod.object({
+  "batchId": zod.int().min(1),
+  "tierId": zod.int().min(1),
+  "label": zod.string(),
+  "quantity": zod.int().min(1),
+  "nominalValueCents": zod.int().min(1),
+  "totalValueCents": zod.int().min(1),
+  "commitHash": zod.string().min(addAdminPrizeTierResponseCommitHashMin).max(addAdminPrizeTierResponseCommitHashMax),
+  "createdAt": zod.coerce.date(),
+  "remainingCells": zod.int().min(addAdminPrizeTierResponseRemainingCellsMin)
+})
+
+
+/**
  * @summary List awarded positions with planned and distributed prize values
  */
 export const listAdminPrizePositionsQueryStatusDefault = `all`;

@@ -34,10 +34,42 @@ export type PrizeBatchSummary = {
   canGenerate: boolean;
 };
 
+export type AddPrizeTierInput = {
+  label: string;
+  totalValueCents: number;
+  nominalValueCents: number;
+};
+
+export type PrizeTierAdditionSummary = {
+  batchId: number;
+  tierId: number;
+  label: string;
+  quantity: number;
+  nominalValueCents: number;
+  totalValueCents: number;
+  commitHash: string;
+  createdAt: string;
+  remainingCells: number;
+};
+
 export class PrizeBatchAlreadyExistsError extends Error {
   constructor() {
     super("O lote de prêmios já foi gerado e não pode ser substituído.");
     this.name = "PrizeBatchAlreadyExistsError";
+  }
+}
+
+export class PrizeBatchNotGeneratedError extends Error {
+  constructor() {
+    super("O lote inicial precisa ser gerado antes de adicionar novos tiers.");
+    this.name = "PrizeBatchNotGeneratedError";
+  }
+}
+
+export class PrizeTierConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PrizeTierConfigurationError";
   }
 }
 
@@ -122,6 +154,60 @@ async function insertPositions(client: PoolClient, positions: WinningPosition[])
       params,
     );
   }
+}
+
+async function chooseAvailableCellIds(client: PoolClient, count: number) {
+  const selected = new Set<number>();
+  let attempts = 0;
+
+  while (selected.size < count && attempts < 40) {
+    const remaining = count - selected.size;
+    const candidateCount = Math.min(
+      TOTAL_CELLS,
+      Math.max(remaining * 4, 100),
+    );
+    const candidates = sortearIdsUnicos(TOTAL_CELLS, candidateCount);
+    const result = await client.query<{ id: number }>(
+      `SELECT c.id
+         FROM cells c
+        WHERE c.id = ANY($1::int[])
+          AND NOT EXISTS (
+            SELECT 1
+              FROM winning_positions wp
+             WHERE wp.cell_id = c.id
+          )`,
+      [candidates],
+    );
+
+    for (const row of result.rows) {
+      selected.add(Number(row.id));
+      if (selected.size === count) break;
+    }
+    attempts += 1;
+  }
+
+  if (selected.size < count) {
+    const fallback = await client.query<{ id: number }>(
+      `SELECT c.id
+         FROM cells c
+        WHERE NOT EXISTS (
+          SELECT 1
+            FROM winning_positions wp
+           WHERE wp.cell_id = c.id
+        )
+        ORDER BY random()
+        LIMIT $1`,
+      [count - selected.size],
+    );
+    for (const row of fallback.rows) selected.add(Number(row.id));
+  }
+
+  if (selected.size !== count) {
+    throw new PrizeTierConfigurationError(
+      "Não foi possível encontrar células disponíveis suficientes.",
+    );
+  }
+  return [...selected];
 }
 
 function generatedSummary(commitHash: string, createdAt: Date | string): PrizeBatchSummary {
@@ -243,6 +329,113 @@ export async function generatePrizeBatch(pool: Pool): Promise<PrizeBatchSummary>
     await client.query("COMMIT");
 
     return generatedSummary(commitHash, batch.rows[0].created_at);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function addPrizeTier(
+  pool: Pool,
+  input: AddPrizeTierInput,
+): Promise<PrizeTierAdditionSummary> {
+  const label = input.label.trim();
+  if (!label) {
+    throw new PrizeTierConfigurationError("Informe um nome para o tier.");
+  }
+  if (
+    !Number.isInteger(input.totalValueCents) ||
+    input.totalValueCents <= 0 ||
+    !Number.isInteger(input.nominalValueCents) ||
+    input.nominalValueCents <= 0
+  ) {
+    throw new PrizeTierConfigurationError(
+      "Os valores do tier precisam ser inteiros positivos em centavos.",
+    );
+  }
+  if (input.totalValueCents % input.nominalValueCents !== 0) {
+    throw new PrizeTierConfigurationError(
+      "O valor total precisa ser divisível pelo valor por célula.",
+    );
+  }
+
+  const quantity = input.totalValueCents / input.nominalValueCents;
+  if (quantity <= 0 || quantity > TOTAL_CELLS) {
+    throw new PrizeTierConfigurationError(
+      "A quantidade calculada de células é inválida.",
+    );
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock($1)", [PRIZE_BATCH_LOCK_KEY]);
+
+    const initialBatch = await client.query(
+      "SELECT id FROM prize_tier_batch WHERE id = 1",
+    );
+    if (initialBatch.rows.length === 0) {
+      throw new PrizeBatchNotGeneratedError();
+    }
+
+    const existing = await client.query<{ positions: string }>(
+      `SELECT COUNT(*)::text AS positions
+         FROM winning_positions`,
+    );
+    const usedPositions = Number(existing.rows[0]?.positions ?? 0);
+    const remainingCells = TOTAL_CELLS - usedPositions;
+    if (quantity > remainingCells) {
+      throw new PrizeTierConfigurationError(
+        `O grid tem apenas ${remainingCells.toLocaleString("pt-BR")} células disponíveis.`,
+      );
+    }
+
+    const nextTier = await client.query<{ tier_id: number }>(
+      `SELECT COALESCE(MAX(tier_id), 0) + 1 AS tier_id
+         FROM prize_pool`,
+    );
+    const tierId = Number(nextTier.rows[0]?.tier_id ?? 1);
+    const cellIds = await chooseAvailableCellIds(client, quantity);
+    const positions = cellIds.map((cellId) => ({ cellId, tierId }));
+    const commitHash = calculateCommitHash(positions);
+
+    await client.query(
+      `INSERT INTO prize_pool
+         (tier_id, label, nominal_value_cents, total_value_cents,
+          total_positions, remaining_value_cents, remaining_positions)
+       VALUES ($1, $2, $3, $4, $5, $4, $5)`,
+      [
+        tierId,
+        label,
+        input.nominalValueCents,
+        input.totalValueCents,
+        quantity,
+      ],
+    );
+    await insertPositions(client, positions);
+
+    const batch = await client.query<{ id: number; created_at: Date }>(
+      `INSERT INTO prize_tier_batch (id, commit_hash)
+       SELECT COALESCE(MAX(id), 0) + 1, $1
+         FROM prize_tier_batch
+       RETURNING id, created_at`,
+      [commitHash],
+    );
+    await client.query("COMMIT");
+
+    return {
+      batchId: Number(batch.rows[0]?.id),
+      tierId,
+      label,
+      quantity,
+      nominalValueCents: input.nominalValueCents,
+      totalValueCents: input.totalValueCents,
+      commitHash,
+      createdAt: new Date(batch.rows[0]?.created_at).toISOString(),
+      remainingCells: remainingCells - quantity,
+    };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

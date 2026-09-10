@@ -28,6 +28,8 @@ import type {
   AdminPrizeBatchGenerateInput,
   AdminPrizePool,
   AdminPrizePositionList,
+  AdminPrizeTierCreated,
+  AdminPrizeTierInput,
   AdminRedemption,
   AdminRedemptionList,
   AdminRedemptionUpdate,
@@ -1591,6 +1593,77 @@ export const useGenerateAdminPrizeBatch = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getGenerateAdminPrizeBatchMutationOptions(options));
+    }
+
+export const getAddAdminPrizeTierUrl = () => {
+
+
+
+
+  return `/api/admin/prize-tiers`
+}
+
+/**
+ * @summary Add a new auditable prize tier to the existing distribution
+ */
+export const addAdminPrizeTier = async (adminPrizeTierInput: AdminPrizeTierInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminPrizeTierCreated> => {
+
+  return customFetch<AdminPrizeTierCreated>(getAddAdminPrizeTierUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminPrizeTierInput)
+  }
+);}
+
+
+
+
+
+export const getAddAdminPrizeTierMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAdminPrizeTier>>, TError,{data: BodyType<AdminPrizeTierInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addAdminPrizeTier>>, TError,{data: BodyType<AdminPrizeTierInput>}, TContext> => {
+
+const mutationKey = ['addAdminPrizeTier'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addAdminPrizeTier>>, {data: BodyType<AdminPrizeTierInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  addAdminPrizeTier(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddAdminPrizeTierMutationResult = NonNullable<Awaited<ReturnType<typeof addAdminPrizeTier>>>
+    export type AddAdminPrizeTierMutationBody = BodyType<AdminPrizeTierInput>
+    export type AddAdminPrizeTierMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Add a new auditable prize tier to the existing distribution
+ */
+export const useAddAdminPrizeTier = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAdminPrizeTier>>, TError,{data: BodyType<AdminPrizeTierInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addAdminPrizeTier>>,
+        TError,
+        {data: BodyType<AdminPrizeTierInput>},
+        TContext
+      > => {
+      return useMutation(getAddAdminPrizeTierMutationOptions(options));
     }
 
 export const getListAdminPrizePositionsUrl = (params?: ListAdminPrizePositionsParams,) => {

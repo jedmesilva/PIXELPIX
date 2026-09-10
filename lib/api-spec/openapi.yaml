@@ -524,6 +524,39 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/prize-tiers:
+    post:
+      operationId: addAdminPrizeTier
+      tags: [admin]
+      summary: Add a new auditable prize tier to the existing distribution
+      security:
+        - AdminAccessKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPrizeTierInput" }
+      responses:
+        "201":
+          description: Prize tier created and positions allocated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPrizeTierCreated" }
+        "400":
+          description: Invalid tier values
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Initial batch is not ready for additions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /admin/prize-positions:
     get:
       operationId: listAdminPrizePositions
@@ -912,6 +945,28 @@ components:
       properties:
         confirm: { type: boolean, const: true }
       required: [confirm]
+    AdminPrizeTierInput:
+      type: object
+      properties:
+        label: { type: string, minLength: 1, maxLength: 80 }
+        totalValueCents: { type: integer, minimum: 1 }
+        nominalValueCents: { type: integer, minimum: 1 }
+        confirm: { type: boolean, const: true }
+      required: [label, totalValueCents, nominalValueCents, confirm]
+    AdminPrizeTierCreated:
+      type: object
+      properties:
+        batchId: { type: integer, minimum: 1 }
+        tierId: { type: integer, minimum: 1 }
+        label: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        nominalValueCents: { type: integer, minimum: 1 }
+        totalValueCents: { type: integer, minimum: 1 }
+        commitHash: { type: string, minLength: 64, maxLength: 64 }
+        createdAt: { type: string, format: date-time }
+        remainingCells: { type: integer, minimum: 0 }
+      required:
+        [batchId, tierId, label, quantity, nominalValueCents, totalValueCents, commitHash, createdAt, remainingCells]
     AdminPrizePosition:
       type: object
       properties:
