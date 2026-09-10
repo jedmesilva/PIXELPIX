@@ -125,11 +125,14 @@ export const ReserveCellBody = zod.object({
 export const reserveCellResponseCellIdMin = 0;
 export const reserveCellResponseCellIdMax = 999999;
 
+export const reserveCellResponseAmountCentsMin = 0;
+
 
 
 export const ReserveCellResponse = zod.object({
   "cellId": zod.int().min(reserveCellResponseCellIdMin).max(reserveCellResponseCellIdMax),
   "token": zod.uuid(),
+  "amountCents": zod.int().min(reserveCellResponseAmountCentsMin),
   "expiresAt": zod.coerce.date()
 })
 

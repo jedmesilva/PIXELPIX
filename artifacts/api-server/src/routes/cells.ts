@@ -50,6 +50,7 @@ const WINDOW_MS = 60_000;
 const ESCALATION_WINDOW_MS = 10 * 60_000;
 const ESCALATION_THRESHOLD = 3;
 const RAPID_CLICK_MS = 1_500;
+const PRICE_PROGRESS_LOCK_ID = 20260910;
 
 type Counter = { startedAt: number; attempts: number };
 type Escalation = { startedAt: number; hits: number };
@@ -482,36 +483,48 @@ router.post("/cells/reserve", async (request, response) => {
   }
 
   const ip = clientIp(request);
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      `INSERT INTO cells (id, status, emoji, background_color)
+    await client.query("BEGIN");
+    await client.query(
+      `SELECT pg_advisory_xact_lock(${PRICE_PROGRESS_LOCK_ID})`,
+    );
+    const reservationPriceCents = await calculateCellPriceCents(client);
+    const result = await client.query(
+      `INSERT INTO cells (
+         id, status, emoji, background_color, reservation_price_cents
+       )
        SELECT $1, 'reserved',
               ${generatedCellEmojiSql("($1::integer)")},
-              ${generatedCellBackgroundSql("$1")}
+              ${generatedCellBackgroundSql("$1")},
+              $2
        ON CONFLICT (id) DO UPDATE
          SET reservation_token = gen_random_uuid(),
              email = NULL,
              status = 'reserved',
              reserved_at = NOW(),
+             reservation_price_cents = $2,
              payment_id = NULL,
              prize_value_cents = 0,
              revealed_by = NULL,
              certificate_sent_at = NULL
         WHERE cells.status IN ('available', 'expired')
        RETURNING id, reservation_token, reserved_at`,
-      [id],
+      [id, reservationPriceCents],
     );
     if (result.rows.length === 0) {
+      await client.query("ROLLBACK");
       response.status(409).json({ error: "Célula já reservada ou revelada" });
       return;
     }
 
     // A checkout from a previous expired reservation must never be reused.
-    await pool.query(
+    await client.query(
       `UPDATE payments SET status = 'failed'
        WHERE cell_id = $1 AND status = 'pending'`,
       [id],
     );
+    await client.query("COMMIT");
     activeReservations.set(id, {
       ip,
       deviceId,
@@ -528,13 +541,17 @@ router.post("/cells/reserve", async (request, response) => {
     response.json({
       cellId: result.rows[0].id,
       token: result.rows[0].reservation_token,
+      amountCents: reservationPriceCents,
       expiresAt: new Date(
         new Date(result.rows[0].reserved_at).getTime() + RESERVATION_TTL_MS,
       ).toISOString(),
     });
   } catch (error) {
+    await client.query("ROLLBACK");
     request.log?.error({ error }, "Could not reserve cell");
     response.status(500).json({ error: "Não foi possível reservar a célula" });
+  } finally {
+    client.release();
   }
 });
 
@@ -563,7 +580,7 @@ router.post("/cells/email", async (request, response) => {
     const updated = await client.query(
       `UPDATE cells SET email = $1
        WHERE id = $2 AND reservation_token = $3 AND status = 'reserved'
-       RETURNING id`,
+       RETURNING id, reservation_price_cents`,
       [email, cellId, token],
     );
     if (updated.rows.length === 0) {
@@ -596,7 +613,23 @@ router.post("/cells/email", async (request, response) => {
       return;
     }
 
-    const amountCents = await calculateCellPriceCents(client);
+    let amountCents =
+      updated.rows[0].reservation_price_cents == null
+        ? null
+        : Number(updated.rows[0].reservation_price_cents);
+    if (amountCents == null) {
+      // Backward compatibility for reservations created before the quote
+      // column was deployed. New reservations always have a locked quote.
+      amountCents = await calculateCellPriceCents(client);
+      await client.query(
+        `UPDATE cells
+            SET reservation_price_cents = $1
+          WHERE id = $2
+            AND reservation_token = $3
+            AND status = 'reserved'`,
+        [amountCents, cellId, token],
+      );
+    }
     const externalReference = JSON.stringify({ cellId, token });
     let providerPaymentId: string;
     let checkoutUrl: string;
@@ -796,12 +829,28 @@ router.post("/checkout/local/:paymentId/confirm", async (request, response) => {
 });
 
 export async function expireReservations() {
-  const expired = await pool.query(
-    `UPDATE cells SET status = 'expired'
-     WHERE status = 'reserved'
-       AND reserved_at < NOW() - INTERVAL '5 minutes'
+  const client = await pool.connect();
+  let expired;
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `SELECT pg_advisory_xact_lock(${PRICE_PROGRESS_LOCK_ID})`,
+    );
+    expired = await client.query(
+      `UPDATE cells
+          SET status = 'expired',
+              reservation_price_cents = NULL
+       WHERE status = 'reserved'
+         AND reserved_at < NOW() - INTERVAL '5 minutes'
        RETURNING id`,
-  );
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
   for (const row of expired.rows) {
     const cellId = Number(row.id);
     releaseActiveReservationByCell(cellId);

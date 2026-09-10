@@ -639,8 +639,9 @@ components:
       properties:
         cellId: { type: integer, minimum: 0, maximum: 999999 }
         token: { type: string, format: uuid }
+        amountCents: { type: integer, minimum: 0 }
         expiresAt: { type: string, format: date-time }
-      required: [cellId, token, expiresAt]
+      required: [cellId, token, amountCents, expiresAt]
     CellEmailInput:
       type: object
       properties:

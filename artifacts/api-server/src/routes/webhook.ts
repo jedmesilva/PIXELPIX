@@ -350,7 +350,9 @@ export async function processPaymentConfirmed(input: {
     await client.query("BEGIN");
     const marked = await client.query(
       `UPDATE cells
-       SET status = 'paid_pending_prize', payment_id = $1
+       SET status = 'paid_pending_prize',
+           reservation_price_cents = NULL,
+           payment_id = $1
        WHERE id = $2 AND reservation_token = $3
          AND status IN ('reserved', 'expired')
        RETURNING email`,
@@ -419,6 +421,7 @@ export async function processPaymentConfirmed(input: {
     await client.query(
       `UPDATE cells
         SET status = 'paid',
+            reservation_price_cents = NULL,
             prize_value_cents = $1,
             emoji = CASE WHEN $2::integer IS NULL THEN emoji ELSE '💰' END,
             revealed_by = 'você', revealed_at = NOW()

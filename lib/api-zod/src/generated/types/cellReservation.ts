@@ -13,5 +13,7 @@ export interface CellReservation {
      */
   cellId: number;
   token: string;
+  /** @minimum 0 */
+  amountCents: number;
   expiresAt: Date;
 }
