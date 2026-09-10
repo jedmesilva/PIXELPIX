@@ -9,7 +9,10 @@ import './index.css';
 const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '')
   .replace(/\/+$/, '')
   .replace(/\/api$/, '');
-if (apiBaseUrl) setBaseUrl(apiBaseUrl);
+// In the Replit preview, the API artifact is mounted at /api on the same
+// origin. Keep requests relative in dev so VITE_API_URL cannot point the
+// browser at a different server that does not expose the admin routes.
+if (!import.meta.env.DEV && apiBaseUrl) setBaseUrl(apiBaseUrl);
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.
