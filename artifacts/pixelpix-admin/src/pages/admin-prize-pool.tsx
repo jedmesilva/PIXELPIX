@@ -88,6 +88,7 @@ function PrizeBatchControl() {
   if (!data) return null;
 
   if (data.status === 'generated') {
+    const tierCount = data.tiers.length;
     const totalValueCents = parseMoneyInput(tierTotalValue);
     const nominalValueCents = parseMoneyInput(tierUnitValue);
     const quantity =
@@ -123,32 +124,59 @@ function PrizeBatchControl() {
 
     return <section className="panel overflow-hidden" data-testid="panel-prize-batch-generated">
       <div className="flex flex-col gap-4 border-b border-border/70 bg-[#eaf6d9] px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#789a31] text-white"><Check size={19} /></div><div><div className="section-kicker text-[#557a1d]">Lote selado</div><h2 className="mt-1 text-lg font-bold">Distribuição premiada ativa</h2><p className="mt-1 text-sm text-[#557a1d]">O lote inicial é imutável, mas novos tiers podem ser adicionados em operações auditáveis.</p></div></div>
+        <div className="flex items-start gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#789a31] text-white"><Check size={19} /></div>
+          <div>
+            <div className="section-kicker text-[#557a1d]">Lote 01 · base</div>
+            <h2 className="mt-1 text-lg font-bold">Distribuição inicial selada</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-5 text-[#557a1d]">Este é o lote original da distribuição. Ele não muda quando novos tiers incrementais são adicionados.</p>
+            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-bold text-[#557a1d]"><span className="size-1.5 rounded-full bg-[#789a31]" /> Ativo e imutável</div>
+          </div>
+        </div>
         <div className="text-left sm:text-right"><div className="text-[10px] font-bold uppercase tracking-[.14em] text-[#557a1d]">Criado em</div><div className="mt-1 font-mono-ui text-xs">{formatDate(data.createdAt, true)}</div></div>
       </div>
-      <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.4fr]">
-        <div><div className="section-kicker">Commit hash</div><div className="mt-2 flex items-start gap-2"><code className="min-w-0 break-all rounded-lg bg-muted px-3 py-2 font-mono-ui text-[11px] leading-5">{data.commitHash}</code>{data.commitHash && <button className="icon-button shrink-0" aria-label="Copiar commit hash" onClick={() => { void navigator.clipboard.writeText(data.commitHash!).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); }); }}><Copy size={14} /></button>}</div>{copied && <div className="mt-2 text-xs font-semibold text-[#557a1d]">Copiado.</div>}</div>
-        <div className="grid gap-3 sm:grid-cols-3">{data.tiers.map((tier) => <div className="rounded-xl border border-border/70 bg-muted/30 p-3" key={tier.id}><div className="text-xs font-semibold">{tier.label}</div><div className="mt-2 font-mono-ui text-lg font-bold">{tier.quantity.toLocaleString('pt-BR')}</div><div className="text-[10px] text-muted-foreground">de {formatBRL(tier.nominalValueCents)}</div></div>)}</div>
+
+      <div className="grid grid-cols-2 gap-px border-b border-border/70 bg-border/70 sm:grid-cols-4">
+        <div className="bg-card px-5 py-4"><div className="text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Tiers no lote</div><div className="mt-1 font-mono-ui text-xl font-bold">{tierCount}</div><div className="mt-1 text-[11px] text-muted-foreground">faixas configuradas</div></div>
+        <div className="bg-card px-5 py-4"><div className="text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Células</div><div className="mt-1 font-mono-ui text-xl font-bold">{data.totalPositions.toLocaleString('pt-BR')}</div><div className="mt-1 text-[11px] text-muted-foreground">posições premiadas</div></div>
+        <div className="bg-card px-5 py-4"><div className="text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Valor nominal</div><div className="mt-1 font-mono-ui text-xl font-bold">{formatBRL(data.totalValueCents)}</div><div className="mt-1 text-[11px] text-muted-foreground">distribuição planejada</div></div>
+        <div className="bg-card px-5 py-4"><div className="text-[10px] font-bold uppercase tracking-[.12em] text-muted-foreground">Expansão</div><div className="mt-1 text-base font-bold text-[#557a1d]">Liberada</div><div className="mt-1 text-[11px] text-muted-foreground">tiers incrementais</div></div>
       </div>
+
+      <div className="grid gap-5 p-5 lg:grid-cols-[1.15fr_.85fr]">
+        <div>
+          <div className="section-kicker">Prova de integridade do lote 01</div>
+          <div className="mt-2 flex items-start gap-2">
+            <code className="min-w-0 break-all rounded-lg bg-muted px-3 py-2 font-mono-ui text-[11px] leading-5">{data.commitHash}</code>
+            {data.commitHash && <button className="icon-button shrink-0" aria-label="Copiar commit hash" onClick={() => { void navigator.clipboard.writeText(data.commitHash!).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); }); }}><Copy size={14} /></button>}
+          </div>
+          {copied && <div className="mt-2 text-xs font-semibold text-[#557a1d]">Commit copiado.</div>}
+        </div>
+        <div className="rounded-xl border border-border/70 bg-muted/25 p-4">
+          <div className="section-kicker">Como ler a distribuição</div>
+          <p className="mt-2 text-sm leading-5 text-muted-foreground">Cada tier define um prêmio por célula e uma quantidade de células. O valor nominal do tier é a multiplicação desses dois números.</p>
+        </div>
+      </div>
+
       <div className="border-t border-border/70 bg-muted/15 px-5 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div><div className="section-kicker">Expandir distribuição</div><p className="mt-1 text-sm text-muted-foreground">Adicione um novo tier sem alterar as posições já sorteadas.</p></div>
-          {!addTierOpen && <button className="button button-coral" onClick={() => { setAddTierOpen(true); setTierSuccess(''); setTierError(''); }}><Sparkles size={15} /> Adicionar tier</button>}
+          <div><div className="section-kicker">Lote incremental</div><p className="mt-1 text-sm text-muted-foreground">Cada novo tier cria uma operação própria e preserva as posições já sorteadas.</p></div>
+          {!addTierOpen && <button className="button button-coral" onClick={() => { setAddTierOpen(true); setTierSuccess(''); setTierError(''); }}><Sparkles size={15} /> Criar tier incremental</button>}
         </div>
-        {tierSuccess && <div className="mt-3 rounded-lg border border-[#b9d993] bg-[#f1f9e8] px-3 py-2 text-xs font-semibold text-[#557a1d]">{tierSuccess}</div>}
+        {tierSuccess && <div className="mt-3 rounded-lg border border-[#b9d993] bg-[#f1f9e8] px-3 py-2 text-xs font-semibold text-[#557a1d]"><div className="flex items-start gap-2"><Check size={15} className="mt-0.5 shrink-0" /><span>{tierSuccess}</span></div></div>}
         {addTierOpen && <div className="mt-4 rounded-xl border border-border/70 bg-card p-4">
+          <div className="mb-4 rounded-lg bg-[#f4f8ea] px-3 py-2.5 text-xs leading-5 text-[#557a1d]">Informe o orçamento do novo tier e o prêmio de cada célula. A quantidade será calculada automaticamente.</div>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="field-label"><span>Nome do tier</span><input className="field" value={tierLabel} maxLength={80} onChange={(event) => setTierLabel(event.target.value)} placeholder="Ex.: R$25" /></label>
-            <label className="field-label"><span>Valor total do tier</span><input className="field" type="number" min="0.01" step="0.01" value={tierTotalValue} onChange={(event) => setTierTotalValue(event.target.value)} placeholder="1000.00" /></label>
-            <label className="field-label"><span>Valor por célula</span><input className="field" type="number" min="0.01" step="0.01" value={tierUnitValue} onChange={(event) => setTierUnitValue(event.target.value)} placeholder="25.00" /></label>
+            <label className="field-label"><span>Orçamento total</span><input className="field" type="number" min="0.01" step="0.01" value={tierTotalValue} onChange={(event) => setTierTotalValue(event.target.value)} placeholder="1.000,00" /></label>
+            <label className="field-label"><span>Prêmio por célula</span><input className="field" type="number" min="0.01" step="0.01" value={tierUnitValue} onChange={(event) => setTierUnitValue(event.target.value)} placeholder="25,00" /></label>
           </div>
-          <div className="mt-4 rounded-lg bg-muted/40 px-3 py-3 text-sm">
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              <span><strong>Quantidade calculada:</strong> {quantity ? quantity.toLocaleString('pt-BR') : '—'} células</span>
-              <span><strong>Valor total:</strong> {totalValueCents ? formatBRL(totalValueCents) : '—'}</span>
-            </div>
-            {totalValueCents > 0 && nominalValueCents > 0 && !quantity && <p className="mt-2 text-xs font-semibold text-[#a83d2f]">O valor total precisa ser divisível pelo valor por célula.</p>}
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-3"><div className="text-[10px] font-bold uppercase tracking-[.1em] text-muted-foreground">Células a sortear</div><div className="mt-1 font-mono-ui text-lg font-bold">{quantity ? quantity.toLocaleString('pt-BR') : '—'}</div></div>
+            <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-3"><div className="text-[10px] font-bold uppercase tracking-[.1em] text-muted-foreground">Valor do tier</div><div className="mt-1 font-mono-ui text-lg font-bold">{totalValueCents ? formatBRL(totalValueCents) : '—'}</div></div>
+            <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-3"><div className="text-[10px] font-bold uppercase tracking-[.1em] text-muted-foreground">Regra</div><div className="mt-1 text-sm font-bold">{nominalValueCents ? `${formatBRL(nominalValueCents)} por célula` : 'Aguardando valores'}</div></div>
           </div>
+          {totalValueCents > 0 && nominalValueCents > 0 && !quantity && <p className="mt-3 text-xs font-semibold text-[#a83d2f]">O orçamento total precisa ser divisível pelo prêmio por célula.</p>}
           {tierError && <div className="mt-3 rounded-lg border border-[#e7b5a8] bg-[#fff6f2] px-3 py-2 text-xs font-semibold text-[#a83d2f]">{tierError}</div>}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button className="button button-danger" disabled={addTier.isPending} onClick={submitTier}>{addTier.isPending ? 'Criando tier…' : 'Confirmar e sortear células'}</button>
@@ -216,9 +244,9 @@ function PrizePoolContent() {
     <div className="pool-banner"><div className="pool-banner-mark"><ShieldCheck size={21} /></div><div className="min-w-0 flex-1"><div className="section-kicker text-[#d9f77a]">Integridade do lote</div><h2>{data.batchRevealedAt ? 'Commit revelado e conferido' : 'Lote aguardando reveal'}</h2><p>{data.batchRevealedAt ? `Revelado em ${formatDate(data.batchRevealedAt, true)}. A distribuição está disponível para operação.` : 'A prova criptográfica ainda não foi revelada para este lote.'}</p></div><div className="pool-banner-stat"><span>{Math.round(allocation)}%</span><small>alocado</small></div></div>
      <PrizeBatchControl />
      <div className="grid gap-6 xl:grid-cols-[1.4fr_.6fr]">
-      <section className="panel overflow-hidden" data-testid="panel-prize-tiers">
-        <SectionHeading kicker="A — distribuição" title="Faixas de prêmio" detail={`${remainingPositions.toLocaleString('pt-BR')} disponíveis · ${foundPositions.toLocaleString('pt-BR')} encontrados · ${redeemedPositions.toLocaleString('pt-BR')} resgatados`} />
-        {data.tiers.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Faixa</th><th>Valor unitário</th><th>Planejado</th><th>Encontrados</th><th>Disponíveis</th><th>Resgates</th><th>Progresso</th></tr></thead><tbody>{data.tiers.map((tier) => { const percent = tier.totalPositions ? (tier.foundPositions / tier.totalPositions) * 100 : 0; return <tr key={tier.tierId} data-testid={`row-prize-tier-${tier.tierId}`}><td><div className="flex items-center gap-3"><span className="tier-index">{String(tier.tierId).padStart(2, '0')}</span><div><div className="font-semibold">{tier.label}</div><div className="mt-0.5 text-xs text-muted-foreground">tier {tier.tierId}</div></div></div></td><td className="font-mono-ui text-sm font-bold">{formatBRL(tier.nominalValueCents)}</td><td><div className="font-mono-ui text-sm">{tier.totalPositions.toLocaleString('pt-BR')}</div><div className="mt-1 text-[10px] text-muted-foreground">{formatBRL(tier.totalValueCents)}</div></td><td><div className="font-mono-ui text-sm font-bold">{tier.foundPositions.toLocaleString('pt-BR')}</div><div className="mt-1 text-[10px] text-muted-foreground">{formatBRL(tier.foundValueCents)} liberados</div></td><td><div className="font-mono-ui text-sm font-bold">{tier.remainingPositions.toLocaleString('pt-BR')}</div><div className="mt-1 text-[10px] text-muted-foreground">{formatBRL(tier.remainingValueCents)} em reserva</div></td><td><div className="font-mono-ui text-sm font-bold">{tier.redeemedPositions.toLocaleString('pt-BR')} pagos</div><div className="mt-1 text-[10px] text-muted-foreground">{tier.pendingRedemptionPositions} pendentes · {tier.rejectedPositions} rejeitados</div></td><td className="min-w-[150px]"><div className="mb-1 flex justify-between text-[10px] text-muted-foreground"><span>{Math.round(percent)}% encontrados</span><span>{tier.foundPositions}/{tier.totalPositions}</span></div><div className="progress-track"><div className="progress-fill bg-[#789a31]" style={{ width: `${Math.min(100, percent)}%` }} /></div><div className="mt-2 text-[10px] text-muted-foreground">{formatBRL(tier.redeemedValueCents)} pagos</div></td></tr> })}</tbody></table></div> : <EmptyState title="Pool sem faixas" detail="Não há tiers registrados neste lote." />}
+       <section className="panel overflow-hidden" data-testid="panel-prize-tiers">
+         <SectionHeading kicker="A — tiers e lotes" title="Tiers da distribuição" detail={`${data.tiers.length} tiers · ${totalPositions.toLocaleString('pt-BR')} células · ${formatBRL(totalValue)}`} />
+         {data.tiers.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Tier</th><th>Prêmio por célula</th><th>Células no tier</th><th>Valor nominal</th><th>Resgates</th><th>Progresso</th></tr></thead><tbody>{data.tiers.map((tier) => { const percent = tier.totalPositions ? (tier.foundPositions / tier.totalPositions) * 100 : 0; return <tr key={tier.tierId} data-testid={`row-prize-tier-${tier.tierId}`}><td><div className="flex items-center gap-3"><span className="tier-index">{String(tier.tierId).padStart(2, '0')}</span><div><div className="font-semibold">{tier.label}</div><div className="mt-0.5 text-xs text-muted-foreground">Tier {String(tier.tierId).padStart(2, '0')}</div></div></div></td><td><div className="font-mono-ui text-sm font-bold">{formatBRL(tier.nominalValueCents)}</div><div className="mt-1 text-[10px] text-muted-foreground">por célula</div></td><td><div className="font-mono-ui text-sm font-bold">{tier.totalPositions.toLocaleString('pt-BR')}</div><div className="mt-1 text-[10px] text-muted-foreground">{tier.remainingPositions.toLocaleString('pt-BR')} disponíveis</div></td><td><div className="font-mono-ui text-sm font-bold">{formatBRL(tier.totalValueCents)}</div><div className="mt-1 text-[10px] text-muted-foreground">{tier.foundPositions.toLocaleString('pt-BR')} encontrados</div></td><td><div className="font-mono-ui text-sm font-bold">{tier.redeemedPositions.toLocaleString('pt-BR')} pagos</div><div className="mt-1 text-[10px] text-muted-foreground">{tier.pendingRedemptionPositions} pendentes · {tier.rejectedPositions} rejeitados</div></td><td className="min-w-[150px]"><div className="mb-1 flex justify-between text-[10px] text-muted-foreground"><span>{Math.round(percent)}% encontrados</span><span>{tier.foundPositions}/{tier.totalPositions}</span></div><div className="progress-track"><div className="progress-fill bg-[#789a31]" style={{ width: `${Math.min(100, percent)}%` }} /></div><div className="mt-2 text-[10px] text-muted-foreground">{formatBRL(tier.redeemedValueCents)} pagos</div></td></tr> })}</tbody></table></div> : <EmptyState title="Pool sem tiers" detail="Não há tiers registrados nesta distribuição." />}
         <div className="grid grid-cols-2 gap-px border-t border-border/70 bg-border/70 xl:grid-cols-4"><div className="bg-card px-5 py-4"><div className="text-xs text-muted-foreground">Distribuição total</div><div className="mt-1 font-mono-ui text-lg font-bold">{formatBRL(totalValue)}</div><div className="mt-1 text-[10px] text-muted-foreground">{totalPositions.toLocaleString('pt-BR')} posições</div></div><div className="bg-card px-5 py-4"><div className="text-xs text-muted-foreground">Encontrado</div><div className="mt-1 font-mono-ui text-lg font-bold">{formatBRL(foundValue)}</div><div className="mt-1 text-[10px] text-muted-foreground">{foundPositions.toLocaleString('pt-BR')} posições</div></div><div className="bg-card px-5 py-4"><div className="text-xs text-muted-foreground">Resgatado</div><div className="mt-1 font-mono-ui text-lg font-bold">{formatBRL(redeemedValue)}</div><div className="mt-1 text-[10px] text-muted-foreground">{redeemedPositions.toLocaleString('pt-BR')} pagamentos</div></div><div className="bg-card px-5 py-4"><div className="text-xs text-muted-foreground">Aguardando / rejeitado</div><div className="mt-1 font-mono-ui text-lg font-bold">{formatBRL(pendingRedemptionValue + rejectedValue)}</div><div className="mt-1 text-[10px] text-muted-foreground">{pendingRedemptionPositions} pendentes · {rejectedPositions} rejeitados</div></div></div>
       </section>
       <section className="panel" data-testid="panel-pool-safety">
