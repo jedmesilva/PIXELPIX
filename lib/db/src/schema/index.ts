@@ -76,6 +76,31 @@ export const prizePool = pgTable("prize_pool", {
   }),
 );
 
+export const prizeTierDrafts = pgTable(
+  "prize_tier_drafts",
+  {
+    tierId: integer("tier_id").primaryKey(),
+    label: text("label").notNull(),
+    nominalValueCents: bigint("nominal_value_cents", { mode: "number" }).notNull(),
+    totalValueCents: bigint("total_value_cents", { mode: "number" }).notNull(),
+    totalPositions: integer("total_positions").notNull(),
+    status: text("status").notNull().default("draft"),
+    commitHash: text("commit_hash"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    allocatedAt: timestamp("allocated_at", { withTimezone: true }),
+  },
+  (table) => ({
+    statusValues: check(
+      "prize_tier_drafts_status_values",
+      sql`${table.status} IN ('draft', 'allocated')`,
+    ),
+    valuesNonNegative: check(
+      "prize_tier_drafts_values_non_negative",
+      sql`${table.nominalValueCents} > 0 AND ${table.totalValueCents} > 0 AND ${table.totalPositions} > 0`,
+    ),
+  }),
+);
+
 export const winningPositions = pgTable(
   "winning_positions",
   {
@@ -93,6 +118,7 @@ export const winningPositions = pgTable(
 
 export const prizeTierBatch = pgTable("prize_tier_batch", {
   id: integer("id").primaryKey().default(1),
+  tierId: integer("tier_id"),
   commitHash: text("commit_hash").notNull(),
   revealedAt: timestamp("revealed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

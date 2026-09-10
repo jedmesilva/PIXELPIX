@@ -31,7 +31,13 @@ export type PrizeBatchSummary = {
   totalPositions: number;
   totalValueCents: number;
   tiers: PrizeBatchTier[];
+  draftTiers: PrizeTierDraft[];
   canGenerate: boolean;
+};
+
+export type PrizeTierDraft = PrizeBatchTier & {
+  status: "draft";
+  createdAt: string;
 };
 
 export type AddPrizeTierInput = {
@@ -47,9 +53,10 @@ export type PrizeTierAdditionSummary = {
   quantity: number;
   nominalValueCents: number;
   totalValueCents: number;
-  commitHash: string;
+  commitHash: string | null;
   createdAt: string;
   remainingCells: number;
+  status: "draft" | "allocated";
 };
 
 export class PrizeBatchAlreadyExistsError extends Error {
@@ -219,21 +226,38 @@ function generatedSummary(commitHash: string, createdAt: Date | string): PrizeBa
     totalPositions: tiers.reduce((total, tier) => total + tier.quantity, 0),
     totalValueCents: tiers.reduce((total, tier) => total + tier.totalValueCents, 0),
     tiers,
+    draftTiers: [],
     canGenerate: false,
   };
 }
 
 export async function getPrizeBatchStatus(pool: Pool): Promise<PrizeBatchSummary> {
-  const [batch, tiers] = await Promise.all([
+  const [batch, tiers, drafts] = await Promise.all([
     pool.query("SELECT commit_hash, created_at FROM prize_tier_batch WHERE id = 1"),
     pool.query(
       `SELECT tier_id, label, nominal_value_cents, total_value_cents, total_positions
          FROM prize_pool
         ORDER BY tier_id`,
     ),
+    pool.query(
+      `SELECT tier_id, label, nominal_value_cents, total_value_cents,
+              total_positions, created_at
+         FROM prize_tier_drafts
+        WHERE status = 'draft'
+        ORDER BY tier_id`,
+    ),
   ]);
 
   const batchRow = batch.rows[0];
+  const draftTiers: PrizeTierDraft[] = drafts.rows.map((row) => ({
+    id: Number(row.tier_id),
+    label: String(row.label),
+    quantity: Number(row.total_positions),
+    nominalValueCents: Number(row.nominal_value_cents),
+    totalValueCents: Number(row.total_value_cents),
+    status: "draft",
+    createdAt: new Date(row.created_at).toISOString(),
+  }));
   if (!batchRow) {
     const configured = configuredTiers();
     return {
@@ -243,6 +267,7 @@ export async function getPrizeBatchStatus(pool: Pool): Promise<PrizeBatchSummary
       totalPositions: configured.reduce((total, tier) => total + tier.quantity, 0),
       totalValueCents: configured.reduce((total, tier) => total + tier.totalValueCents, 0),
       tiers: configured,
+      draftTiers,
       canGenerate: true,
     };
   }
@@ -261,6 +286,7 @@ export async function getPrizeBatchStatus(pool: Pool): Promise<PrizeBatchSummary
     totalPositions: storedTiers.reduce((total, tier) => total + tier.quantity, 0),
     totalValueCents: storedTiers.reduce((total, tier) => total + tier.totalValueCents, 0),
     tiers: storedTiers,
+    draftTiers,
     canGenerate: false,
   };
 }
@@ -380,12 +406,16 @@ export async function addPrizeTier(
       throw new PrizeBatchNotGeneratedError();
     }
 
-    const existing = await client.query<{ positions: string }>(
-      `SELECT COUNT(*)::text AS positions
-         FROM winning_positions`,
+    const existing = await client.query<{ positions: string; draft_positions: string }>(
+      `SELECT
+         (SELECT COUNT(*)::text FROM winning_positions) AS positions,
+         (SELECT COALESCE(SUM(total_positions), 0)::text
+            FROM prize_tier_drafts
+           WHERE status = 'draft') AS draft_positions`,
     );
     const usedPositions = Number(existing.rows[0]?.positions ?? 0);
-    const remainingCells = TOTAL_CELLS - usedPositions;
+    const draftPositions = Number(existing.rows[0]?.draft_positions ?? 0);
+    const remainingCells = TOTAL_CELLS - usedPositions - draftPositions;
     if (quantity > remainingCells) {
       throw new PrizeTierConfigurationError(
         `O grid tem apenas ${remainingCells.toLocaleString("pt-BR")} células disponíveis.`,
@@ -394,10 +424,79 @@ export async function addPrizeTier(
 
     const nextTier = await client.query<{ tier_id: number }>(
       `SELECT COALESCE(MAX(tier_id), 0) + 1 AS tier_id
-         FROM prize_pool`,
+         FROM (
+           SELECT tier_id FROM prize_pool
+           UNION ALL
+           SELECT tier_id FROM prize_tier_drafts
+         ) ids`,
     );
     const tierId = Number(nextTier.rows[0]?.tier_id ?? 1);
-    const cellIds = await chooseAvailableCellIds(client, quantity);
+    await client.query(
+      `INSERT INTO prize_tier_drafts
+         (tier_id, label, nominal_value_cents, total_value_cents, total_positions)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        tierId,
+        label,
+        input.nominalValueCents,
+        input.totalValueCents,
+        quantity,
+      ],
+    );
+    await client.query("COMMIT");
+
+    return {
+      batchId: 1,
+      tierId,
+      label,
+      quantity,
+      nominalValueCents: input.nominalValueCents,
+      totalValueCents: input.totalValueCents,
+      commitHash: null,
+      createdAt: new Date().toISOString(),
+      remainingCells,
+      status: "draft",
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function drawPrizeTier(
+  pool: Pool,
+  tierId: number,
+): Promise<PrizeTierAdditionSummary> {
+  if (!Number.isInteger(tierId) || tierId <= 0) {
+    throw new PrizeTierConfigurationError("Tier inválido.");
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock($1)", [PRIZE_BATCH_LOCK_KEY]);
+
+    const draftResult = await client.query(
+      `SELECT tier_id, label, nominal_value_cents, total_value_cents, total_positions, created_at
+         FROM prize_tier_drafts
+        WHERE tier_id = $1 AND status = 'draft'
+        FOR UPDATE`,
+      [tierId],
+    );
+    const draft = draftResult.rows[0];
+    if (!draft) {
+      throw new PrizeTierConfigurationError("Este tier não está aguardando sorteio.");
+    }
+
+    const existingPositions = await client.query<{ positions: string }>(
+      "SELECT COUNT(*)::text AS positions FROM winning_positions",
+    );
+    const cellIds = await chooseAvailableCellIds(
+      client,
+      Number(draft.total_positions),
+    );
     const positions = cellIds.map((cellId) => ({ cellId, tierId }));
     const commitHash = calculateCommitHash(positions);
 
@@ -408,19 +507,25 @@ export async function addPrizeTier(
        VALUES ($1, $2, $3, $4, $5, $4, $5)`,
       [
         tierId,
-        label,
-        input.nominalValueCents,
-        input.totalValueCents,
-        quantity,
+        draft.label,
+        draft.nominal_value_cents,
+        draft.total_value_cents,
+        draft.total_positions,
       ],
     );
     await insertPositions(client, positions);
+    await client.query(
+      `UPDATE prize_tier_drafts
+          SET status = 'allocated', commit_hash = $1, allocated_at = NOW()
+        WHERE tier_id = $2`,
+      [commitHash, tierId],
+    );
 
     const batch = await client.query<{ id: number; created_at: Date }>(
       `INSERT INTO prize_tier_batch (id, commit_hash)
        SELECT COALESCE(MAX(id), 0) + 1, $1
          FROM prize_tier_batch
-       RETURNING id, created_at`,
+        RETURNING id, created_at`,
       [commitHash],
     );
     await client.query("COMMIT");
@@ -428,13 +533,17 @@ export async function addPrizeTier(
     return {
       batchId: Number(batch.rows[0]?.id),
       tierId,
-      label,
-      quantity,
-      nominalValueCents: input.nominalValueCents,
-      totalValueCents: input.totalValueCents,
+      label: String(draft.label),
+      quantity: Number(draft.total_positions),
+      nominalValueCents: Number(draft.nominal_value_cents),
+      totalValueCents: Number(draft.total_value_cents),
       commitHash,
       createdAt: new Date(batch.rows[0]?.created_at).toISOString(),
-      remainingCells: remainingCells - quantity,
+      remainingCells:
+        TOTAL_CELLS -
+        Number(existingPositions.rows[0]?.positions ?? 0) -
+        positions.length,
+      status: "allocated",
     };
   } catch (error) {
     await client.query("ROLLBACK");

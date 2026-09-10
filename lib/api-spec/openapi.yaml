@@ -557,6 +557,45 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/prize-tiers/{tierId}/draw:
+    post:
+      operationId: drawAdminPrizeTier
+      tags: [admin]
+      summary: Draw available cells and allocate a configured prize tier
+      description: This operation is irreversible for the selected tier and creates an auditable commit hash.
+      security:
+        - AdminAccessKey: []
+      parameters:
+        - name: tierId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPrizeTierDrawInput" }
+      responses:
+        "200":
+          description: Prize tier allocated to randomly selected cells
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPrizeTierCreated" }
+        "400":
+          description: Invalid tier or missing confirmation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Missing or invalid admin access key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Tier is not available for drawing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /admin/prize-positions:
     get:
       operationId: listAdminPrizePositions
@@ -910,11 +949,25 @@ components:
         tiers:
           type: array
           items: { $ref: "#/components/schemas/AdminPrizeTier" }
+        draftTiers:
+          type: array
+          items: { $ref: "#/components/schemas/AdminPrizeTierDraft" }
         commitHash: { type: ["string", "null"] }
         batchCreatedAt: { type: ["string", "null"], format: date-time }
         batchRevealedAt: { type: ["string", "null"], format: date-time }
         safetyMarginBps: { type: ["integer", "null"], minimum: 0 }
-      required: [tiers, commitHash, batchCreatedAt, batchRevealedAt, safetyMarginBps]
+      required: [tiers, draftTiers, commitHash, batchCreatedAt, batchRevealedAt, safetyMarginBps]
+    AdminPrizeTierDraft:
+      type: object
+      properties:
+        tierId: { type: integer, minimum: 1 }
+        label: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        nominalValueCents: { type: integer, minimum: 1 }
+        totalValueCents: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        status: { type: string, enum: [draft] }
+      required: [tierId, label, quantity, nominalValueCents, totalValueCents, createdAt, status]
     AdminPrizeBatchTier:
       type: object
       properties:
@@ -937,9 +990,12 @@ components:
         tiers:
           type: array
           items: { $ref: "#/components/schemas/AdminPrizeBatchTier" }
+        draftTiers:
+          type: array
+          items: { $ref: "#/components/schemas/AdminPrizeTierDraft" }
         canGenerate: { type: boolean }
       required:
-        [status, commitHash, createdAt, totalPositions, totalValueCents, tiers, canGenerate]
+        [status, commitHash, createdAt, totalPositions, totalValueCents, tiers, draftTiers, canGenerate]
     AdminPrizeBatchGenerateInput:
       type: object
       properties:
@@ -953,6 +1009,11 @@ components:
         nominalValueCents: { type: integer, minimum: 1 }
         confirm: { type: boolean, const: true }
       required: [label, totalValueCents, nominalValueCents, confirm]
+    AdminPrizeTierDrawInput:
+      type: object
+      properties:
+        confirm: { type: boolean, const: true }
+      required: [confirm]
     AdminPrizeTierCreated:
       type: object
       properties:
@@ -962,11 +1023,12 @@ components:
         quantity: { type: integer, minimum: 1 }
         nominalValueCents: { type: integer, minimum: 1 }
         totalValueCents: { type: integer, minimum: 1 }
-        commitHash: { type: string, minLength: 64, maxLength: 64 }
+        commitHash: { type: ["string", "null"], minLength: 64, maxLength: 64 }
         createdAt: { type: string, format: date-time }
         remainingCells: { type: integer, minimum: 0 }
+        status: { type: string, enum: [draft, allocated] }
       required:
-        [batchId, tierId, label, quantity, nominalValueCents, totalValueCents, commitHash, createdAt, remainingCells]
+        [batchId, tierId, label, quantity, nominalValueCents, totalValueCents, commitHash, createdAt, remainingCells, status]
     AdminPrizePosition:
       type: object
       properties:

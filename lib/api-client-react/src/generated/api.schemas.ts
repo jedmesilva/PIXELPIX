@@ -422,8 +422,30 @@ export interface AdminPrizeTier {
   rejectedValueCents: number;
 }
 
+export type AdminPrizeTierDraftStatus = typeof AdminPrizeTierDraftStatus[keyof typeof AdminPrizeTierDraftStatus];
+
+
+export const AdminPrizeTierDraftStatus = {
+  draft: 'draft',
+} as const;
+
+export interface AdminPrizeTierDraft {
+  /** @minimum 1 */
+  tierId: number;
+  label: string;
+  /** @minimum 1 */
+  quantity: number;
+  /** @minimum 1 */
+  nominalValueCents: number;
+  /** @minimum 1 */
+  totalValueCents: number;
+  createdAt: string;
+  status: AdminPrizeTierDraftStatus;
+}
+
 export interface AdminPrizePool {
   tiers: AdminPrizeTier[];
+  draftTiers: AdminPrizeTierDraft[];
   /** @nullable */
   commitHash: string | null;
   /** @nullable */
@@ -468,6 +490,7 @@ export interface AdminPrizeBatch {
   /** @minimum 0 */
   totalValueCents: number;
   tiers: AdminPrizeBatchTier[];
+  draftTiers: AdminPrizeTierDraft[];
   canGenerate: boolean;
 }
 
@@ -489,6 +512,19 @@ export interface AdminPrizeTierInput {
   confirm: true;
 }
 
+export const AdminPrizeTierDrawInputValue = {
+  confirm: true,
+} as const;
+export type AdminPrizeTierDrawInput = typeof AdminPrizeTierDrawInputValue;
+
+export type AdminPrizeTierCreatedStatus = typeof AdminPrizeTierCreatedStatus[keyof typeof AdminPrizeTierCreatedStatus];
+
+
+export const AdminPrizeTierCreatedStatus = {
+  draft: 'draft',
+  allocated: 'allocated',
+} as const;
+
 export interface AdminPrizeTierCreated {
   /** @minimum 1 */
   batchId: number;
@@ -504,11 +540,13 @@ export interface AdminPrizeTierCreated {
   /**
      * @minLength 64
      * @maxLength 64
+     * @nullable
      */
-  commitHash: string;
+  commitHash: string | null;
   createdAt: string;
   /** @minimum 0 */
   remainingCells: number;
+  status: AdminPrizeTierCreatedStatus;
 }
 
 export type AdminPrizePositionPositionStatus = typeof AdminPrizePositionPositionStatus[keyof typeof AdminPrizePositionPositionStatus];

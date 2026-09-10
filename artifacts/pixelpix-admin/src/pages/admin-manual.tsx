@@ -143,7 +143,7 @@ function AdminManualContent() {
       <PageHeader
         eyebrow="Central de operações"
         title="Manual do administrador"
-        description="Um guia prático para consultar o sistema, gerar o lote premiado, analisar resgates e concluir pagamentos com segurança."
+        description="Um guia prático para consultar o sistema, configurar tiers, sortear células, analisar resgates e concluir pagamentos com segurança."
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -197,36 +197,36 @@ function AdminManualContent() {
           </ManualSection>
 
           <ManualSection
-            id="lote-premiado"
-            eyebrow="03 / integridade"
-            title="Gerar o lote premiado"
-            description="Esta é a operação mais sensível do painel. Ela cria a distribuição criptográfica que será usada pelo produto."
+             id="lote-premiado"
+             eyebrow="03 / configuração e sorteio"
+             title="Configurar e sortear prêmios"
+             description="O painel separa a configuração comercial da alocação aleatória. Essa separação evita que uma revisão de valores sorteie células por acidente."
             icon={Sparkles}
             tone="warning"
           >
             <Callout icon={AlertTriangle} title="A geração é irreversível e só pode acontecer uma vez." tone="warning">
-              Não clique para testar, não gere um novo lote para substituir o anterior e não execute a operação enquanto a configuração comercial ainda estiver em revisão.
+              O sorteio de células é irreversível. Crie o tier, revise os valores e só então confirme o botão “Sortear células”.
             </Callout>
             <div className="space-y-4">
-              <Step number="1" title="Abra “Prize pool” no menu lateral">
-                A página mostra as faixas planejadas, posições, reserva e metadados de integridade.
+              <Step number="1" title="Abra “Prêmios e sorteios” no menu lateral">
+                A página mostra o lote-base, os tiers já sorteados e os tiers que ainda aguardam uma decisão.
               </Step>
-              <Step number="2" title="Confirme que o estado ainda é “não gerado”">
-                O bloco amarelo “Gerar lote premiado” só deve aparecer antes da primeira geração. Se o lote já estiver selado, não existe ação de substituição.
+              <Step number="2" title="Entenda o lote-base">
+                O lote-base é a primeira distribuição criptográfica e não é substituído. Novos tiers não reabrem nem alteram esse lote.
               </Step>
-              <Step number="3" title="Revise o resumo antes de prosseguir">
-                Confira a quantidade total de posições e o valor nominal total. Verifique se os números correspondem ao planejamento aprovado.
+              <Step number="3" title="Crie um tier como rascunho">
+                Informe o orçamento total e o valor nominal por célula. O sistema calcula a quantidade, mas ainda não grava posições premiadas.
               </Step>
-              <Step number="4" title="Clique em “Preparar geração” e confirme">
-                A confirmação final cria as posições, mistura os tiers e grava o commit hash. Aguarde a conclusão sem recarregar ou abrir outra operação em paralelo.
+              <Step number="4" title="Revise o card pendente">
+                Confira nome, valor por célula, quantidade e valor nominal total. Enquanto estiver como “Rascunho”, o tier não participa do grid público.
               </Step>
-              <Step number="5" title="Registre o commit hash">
-                Depois da geração, copie o hash exibido e guarde-o no registro operacional da campanha. Ele serve para provar qual distribuição foi selada.
+              <Step number="5" title="Confirme “Sortear células”">
+                O sistema escolhe células disponíveis, grava as posições, cria o pool do tier e gera um commit hash próprio. A operação não pode ser desfeita.
               </Step>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-border/70 bg-card p-4"><div className="font-semibold">Planejado</div><p className="mt-1 text-sm leading-6 text-muted-foreground">Valor nominal da faixa definida no lote.</p></div>
-              <div className="rounded-xl border border-border/70 bg-card p-4"><div className="font-semibold">Distribuído</div><p className="mt-1 text-sm leading-6 text-muted-foreground">Valor liberado dinamicamente quando a posição é encontrada.</p></div>
+               <div className="rounded-xl border border-border/70 bg-card p-4"><div className="font-semibold">Nominal / planejado</div><p className="mt-1 text-sm leading-6 text-muted-foreground">Valor da configuração do tier: quantidade multiplicada pelo valor por célula.</p></div>
+               <div className="rounded-xl border border-border/70 bg-card p-4"><div className="font-semibold">Distribuído / liberado</div><p className="mt-1 text-sm leading-6 text-muted-foreground">Valor real liberado quando uma célula é encontrada. Pode ser diferente do nominal.</p></div>
             </div>
           </ManualSection>
 
@@ -322,7 +322,7 @@ function AdminManualContent() {
               {[
                 'Entrar com a chave administrativa sem colocá-la na URL.',
                 'Ler a Visão geral e verificar pendências financeiras.',
-                'Conferir o estado do Prize pool e o commit hash.',
+                'Conferir os tiers ativos, os rascunhos e os commits de auditoria.',
                 'Revisar resgates pendentes e falhos.',
                 'Validar certificado, célula, valor e chave Pix antes de aprovar.',
                 'Confirmar o retorno do provedor antes de marcar como pago.',
@@ -349,7 +349,7 @@ function AdminManualContent() {
               {[
                 ['comece-aqui', 'Comece por aqui'],
                 ['visao-geral', 'Visão geral'],
-                ['lote-premiado', 'Gerar lote premiado'],
+                ['lote-premiado', 'Configurar e sortear prêmios'],
                 ['posicoes', 'Consultar posições'],
                 ['resgates', 'Processar resgate'],
                 ['falhas-e-seguranca', 'Falhas e segurança'],

@@ -29,6 +29,7 @@ import type {
   AdminPrizePool,
   AdminPrizePositionList,
   AdminPrizeTierCreated,
+  AdminPrizeTierDrawInput,
   AdminPrizeTierInput,
   AdminRedemption,
   AdminRedemptionList,
@@ -1664,6 +1665,79 @@ export const useAddAdminPrizeTier = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getAddAdminPrizeTierMutationOptions(options));
+    }
+
+export const getDrawAdminPrizeTierUrl = (tierId: number,) => {
+
+
+
+
+  return `/api/admin/prize-tiers/${tierId}/draw`
+}
+
+/**
+ * This operation is irreversible for the selected tier and creates an auditable commit hash.
+ * @summary Draw available cells and allocate a configured prize tier
+ */
+export const drawAdminPrizeTier = async (tierId: number,
+    adminPrizeTierDrawInput: AdminPrizeTierDrawInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminPrizeTierCreated> => {
+
+  return customFetch<AdminPrizeTierCreated>(getDrawAdminPrizeTierUrl(tierId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminPrizeTierDrawInput)
+  }
+);}
+
+
+
+
+
+export const getDrawAdminPrizeTierMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof drawAdminPrizeTier>>, TError,{tierId: number;data: BodyType<AdminPrizeTierDrawInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof drawAdminPrizeTier>>, TError,{tierId: number;data: BodyType<AdminPrizeTierDrawInput>}, TContext> => {
+
+const mutationKey = ['drawAdminPrizeTier'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof drawAdminPrizeTier>>, {tierId: number;data: BodyType<AdminPrizeTierDrawInput>}> = (props) => {
+          const {tierId,data} = props ?? {};
+
+          return  drawAdminPrizeTier(tierId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DrawAdminPrizeTierMutationResult = NonNullable<Awaited<ReturnType<typeof drawAdminPrizeTier>>>
+    export type DrawAdminPrizeTierMutationBody = BodyType<AdminPrizeTierDrawInput>
+    export type DrawAdminPrizeTierMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Draw available cells and allocate a configured prize tier
+ */
+export const useDrawAdminPrizeTier = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof drawAdminPrizeTier>>, TError,{tierId: number;data: BodyType<AdminPrizeTierDrawInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof drawAdminPrizeTier>>,
+        TError,
+        {tierId: number;data: BodyType<AdminPrizeTierDrawInput>},
+        TContext
+      > => {
+      return useMutation(getDrawAdminPrizeTierMutationOptions(options));
     }
 
 export const getListAdminPrizePositionsUrl = (params?: ListAdminPrizePositionsParams,) => {

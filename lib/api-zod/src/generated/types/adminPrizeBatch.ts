@@ -7,6 +7,7 @@
  */
 import type { AdminPrizeBatchStatus } from './adminPrizeBatchStatus';
 import type { AdminPrizeBatchTier } from './adminPrizeBatchTier';
+import type { AdminPrizeTierDraft } from './adminPrizeTierDraft';
 
 export interface AdminPrizeBatch {
   status: AdminPrizeBatchStatus;
@@ -19,5 +20,6 @@ export interface AdminPrizeBatch {
   /** @minimum 0 */
   totalValueCents: number;
   tiers: AdminPrizeBatchTier[];
+  draftTiers: AdminPrizeTierDraft[];
   canGenerate: boolean;
 }

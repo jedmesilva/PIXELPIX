@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AdminPrizeTier } from './adminPrizeTier';
+import type { AdminPrizeTierDraft } from './adminPrizeTierDraft';
 
 export interface AdminPrizePool {
   tiers: AdminPrizeTier[];
+  draftTiers: AdminPrizeTierDraft[];
   /** @nullable */
   commitHash: string | null;
   /** @nullable */

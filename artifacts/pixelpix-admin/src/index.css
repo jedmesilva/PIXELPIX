@@ -523,6 +523,30 @@ button:active:not(:disabled) { transform: translateY(1px); }
     color: #93660d;
   }
 
+  .tier-draft-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.9rem;
+    background: hsl(var(--card));
+    padding: 1rem;
+  }
+
+  .tier-index {
+    display: inline-grid;
+    height: 1.45rem;
+    min-width: 1.45rem;
+    place-items: center;
+    border-radius: 0.4rem;
+    background: #f2e4bd;
+    color: #71530b;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 800;
+  }
+
   .status-approved {
     background: #def1c0;
     color: #4b7518;
@@ -1239,6 +1263,15 @@ button:active:not(:disabled) { transform: translateY(1px); }
 }
 
 @media (max-width: 720px) {
+  .tier-draft-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tier-draft-card .button {
+    width: 100%;
+  }
+
   .page-header {
     align-items: stretch;
     flex-direction: column;

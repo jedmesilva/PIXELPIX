@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminPrizeTierCreatedStatus } from './adminPrizeTierCreatedStatus';
 
 export interface AdminPrizeTierCreated {
   /** @minimum 1 */
@@ -21,9 +22,11 @@ export interface AdminPrizeTierCreated {
   /**
      * @minLength 64
      * @maxLength 64
+     * @nullable
      */
-  commitHash: string;
+  commitHash: string | null;
   createdAt: Date;
   /** @minimum 0 */
   remainingCells: number;
+  status: AdminPrizeTierCreatedStatus;
 }

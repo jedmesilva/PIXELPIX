@@ -4,8 +4,8 @@ import { Link, useLocation } from 'wouter';
 
 const navigation = [
   { href: '/admin/', label: 'Visão geral', icon: LayoutDashboard },
-  { href: '/admin/redemptions', label: 'Resgates', icon: TicketCheck },
-  { href: '/admin/prize-pool', label: 'Prize pool', icon: Boxes },
+  { href: '/admin/prize-pool', label: 'Prêmios e sorteios', icon: Boxes },
+  { href: '/admin/redemptions', label: 'Fila de resgates', icon: TicketCheck },
   { href: '/admin/manual', label: 'Manual', icon: BookOpen },
 ];
 
@@ -43,8 +43,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="mt-auto p-4">
           <div className="rounded-2xl border border-sidebar-border bg-sidebar-accent/60 p-4">
             <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold text-sidebar-foreground/65"><span className="pulse-dot size-2 rounded-full bg-sidebar-primary" />Central operacional</div>
-            <div className="font-mono-ui text-xs text-sidebar-foreground/90">lote / 07A</div>
-            <div className="mt-1 text-[11px] text-sidebar-foreground/45">Integridade do grid nominal</div>
+            <div className="font-mono-ui text-xs text-sidebar-foreground/90">operação / ativa</div>
+            <div className="mt-1 text-[11px] text-sidebar-foreground/45">Integridade do grid monitorada</div>
         </div>
         <div className="mt-4 flex items-center gap-3 border-t border-sidebar-border pt-4">
           <div className="grid size-8 place-items-center rounded-full bg-[#ff8e70] text-xs font-bold text-[#202a2f]">OP</div>
@@ -63,7 +63,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-md sm:px-8">
           <div className="flex items-center gap-3">
             <button className="rounded-xl border border-border bg-card p-2 lg:hidden" onClick={() => setMobileOpen(true)} data-testid="button-open-menu"><Menu size={18} /></button>
-            <div><div className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Internal console</div><div className="mt-0.5 text-sm font-semibold">Prize operations</div></div>
+            <div><div className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Console interno</div><div className="mt-0.5 text-sm font-semibold">Operação PIXELPIX</div></div>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground"><ShieldCheck size={16} className="text-emerald-600" /><span className="hidden sm:inline">Ambiente protegido</span><span className="size-1.5 rounded-full bg-emerald-500" /></div>
         </header>

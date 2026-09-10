@@ -459,9 +459,9 @@ function RedemptionsContent() {
     return (
       <>
         <PageHeader
-          eyebrow="Operações / fila financeira"
-          title="Resgates"
-          description="Analise e processe solicitações de pagamento Pix."
+          eyebrow="Operação / fila de resgates"
+          title="Fila de resgates"
+          description="Analise certificados, valide pagamentos e registre cada decisão."
         />
         <AccessKeyPrompt
           onSaved={(key) => {
@@ -476,9 +476,9 @@ function RedemptionsContent() {
     return (
       <>
         <PageHeader
-          eyebrow="Operações / fila financeira"
-          title="Resgates"
-          description="Analise e processe solicitações de pagamento Pix."
+          eyebrow="Operação / fila de resgates"
+          title="Fila de resgates"
+          description="Analise certificados, valide pagamentos e registre cada decisão."
         />
         <LoadingPanel rows={7} />
       </>
@@ -488,9 +488,9 @@ function RedemptionsContent() {
     return (
       <>
         <PageHeader
-          eyebrow="Operações / fila financeira"
-          title="Resgates"
-          description="Analise e processe solicitações de pagamento Pix."
+          eyebrow="Operação / fila de resgates"
+          title="Fila de resgates"
+          description="Analise certificados, valide pagamentos e registre cada decisão."
         />
         {showKey || !accessKey ? (
           <AccessKeyPrompt
@@ -508,7 +508,7 @@ function RedemptionsContent() {
   if (list.isError) {
     return (
       <>
-        <PageHeader eyebrow="Operações / fila financeira" title="Resgates" />
+        <PageHeader eyebrow="Operação / fila de resgates" title="Fila de resgates" />
         <ErrorState onRetry={() => list.refetch()} />
       </>
     );
@@ -520,8 +520,8 @@ function RedemptionsContent() {
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow="Operações / fila financeira"
-        title="Resgates"
+        eyebrow="Operação / fila de resgates"
+        title="Fila de resgates"
         description="Analise cada solicitação, aprove pagamentos válidos e registre o motivo de recusas."
         action={
           <button

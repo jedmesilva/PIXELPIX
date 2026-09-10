@@ -577,6 +577,10 @@ export const getAdminPrizePoolResponseTiersItemRejectedPositionsMin = 0;
 
 export const getAdminPrizePoolResponseTiersItemRejectedValueCentsMin = 0;
 
+
+
+
+
 export const getAdminPrizePoolResponseSafetyMarginBpsMin = 0;
 
 
@@ -598,6 +602,15 @@ export const GetAdminPrizePoolResponse = zod.object({
   "pendingRedemptionValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemPendingRedemptionValueCentsMin),
   "rejectedPositions": zod.int().min(getAdminPrizePoolResponseTiersItemRejectedPositionsMin),
   "rejectedValueCents": zod.int().min(getAdminPrizePoolResponseTiersItemRejectedValueCentsMin)
+})),
+  "draftTiers": zod.array(zod.object({
+  "tierId": zod.int().min(1),
+  "label": zod.string(),
+  "quantity": zod.int().min(1),
+  "nominalValueCents": zod.int().min(1),
+  "totalValueCents": zod.int().min(1),
+  "createdAt": zod.coerce.date(),
+  "status": zod.enum(['draft'])
 })),
   "commitHash": zod.string().nullable(),
   "batchCreatedAt": zod.coerce.date().nullable(),
@@ -622,6 +635,10 @@ export const getAdminPrizeBatchResponseTiersItemTotalValueCentsMin = 0;
 
 
 
+
+
+
+
 export const GetAdminPrizeBatchResponse = zod.object({
   "status": zod.enum(['not_generated', 'generated']),
   "commitHash": zod.string().nullable(),
@@ -634,6 +651,15 @@ export const GetAdminPrizeBatchResponse = zod.object({
   "quantity": zod.int().min(getAdminPrizeBatchResponseTiersItemQuantityMin),
   "nominalValueCents": zod.int().min(getAdminPrizeBatchResponseTiersItemNominalValueCentsMin),
   "totalValueCents": zod.int().min(getAdminPrizeBatchResponseTiersItemTotalValueCentsMin)
+})),
+  "draftTiers": zod.array(zod.object({
+  "tierId": zod.int().min(1),
+  "label": zod.string(),
+  "quantity": zod.int().min(1),
+  "nominalValueCents": zod.int().min(1),
+  "totalValueCents": zod.int().min(1),
+  "createdAt": zod.coerce.date(),
+  "status": zod.enum(['draft'])
 })),
   "canGenerate": zod.boolean()
 })
@@ -660,6 +686,10 @@ export const generateAdminPrizeBatchResponseTiersItemTotalValueCentsMin = 0;
 
 
 
+
+
+
+
 export const GenerateAdminPrizeBatchResponse = zod.object({
   "status": zod.enum(['not_generated', 'generated']),
   "commitHash": zod.string().nullable(),
@@ -672,6 +702,15 @@ export const GenerateAdminPrizeBatchResponse = zod.object({
   "quantity": zod.int().min(generateAdminPrizeBatchResponseTiersItemQuantityMin),
   "nominalValueCents": zod.int().min(generateAdminPrizeBatchResponseTiersItemNominalValueCentsMin),
   "totalValueCents": zod.int().min(generateAdminPrizeBatchResponseTiersItemTotalValueCentsMin)
+})),
+  "draftTiers": zod.array(zod.object({
+  "tierId": zod.int().min(1),
+  "label": zod.string(),
+  "quantity": zod.int().min(1),
+  "nominalValueCents": zod.int().min(1),
+  "totalValueCents": zod.int().min(1),
+  "createdAt": zod.coerce.date(),
+  "status": zod.enum(['draft'])
 })),
   "canGenerate": zod.boolean()
 })
@@ -712,9 +751,51 @@ export const AddAdminPrizeTierResponse = zod.object({
   "quantity": zod.int().min(1),
   "nominalValueCents": zod.int().min(1),
   "totalValueCents": zod.int().min(1),
-  "commitHash": zod.string().min(addAdminPrizeTierResponseCommitHashMin).max(addAdminPrizeTierResponseCommitHashMax),
+  "commitHash": zod.string().min(addAdminPrizeTierResponseCommitHashMin).max(addAdminPrizeTierResponseCommitHashMax).nullable(),
   "createdAt": zod.coerce.date(),
-  "remainingCells": zod.int().min(addAdminPrizeTierResponseRemainingCellsMin)
+  "remainingCells": zod.int().min(addAdminPrizeTierResponseRemainingCellsMin),
+  "status": zod.enum(['draft', 'allocated'])
+})
+
+
+/**
+ * This operation is irreversible for the selected tier and creates an auditable commit hash.
+ * @summary Draw available cells and allocate a configured prize tier
+ */
+
+
+
+export const DrawAdminPrizeTierParams = zod.object({
+  "tierId": zod.coerce.number().int().min(1)
+})
+
+export const DrawAdminPrizeTierBody = zod.object({
+  "confirm": zod.literal(true)
+})
+
+
+
+
+
+
+export const drawAdminPrizeTierResponseCommitHashMin = 64;
+export const drawAdminPrizeTierResponseCommitHashMax = 64;
+
+export const drawAdminPrizeTierResponseRemainingCellsMin = 0;
+
+
+
+export const DrawAdminPrizeTierResponse = zod.object({
+  "batchId": zod.int().min(1),
+  "tierId": zod.int().min(1),
+  "label": zod.string(),
+  "quantity": zod.int().min(1),
+  "nominalValueCents": zod.int().min(1),
+  "totalValueCents": zod.int().min(1),
+  "commitHash": zod.string().min(drawAdminPrizeTierResponseCommitHashMin).max(drawAdminPrizeTierResponseCommitHashMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "remainingCells": zod.int().min(drawAdminPrizeTierResponseRemainingCellsMin),
+  "status": zod.enum(['draft', 'allocated'])
 })
 
 

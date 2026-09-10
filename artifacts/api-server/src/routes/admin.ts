@@ -9,6 +9,7 @@ import {
   GetAdminOverviewResponse,
   AddAdminPrizeTierBody,
   AddAdminPrizeTierResponse,
+  DrawAdminPrizeTierBody,
   ListAdminRedemptionsQueryParams,
   ListAdminRedemptionsResponse,
   UpdateAdminRedemptionBody,
@@ -25,6 +26,7 @@ import { sendPixTransfer } from "../lib/efi";
 import {
   generatePrizeBatch,
   addPrizeTier,
+  drawPrizeTier,
   getPrizeBatchStatus,
   PrizeBatchAlreadyExistsError,
   PrizeBatchNotGeneratedError,
@@ -137,6 +139,29 @@ router.post("/prize-tiers", async (request, response): Promise<void> => {
       return;
     }
     request.log.error({ error }, "Admin prize tier creation failed");
+    throw error;
+  }
+});
+
+router.post("/prize-tiers/:tierId/draw", async (request, response): Promise<void> => {
+  const tierId = Number(request.params.tierId);
+  const parsed = DrawAdminPrizeTierBody.safeParse(request.body);
+  if (!Number.isInteger(tierId) || tierId <= 0 || !parsed.success) {
+    response.status(400).json({
+      error: parsed.success ? "Tier inválido." : parsed.error.message,
+    });
+    return;
+  }
+
+  try {
+    const tier = await drawPrizeTier(pool, tierId);
+    response.json(AddAdminPrizeTierResponse.parse(tier));
+  } catch (error) {
+    if (error instanceof PrizeTierConfigurationError) {
+      response.status(409).json({ error: error.message });
+      return;
+    }
+    request.log.error({ error }, "Admin prize tier draw failed");
     throw error;
   }
 });
@@ -621,7 +646,7 @@ router.post(
 );
 
 router.get("/prize-pool", async (_request, response): Promise<void> => {
-  const [tiers, batch, safety] = await Promise.all([
+  const [tiers, drafts, batch, safety] = await Promise.all([
     pool.query(
       `SELECT
          pp.tier_id,
@@ -665,6 +690,13 @@ router.get("/prize-pool", async (_request, response): Promise<void> => {
        ORDER BY pp.nominal_value_cents DESC`,
     ),
     pool.query(
+      `SELECT tier_id, label, nominal_value_cents, total_value_cents,
+              total_positions, created_at
+         FROM prize_tier_drafts
+        WHERE status = 'draft'
+        ORDER BY tier_id`,
+    ),
+    pool.query(
       `SELECT commit_hash, created_at, revealed_at
        FROM prize_tier_batch WHERE id = 1`,
     ),
@@ -692,6 +724,15 @@ router.get("/prize-pool", async (_request, response): Promise<void> => {
         rejectedPositions: Number(row.rejected_positions),
         rejectedValueCents: Number(row.rejected_value_cents),
       })),
+       draftTiers: drafts.rows.map((row) => ({
+         tierId: Number(row.tier_id),
+         label: String(row.label),
+         quantity: Number(row.total_positions),
+         nominalValueCents: Number(row.nominal_value_cents),
+         totalValueCents: Number(row.total_value_cents),
+         createdAt: iso(row.created_at)!,
+         status: "draft" as const,
+       })),
       commitHash: batchRow?.commit_hash ?? null,
       batchCreatedAt: iso(batchRow?.created_at),
       batchRevealedAt: iso(batchRow?.revealed_at),

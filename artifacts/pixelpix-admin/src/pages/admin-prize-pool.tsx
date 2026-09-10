@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, BadgeCheck, Check, Copy, Database, Fingerprint, LockKeyhole, RefreshCw, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAddAdminPrizeTier, useGenerateAdminPrizeBatch, useGetAdminPrizeBatch, useGetAdminPrizePool, useListAdminPrizePositions, getGetAdminPrizeBatchQueryKey, getGetAdminPrizePoolQueryKey, getListAdminPrizePositionsQueryKey } from '@workspace/api-client-react';
+import { useAddAdminPrizeTier, useDrawAdminPrizeTier, useGenerateAdminPrizeBatch, useGetAdminPrizeBatch, useGetAdminPrizePool, useListAdminPrizePositions, getGetAdminPrizeBatchQueryKey, getGetAdminPrizePoolQueryKey, getListAdminPrizePositionsQueryKey } from '@workspace/api-client-react';
 import { AdminShell, PageHeader } from '@/components/admin-shell';
 import { AccessKeyPrompt, EmptyState, ErrorState, LoadingPanel, SectionHeading, formatBRL, formatDate, isAccessError, useAdminAccess, withAdminAuthRevision } from '@/components/admin-ui';
 
@@ -35,6 +35,8 @@ function PrizeBatchControl() {
   const [tierUnitValue, setTierUnitValue] = useState('');
   const [tierError, setTierError] = useState('');
   const [tierSuccess, setTierSuccess] = useState('');
+  const [drawTierId, setDrawTierId] = useState<number | null>(null);
+  const [drawError, setDrawError] = useState('');
   const batch = useGetAdminPrizeBatch({
     request: { headers: { 'x-admin-access-key': accessKey } },
     query: {
@@ -63,7 +65,7 @@ function PrizeBatchControl() {
         setTierUnitValue('');
         setTierError('');
         setTierSuccess(
-          `Tier ${result.label} criado com ${result.quantity.toLocaleString('pt-BR')} células. Commit: ${result.commitHash}`,
+          `Tier ${result.label} criado como rascunho com ${result.quantity.toLocaleString('pt-BR')} células planejadas. O sorteio ainda não foi executado.`,
         );
         await queryClient.invalidateQueries({ queryKey: getGetAdminPrizeBatchQueryKey() });
         await queryClient.invalidateQueries({ queryKey: getGetAdminPrizePoolQueryKey() });
@@ -75,6 +77,25 @@ function PrizeBatchControl() {
             ? error.message
             : 'Não foi possível adicionar o tier.',
         );
+      },
+    },
+  });
+  const drawTier = useDrawAdminPrizeTier({
+    request: { headers: { 'x-admin-access-key': accessKey } },
+    mutation: {
+      onSuccess: async (result) => {
+        setDrawTierId(null);
+        setDrawError('');
+        setTierSuccess(
+          `Tier ${result.label} sorteado: ${result.quantity.toLocaleString('pt-BR')} células alocadas. Commit ${result.commitHash?.slice(0, 12)}…`,
+        );
+        await queryClient.invalidateQueries({ queryKey: getGetAdminPrizeBatchQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getGetAdminPrizePoolQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: getListAdminPrizePositionsQueryKey() });
+      },
+      onError: (error) => {
+        setDrawError(error instanceof Error ? error.message : 'Não foi possível sortear este tier.');
+        setDrawTierId(null);
       },
     },
   });
@@ -127,9 +148,9 @@ function PrizeBatchControl() {
         <div className="flex items-start gap-3">
           <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#789a31] text-white"><Check size={19} /></div>
           <div>
-            <div className="section-kicker text-[#557a1d]">Lote 01 · base</div>
-            <h2 className="mt-1 text-lg font-bold">Distribuição inicial selada</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-5 text-[#557a1d]">Este é o lote original da distribuição. Ele não muda quando novos tiers incrementais são adicionados.</p>
+             <div className="section-kicker text-[#557a1d]">Lote-base · imutável</div>
+             <h2 className="mt-1 text-lg font-bold">Configuração inicial selada</h2>
+             <p className="mt-1 max-w-2xl text-sm leading-5 text-[#557a1d]">O lote-base contém a primeira distribuição criptográfica. Novos tiers são configurados e sorteados separadamente, sem reabrir este lote.</p>
             <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-bold text-[#557a1d]"><span className="size-1.5 rounded-full bg-[#789a31]" /> Ativo e imutável</div>
           </div>
         </div>
@@ -145,7 +166,7 @@ function PrizeBatchControl() {
 
       <div className="grid gap-5 p-5 lg:grid-cols-[1.15fr_.85fr]">
         <div>
-          <div className="section-kicker">Prova de integridade do lote 01</div>
+           <div className="section-kicker">Commit do lote-base</div>
           <div className="mt-2 flex items-start gap-2">
             <code className="min-w-0 break-all rounded-lg bg-muted px-3 py-2 font-mono-ui text-[11px] leading-5">{data.commitHash}</code>
             {data.commitHash && <button className="icon-button shrink-0" aria-label="Copiar commit hash" onClick={() => { void navigator.clipboard.writeText(data.commitHash!).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); }); }}><Copy size={14} /></button>}
@@ -153,19 +174,19 @@ function PrizeBatchControl() {
           {copied && <div className="mt-2 text-xs font-semibold text-[#557a1d]">Commit copiado.</div>}
         </div>
         <div className="rounded-xl border border-border/70 bg-muted/25 p-4">
-          <div className="section-kicker">Como ler a distribuição</div>
-          <p className="mt-2 text-sm leading-5 text-muted-foreground">Cada tier define um prêmio por célula e uma quantidade de células. O valor nominal do tier é a multiplicação desses dois números.</p>
+           <div className="section-kicker">Como ler os estados</div>
+           <p className="mt-2 text-sm leading-5 text-muted-foreground"><strong>Tier</strong> é a regra comercial. <strong>Sorteio</strong> é a alocação aleatória das células. <strong>Encontrado</strong> acontece quando o público descobre uma célula.</p>
         </div>
       </div>
 
       <div className="border-t border-border/70 bg-muted/15 px-5 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div><div className="section-kicker">Lote incremental</div><p className="mt-1 text-sm text-muted-foreground">Cada novo tier cria uma operação própria e preserva as posições já sorteadas.</p></div>
-          {!addTierOpen && <button className="button button-coral" onClick={() => { setAddTierOpen(true); setTierSuccess(''); setTierError(''); }}><Sparkles size={15} /> Criar tier incremental</button>}
+           <div><div className="section-kicker">Configuração comercial</div><p className="mt-1 text-sm text-muted-foreground">Crie o tier primeiro. Depois revise os valores e use o botão do próprio tier para sortear as células disponíveis.</p></div>
+           {!addTierOpen && <button className="button button-coral" onClick={() => { setAddTierOpen(true); setTierSuccess(''); setTierError(''); }}><Sparkles size={15} /> Criar novo tier</button>}
         </div>
         {tierSuccess && <div className="mt-3 rounded-lg border border-[#b9d993] bg-[#f1f9e8] px-3 py-2 text-xs font-semibold text-[#557a1d]"><div className="flex items-start gap-2"><Check size={15} className="mt-0.5 shrink-0" /><span>{tierSuccess}</span></div></div>}
         {addTierOpen && <div className="mt-4 rounded-xl border border-border/70 bg-card p-4">
-          <div className="mb-4 rounded-lg bg-[#f4f8ea] px-3 py-2.5 text-xs leading-5 text-[#557a1d]">Informe o orçamento do novo tier e o prêmio de cada célula. A quantidade será calculada automaticamente.</div>
+           <div className="mb-4 rounded-lg bg-[#f4f8ea] px-3 py-2.5 text-xs leading-5 text-[#557a1d]">Esta etapa apenas configura o tier. A quantidade é calculada agora, mas nenhuma célula é sorteada até você confirmar a ação no tier criado.</div>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="field-label"><span>Nome do tier</span><input className="field" value={tierLabel} maxLength={80} onChange={(event) => setTierLabel(event.target.value)} placeholder="Ex.: R$25" /></label>
             <label className="field-label"><span>Orçamento total</span><input className="field" type="number" min="0.01" step="0.01" value={tierTotalValue} onChange={(event) => setTierTotalValue(event.target.value)} placeholder="1.000,00" /></label>
@@ -179,17 +200,37 @@ function PrizeBatchControl() {
           {totalValueCents > 0 && nominalValueCents > 0 && !quantity && <p className="mt-3 text-xs font-semibold text-[#a83d2f]">O orçamento total precisa ser divisível pelo prêmio por célula.</p>}
           {tierError && <div className="mt-3 rounded-lg border border-[#e7b5a8] bg-[#fff6f2] px-3 py-2 text-xs font-semibold text-[#a83d2f]">{tierError}</div>}
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button className="button button-danger" disabled={addTier.isPending} onClick={submitTier}>{addTier.isPending ? 'Criando tier…' : 'Confirmar e sortear células'}</button>
+             <button className="button button-primary" disabled={addTier.isPending} onClick={submitTier}>{addTier.isPending ? 'Salvando tier…' : 'Salvar tier como rascunho'}</button>
             <button className="button button-ghost" disabled={addTier.isPending} onClick={() => { setAddTierOpen(false); setTierError(''); }}>Cancelar</button>
           </div>
-        </div>}
+         </div>}
+         {drawError && <div className="mt-3 rounded-lg border border-[#e7b5a8] bg-[#fff6f2] px-3 py-2 text-xs font-semibold text-[#a83d2f]">{drawError}</div>}
+         {data.draftTiers.length > 0 && <div className="mt-5 border-t border-border/70 pt-5">
+           <div className="section-kicker">Tiers aguardando sorteio</div>
+           <p className="mt-1 text-sm text-muted-foreground">Os tiers abaixo estão configurados, mas ainda não fazem parte do grid premiado.</p>
+           <div className="mt-3 grid gap-3 lg:grid-cols-2">
+             {data.draftTiers.map((draft) => (
+               <div className="tier-draft-card" key={draft.tierId}>
+                 <div className="min-w-0">
+                   <div className="flex items-center gap-2"><span className="tier-index">{String(draft.tierId).padStart(2, '0')}</span><strong>{draft.label}</strong><span className="status-badge status-pending">Rascunho</span></div>
+                   <div className="mt-2 grid grid-cols-3 gap-3 text-xs">
+                     <div><span className="block text-muted-foreground">Por célula</span><strong className="font-mono-ui">{formatBRL(draft.nominalValueCents)}</strong></div>
+                     <div><span className="block text-muted-foreground">Células</span><strong className="font-mono-ui">{draft.quantity.toLocaleString('pt-BR')}</strong></div>
+                     <div><span className="block text-muted-foreground">Valor nominal</span><strong className="font-mono-ui">{formatBRL(draft.totalValueCents)}</strong></div>
+                   </div>
+                 </div>
+                 <button className="button button-coral shrink-0" disabled={drawTier.isPending} onClick={() => { if (window.confirm(`Sortear ${draft.quantity.toLocaleString('pt-BR')} células para o tier ${draft.label}? Esta ação é irreversível.`)) { setDrawError(''); setDrawTierId(draft.tierId); drawTier.mutate({ tierId: draft.tierId, data: { confirm: true } }); } }}>{drawTierId === draft.tierId ? 'Sorteando…' : 'Sortear células'}</button>
+               </div>
+             ))}
+           </div>
+         </div>}
       </div>
     </section>;
   }
 
-  return <section className="panel overflow-hidden" data-testid="panel-prize-batch-generation">
-    <div className="flex items-start gap-3 border-b border-border/70 bg-[#fff8e5] px-5 py-5"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#f1d78c] text-[#70500a]"><Sparkles size={19} /></div><div><div className="section-kicker text-[#876d2e]">Preparação irreversível</div><h2 className="mt-1 text-lg font-bold">Gerar lote premiado</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-[#876d2e]">Cria {data.totalPositions.toLocaleString('pt-BR')} posições criptograficamente embaralhadas, totalizando {formatBRL(data.totalValueCents)} nominais. Essa operação só pode ser executada uma vez.</p></div></div>
-    <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="text-xs leading-5 text-muted-foreground">O hash de compromisso será exibido após a criação para permitir auditoria da distribuição.</div>{confirmOpen ? <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-[#a83d2f]">Confirmar criação permanente?</span><button className="button button-danger" disabled={generate.isPending} onClick={() => generate.mutate({ data: { confirm: true } })}>{generate.isPending ? 'Gerando…' : 'Sim, gerar lote'}</button><button className="button button-ghost" disabled={generate.isPending} onClick={() => setConfirmOpen(false)}>Cancelar</button></div> : <button className="button button-coral" onClick={() => setConfirmOpen(true)} data-testid="button-open-generate-prize-batch"><Sparkles size={15} /> Preparar geração</button>}</div>
+   return <section className="panel overflow-hidden" data-testid="panel-prize-batch-generation">
+     <div className="flex items-start gap-3 border-b border-border/70 bg-[#fff8e5] px-5 py-5"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#f1d78c] text-[#70500a]"><Sparkles size={19} /></div><div><div className="section-kicker text-[#876d2e]">Primeira configuração · irreversível</div><h2 className="mt-1 text-lg font-bold">Gerar lote-base</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-[#876d2e]">Cria {data.totalPositions.toLocaleString('pt-BR')} posições da configuração inicial, totalizando {formatBRL(data.totalValueCents)} nominais. Esta etapa acontece uma única vez; tiers novos entram pelo fluxo de rascunho e sorteio.</p></div></div>
+     <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="text-xs leading-5 text-muted-foreground">O commit hash será exibido depois e permite conferir a distribuição inicial.</div>{confirmOpen ? <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-[#a83d2f]">Confirmar criação permanente?</span><button className="button button-danger" disabled={generate.isPending} onClick={() => generate.mutate({ data: { confirm: true } })}>{generate.isPending ? 'Gerando…' : 'Sim, gerar lote-base'}</button><button className="button button-ghost" disabled={generate.isPending} onClick={() => setConfirmOpen(false)}>Cancelar</button></div> : <button className="button button-coral" onClick={() => setConfirmOpen(true)} data-testid="button-open-generate-prize-batch"><Sparkles size={15} /> Preparar lote-base</button>}</div>
     {generate.isError && <div className="border-t border-[#e7b5a8] bg-[#fff6f2] px-5 py-3 text-xs font-semibold text-[#a83d2f]">Não foi possível gerar o lote. Ele pode já ter sido criado por outra operação; atualize para conferir.</div>}
   </section>;
 }
@@ -218,10 +259,10 @@ function PrizePoolContent() {
       staleTime: 10_000,
     },
   });
-  if (!accessKey) return <><PageHeader eyebrow="Operações / integridade" title="Prize pool" description="Distribuição, posições e provas de integridade do lote." /><AccessKeyPrompt onSaved={(key) => { saveAccessKey(key); setShowKey(false); }} /></>;
-  if (pool.isLoading) return <><PageHeader eyebrow="Operações / integridade" title="Prize pool" description="Distribuição, posições e provas de integridade do lote." /><LoadingPanel rows={6} /></>;
-  if (pool.isError && isAccessError(pool.error)) return <><PageHeader eyebrow="Operações / integridade" title="Prize pool" description="Distribuição, posições e provas de integridade do lote." />{showKey ? <AccessKeyPrompt onSaved={(key) => { saveAccessKey(key); setShowKey(false); }} /> : <ErrorState accessRequired onRetry={() => setShowKey(true)} />}</>;
-  if (pool.isError || !pool.data) return <><PageHeader eyebrow="Operações / integridade" title="Prize pool" /><ErrorState onRetry={() => pool.refetch()} /></>;
+  if (!accessKey) return <><PageHeader eyebrow="Prêmios / configuração e sorteios" title="Prêmios e sorteios" description="Configure tiers, sorteie células e acompanhe a distribuição sem misturar as etapas." /><AccessKeyPrompt onSaved={(key) => { saveAccessKey(key); setShowKey(false); }} /></>;
+  if (pool.isLoading) return <><PageHeader eyebrow="Prêmios / configuração e sorteios" title="Prêmios e sorteios" description="Configure tiers, sorteie células e acompanhe a distribuição sem misturar as etapas." /><LoadingPanel rows={6} /></>;
+  if (pool.isError && isAccessError(pool.error)) return <><PageHeader eyebrow="Prêmios / configuração e sorteios" title="Prêmios e sorteios" description="Configure tiers, sorteie células e acompanhe a distribuição sem misturar as etapas." />{showKey ? <AccessKeyPrompt onSaved={(key) => { saveAccessKey(key); setShowKey(false); }} /> : <ErrorState accessRequired onRetry={() => setShowKey(true)} />}</>;
+  if (pool.isError || !pool.data) return <><PageHeader eyebrow="Prêmios / configuração e sorteios" title="Prêmios e sorteios" /><ErrorState onRetry={() => pool.refetch()} /></>;
   const data = pool.data;
   const totalPositions = data.tiers.reduce((sum, tier) => sum + tier.totalPositions, 0);
   const foundPositions = data.tiers.reduce((sum, tier) => sum + tier.foundPositions, 0);
@@ -240,12 +281,12 @@ function PrizePoolContent() {
   const positionPageCount = Math.max(1, Math.ceil(positionTotal / positionLimit));
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Operações / integridade" title="Prize pool" description="Distribuição, posições e provas de integridade do lote." action={<button className="button button-secondary" onClick={() => pool.refetch()} data-testid="button-refresh-prize-pool"><RefreshCw size={15} /> Atualizar</button>} />
-    <div className="pool-banner"><div className="pool-banner-mark"><ShieldCheck size={21} /></div><div className="min-w-0 flex-1"><div className="section-kicker text-[#d9f77a]">Integridade do lote</div><h2>{data.batchRevealedAt ? 'Commit revelado e conferido' : 'Lote aguardando reveal'}</h2><p>{data.batchRevealedAt ? `Revelado em ${formatDate(data.batchRevealedAt, true)}. A distribuição está disponível para operação.` : 'A prova criptográfica ainda não foi revelada para este lote.'}</p></div><div className="pool-banner-stat"><span>{Math.round(allocation)}%</span><small>alocado</small></div></div>
+    <PageHeader eyebrow="Prêmios / configuração e sorteios" title="Prêmios e sorteios" description="Configure tiers, sorteie células e acompanhe a distribuição sem misturar as etapas." action={<button className="button button-secondary" onClick={() => pool.refetch()} data-testid="button-refresh-prize-pool"><RefreshCw size={15} /> Atualizar</button>} />
+    <div className="pool-banner"><div className="pool-banner-mark"><ShieldCheck size={21} /></div><div className="min-w-0 flex-1"><div className="section-kicker text-[#d9f77a]">Lote-base / auditoria</div><h2>{data.batchRevealedAt ? 'Distribuição inicial conferida' : 'Lote-base aguardando reveal'}</h2><p>{data.batchRevealedAt ? `Commit revelado em ${formatDate(data.batchRevealedAt, true)}. Tiers novos têm seu próprio sorteio e commit.` : 'A prova criptográfica ainda não foi revelada para a distribuição inicial.'}</p></div><div className="pool-banner-stat"><span>{Math.round(allocation)}%</span><small>encontrado</small></div></div>
      <PrizeBatchControl />
      <div className="grid gap-6 xl:grid-cols-[1.4fr_.6fr]">
        <section className="panel overflow-hidden" data-testid="panel-prize-tiers">
-         <SectionHeading kicker="A — tiers e lotes" title="Tiers da distribuição" detail={`${data.tiers.length} tiers · ${totalPositions.toLocaleString('pt-BR')} células · ${formatBRL(totalValue)}`} />
+         <SectionHeading kicker="A — distribuição ativa" title="Tiers já sorteados" detail={`${data.tiers.length} tiers · ${totalPositions.toLocaleString('pt-BR')} células · ${formatBRL(totalValue)} nominais`} />
          {data.tiers.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>Tier</th><th>Prêmio por célula</th><th>Células no tier</th><th>Valor nominal</th><th>Resgates</th><th>Progresso</th></tr></thead><tbody>{data.tiers.map((tier) => { const percent = tier.totalPositions ? (tier.foundPositions / tier.totalPositions) * 100 : 0; return <tr key={tier.tierId} data-testid={`row-prize-tier-${tier.tierId}`}><td><div className="flex items-center gap-3"><span className="tier-index">{String(tier.tierId).padStart(2, '0')}</span><div><div className="font-semibold">{tier.label}</div><div className="mt-0.5 text-xs text-muted-foreground">Tier {String(tier.tierId).padStart(2, '0')}</div></div></div></td><td><div className="font-mono-ui text-sm font-bold">{formatBRL(tier.nominalValueCents)}</div><div className="mt-1 text-[10px] text-muted-foreground">por célula</div></td><td><div className="font-mono-ui text-sm font-bold">{tier.totalPositions.toLocaleString('pt-BR')}</div><div className="mt-1 text-[10px] text-muted-foreground">{tier.remainingPositions.toLocaleString('pt-BR')} disponíveis</div></td><td><div className="font-mono-ui text-sm font-bold">{formatBRL(tier.totalValueCents)}</div><div className="mt-1 text-[10px] text-muted-foreground">{tier.foundPositions.toLocaleString('pt-BR')} encontrados</div></td><td><div className="font-mono-ui text-sm font-bold">{tier.redeemedPositions.toLocaleString('pt-BR')} pagos</div><div className="mt-1 text-[10px] text-muted-foreground">{tier.pendingRedemptionPositions} pendentes · {tier.rejectedPositions} rejeitados</div></td><td className="min-w-[150px]"><div className="mb-1 flex justify-between text-[10px] text-muted-foreground"><span>{Math.round(percent)}% encontrados</span><span>{tier.foundPositions}/{tier.totalPositions}</span></div><div className="progress-track"><div className="progress-fill bg-[#789a31]" style={{ width: `${Math.min(100, percent)}%` }} /></div><div className="mt-2 text-[10px] text-muted-foreground">{formatBRL(tier.redeemedValueCents)} pagos</div></td></tr> })}</tbody></table></div> : <EmptyState title="Pool sem tiers" detail="Não há tiers registrados nesta distribuição." />}
         <div className="grid grid-cols-2 gap-px border-t border-border/70 bg-border/70 xl:grid-cols-4"><div className="bg-card px-5 py-4"><div className="text-xs text-muted-foreground">Distribuição total</div><div className="mt-1 font-mono-ui text-lg font-bold">{formatBRL(totalValue)}</div><div className="mt-1 text-[10px] text-muted-foreground">{totalPositions.toLocaleString('pt-BR')} posições</div></div><div className="bg-card px-5 py-4"><div className="text-xs text-muted-foreground">Encontrado</div><div className="mt-1 font-mono-ui text-lg font-bold">{formatBRL(foundValue)}</div><div className="mt-1 text-[10px] text-muted-foreground">{foundPositions.toLocaleString('pt-BR')} posições</div></div><div className="bg-card px-5 py-4"><div className="text-xs text-muted-foreground">Resgatado</div><div className="mt-1 font-mono-ui text-lg font-bold">{formatBRL(redeemedValue)}</div><div className="mt-1 text-[10px] text-muted-foreground">{redeemedPositions.toLocaleString('pt-BR')} pagamentos</div></div><div className="bg-card px-5 py-4"><div className="text-xs text-muted-foreground">Aguardando / rejeitado</div><div className="mt-1 font-mono-ui text-lg font-bold">{formatBRL(pendingRedemptionValue + rejectedValue)}</div><div className="mt-1 text-[10px] text-muted-foreground">{pendingRedemptionPositions} pendentes · {rejectedPositions} rejeitados</div></div></div>
       </section>
@@ -257,7 +298,7 @@ function PrizePoolContent() {
       <section className="panel overflow-hidden" data-testid="panel-prize-positions">
         <SectionHeading
           kicker="D — posições premiadas"
-          title="Mapa de prêmios"
+          title="Células sorteadas"
           detail={`${positionTotal.toLocaleString('pt-BR')} posições premiadas registradas`}
         />
         <div className="border-y border-border/70 bg-muted/25 px-5 py-4">
@@ -355,11 +396,11 @@ function PrizePoolContent() {
             </div>
           </>
         ) : (
-          <EmptyState title="Nenhuma posição encontrada" detail="Ajuste os filtros ou confirme se o lote já possui posições premiadas." />
+          <EmptyState title="Nenhuma posição encontrada" detail="Ajuste os filtros ou confirme se algum tier já foi sorteado." />
         )}
       </section>
     <section className="panel" data-testid="panel-commit-metadata">
-      <SectionHeading kicker="C — verificabilidade" title="Metadados commit / reveal" detail="Registro imutável utilizado para conferir a ordem do sorteio." />
+      <SectionHeading kicker="D — verificabilidade" title="Metadados de auditoria" detail="Cada commit registra uma distribuição sorteada e não deve ser alterado." />
       <div className="grid gap-px bg-border/70 sm:grid-cols-3"><div className="metadata-cell"><div className="metadata-icon"><Fingerprint size={17} /></div><div><div className="metadata-label">Commit hash</div><div className="metadata-value break-all">{data.commitHash ?? 'Não disponível'}</div></div></div><div className="metadata-cell"><div className="metadata-icon"><Database size={17} /></div><div><div className="metadata-label">Lote criado</div><div className="metadata-value">{formatDate(data.batchCreatedAt, true)}</div></div></div><div className="metadata-cell"><div className="metadata-icon"><LockKeyhole size={17} /></div><div><div className="metadata-label">Reveal registrado</div><div className="metadata-value">{formatDate(data.batchRevealedAt, true)}</div></div></div></div>
     </section>
     <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><BadgeCheck size={14} className="text-[#789a31]" /> Metadados exibidos diretamente do serviço de operações.</div>
