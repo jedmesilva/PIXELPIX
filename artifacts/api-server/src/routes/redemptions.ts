@@ -5,6 +5,8 @@ import {
   hashCertificateToken,
   verifyCertificateToken,
 } from "../lib/certificates";
+import { buildRedemptionRequestEmail } from "../lib/redemption-request-email";
+import { sendResendEmail } from "../lib/resend";
 
 const router: IRouter = Router();
 
@@ -68,7 +70,7 @@ async function findCertificate(input: { certificateCode: string; token: string }
 
 async function latestRedemption(certificateId: string) {
   const result = await pool.query(
-    `SELECT id, status, requested_at
+    `SELECT id, status, requested_at, rejection_reason
        FROM prize_redemption_requests
       WHERE certificate_id = $1
       ORDER BY requested_at DESC
@@ -116,6 +118,9 @@ router.get("/certificates/verify", async (request, response): Promise<void> => {
           id: Number(redemption.id),
           status: String(redemption.status),
           requestedAt: new Date(redemption.requested_at).toISOString(),
+          rejectionReason: redemption.rejection_reason
+            ? String(redemption.rejection_reason)
+            : null,
         }
       : null,
     canRedeem,
@@ -234,16 +239,146 @@ router.post("/redemptions", async (request: Request, response): Promise<void> =>
     );
     await client.query("COMMIT");
 
+    let notificationSent = false;
+    try {
+      const publicAppUrl =
+        process.env.PUBLIC_APP_URL?.trim() || "https://pixelpix.com.br";
+      const baseUrl = publicAppUrl.replace(/\/+$/, "");
+      const manageUrl =
+        `${baseUrl}/resgatar?code=${encodeURIComponent(String(certificate.certificate_code))}` +
+        `&request=${encodeURIComponent(String(inserted.rows[0].id))}` +
+        `#token=${encodeURIComponent(token)}`;
+      const notification = buildRedemptionRequestEmail({
+        redemptionId: Number(inserted.rows[0].id),
+        cellId: Number(certificate.cell_id),
+        certificateCode: String(certificate.certificate_code),
+        email,
+        pixKey,
+        requestedAmountCents: Number(inserted.rows[0].prize_value_cents),
+        requestedAt: new Date(inserted.rows[0].requested_at),
+        manageUrl,
+      });
+      await sendResendEmail({
+        from:
+          process.env.CERTIFICATE_FROM_EMAIL?.trim() ||
+          "PIXELPIX <onboarding@resend.dev>",
+        to: [email],
+        subject: notification.subject,
+        html: notification.html,
+        text: notification.text,
+        ...(process.env.CERTIFICATE_REPLY_TO?.trim()
+          ? { reply_to: process.env.CERTIFICATE_REPLY_TO.trim() }
+          : {}),
+      });
+      notificationSent = true;
+    } catch (error) {
+      request.log.warn(
+        { error, redemptionId: Number(inserted.rows[0].id) },
+        "Redemption request notification email failed",
+      );
+    }
+
     response.status(201).json({
       id: Number(inserted.rows[0].id),
       status: String(inserted.rows[0].status),
       certificateCode: String(certificate.certificate_code),
       prizeValueCents: Number(inserted.rows[0].prize_value_cents),
       requestedAt: new Date(inserted.rows[0].requested_at).toISOString(),
+      notificationSent,
     });
   } catch (error) {
     await client.query("ROLLBACK");
     request.log.error({ error }, "Prize redemption creation failed");
+    throw error;
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/redemptions/:id/cancel", async (request: Request, response): Promise<void> => {
+  const redemptionId = Number(request.params.id);
+  const certificateCode = readCertificateCode(request.body?.certificateCode);
+  const token = readToken(request.body?.token);
+  if (!Number.isSafeInteger(redemptionId) || redemptionId < 1 || !certificateCode || !token) {
+    response.status(400).json({ error: "Dados de cancelamento inválidos." });
+    return;
+  }
+
+  const payload = verifyCertificateToken(token);
+  if (!payload) {
+    response.status(400).json({ error: "Token do certificado inválido." });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `SELECT r.id, r.status, r.certificate_code, r.certificate_id,
+              pc.token_hash, pc.cell_id, pc.prize_value_cents,
+              c.status AS cell_status
+         FROM prize_redemption_requests r
+         INNER JOIN prize_certificates pc ON pc.id = r.certificate_id
+         INNER JOIN cells c ON c.id = r.cell_id
+        WHERE r.id = $1
+        FOR UPDATE`,
+      [redemptionId],
+    );
+    const redemption = result.rows[0];
+    const validCertificate =
+      redemption &&
+      String(redemption.certificate_code) === certificateCode &&
+      String(redemption.certificate_id) === payload.certificateId &&
+      Number(redemption.cell_id) === payload.cellId &&
+      Number(redemption.prize_value_cents) === payload.prizeValueCents &&
+      String(redemption.cell_status) === "paid" &&
+      sameHash(hashCertificateToken(token), String(redemption.token_hash));
+
+    if (!validCertificate) {
+      await client.query("ROLLBACK");
+      response.status(400).json({ error: "Certificado ou solicitação inválidos." });
+      return;
+    }
+
+    if (!["pending", "approved"].includes(String(redemption.status))) {
+      await client.query("ROLLBACK");
+      response.status(409).json({
+        error: "Esta solicitação não pode mais ser cancelada.",
+        status: String(redemption.status),
+      });
+      return;
+    }
+
+    const reason = "Cancelado pelo titular do certificado.";
+    const updated = await client.query(
+      `UPDATE prize_redemption_requests
+          SET status = 'rejected',
+              processed_at = NOW(),
+              processed_by = 'certificate-holder',
+              rejection_reason = $2,
+              reviewed_at = NOW(),
+              reviewed_by = 'certificate-holder'
+        WHERE id = $1
+        RETURNING id, status, requested_at`,
+      [redemptionId, reason],
+    );
+    await client.query(
+      `INSERT INTO prize_redemption_audit
+         (redemption_request_id, from_status, to_status, actor, reason)
+       VALUES ($1, $2, 'rejected', 'certificate-holder', $3)`,
+      [redemptionId, String(redemption.status), reason],
+    );
+    await client.query("COMMIT");
+
+    response.json({
+      id: Number(updated.rows[0].id),
+      status: "rejected",
+      cancelled: true,
+      requestedAt: new Date(updated.rows[0].requested_at).toISOString(),
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    request.log.error({ error, redemptionId }, "Prize redemption cancellation failed");
     throw error;
   } finally {
     client.release();

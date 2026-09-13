@@ -35,7 +35,7 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
-function logoMark() {
+export function logoMark() {
   return `
     <table role="presentation" cellspacing="0" cellpadding="0" style="display:inline-table;width:44px;height:58px;vertical-align:middle;margin-right:10px;">
       <tr>

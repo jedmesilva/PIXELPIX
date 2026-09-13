@@ -18,6 +18,7 @@ type CertificateVerification = {
     id: number;
     status: string;
     requestedAt: string;
+    rejectionReason: string | null;
   } | null;
   canRedeem: boolean;
 };
@@ -46,19 +47,39 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function redemptionStatusLabel(status: string) {
+function redemptionStatusLabel(status: string, rejectionReason?: string | null) {
+  if (
+    status === "rejected" &&
+    rejectionReason?.toLowerCase().includes("cancelado pelo titular")
+  ) {
+    return "Cancelado pelo titular";
+  }
   return redemptionStatusLabels[status] ?? "Status atualizado";
 }
 
 function RedemptionStatus({
   redemption,
   canRedeem,
+  onCancel,
+  cancelling,
+  confirmingCancel,
+  onAskCancel,
+  onDismissCancel,
 }: {
   redemption: NonNullable<CertificateVerification["redemption"]>;
   canRedeem: boolean;
+  onCancel: () => void;
+  cancelling: boolean;
+  confirmingCancel: boolean;
+  onAskCancel: () => void;
+  onDismissCancel: () => void;
 }) {
   const isRejected = redemption.status === "rejected" || redemption.status === "failed";
   const isPaid = redemption.status === "paid";
+  const isCancelled =
+    redemption.status === "rejected" &&
+    redemption.rejectionReason?.toLowerCase().includes("cancelado pelo titular");
+  const canCancel = redemption.status === "pending" || redemption.status === "approved";
   const StatusIcon = isRejected ? XCircle : isPaid ? CheckCircle2 : Clock3;
 
   return (
@@ -67,19 +88,56 @@ function RedemptionStatus({
         <StatusIcon size={20} aria-hidden="true" />
         <div>
           <span>Status do resgate</span>
-          <strong>{redemptionStatusLabel(redemption.status)}</strong>
+          <strong>{redemptionStatusLabel(redemption.status, redemption.rejectionReason)}</strong>
         </div>
       </div>
       <p>
         Solicitação registrada em {formatDate(redemption.requestedAt)}.
-        {isPaid
+        {isCancelled
+          ? " O pedido foi interrompido e você pode solicitar novamente."
+          : isPaid
           ? " O pagamento foi concluído."
           : isRejected
             ? " Você pode enviar uma nova solicitação com os dados corrigidos."
+            : redemption.status === "payment_pending"
+              ? " O pagamento já foi iniciado e não pode mais ser interrompido."
             : " Você pode voltar a esta tela pelo link do e-mail para acompanhar a atualização."}
       </p>
       {canRedeem && isRejected && (
         <small>O formulário de solicitação está disponível novamente abaixo.</small>
+      )}
+      {canCancel && !confirmingCancel && (
+        <button
+          className="redeem-cancel-button"
+          type="button"
+          onClick={onAskCancel}
+          disabled={cancelling}
+        >
+          Cancelar esta solicitação
+        </button>
+      )}
+      {canCancel && confirmingCancel && (
+        <div className="redeem-cancel-confirmation">
+          <p>Confirme apenas se os dados estiverem errados ou se você não reconhece este pedido.</p>
+          <div>
+            <button
+              className="redeem-button redeem-button-danger"
+              type="button"
+              onClick={onCancel}
+              disabled={cancelling}
+            >
+              {cancelling ? "Cancelando…" : "Confirmar cancelamento"}
+            </button>
+            <button
+              className="redeem-cancel-button"
+              type="button"
+              onClick={onDismissCancel}
+              disabled={cancelling}
+            >
+              Manter solicitação
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -134,6 +192,8 @@ export default function RedeemPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   const verify = async () => {
     if (!certificateCode.trim() || !token.trim()) {
@@ -196,6 +256,7 @@ export default function RedeemPage() {
                 id: Number(data.id),
                 status: String(data.status),
                 requestedAt: String(data.requestedAt),
+                rejectionReason: null,
               },
               canRedeem: false,
             }
@@ -206,6 +267,48 @@ export default function RedeemPage() {
       setMessage(error instanceof Error ? error.message : "Não foi possível criar o resgate.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const cancelRedemption = async () => {
+    if (!certificate?.redemption) return;
+    setCancelling(true);
+    setMessage("");
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/redemptions/${certificate.redemption.id}/cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            certificateCode: certificate.certificateCode,
+            token: token.trim(),
+          }),
+        },
+      );
+      const data = await readJson(response);
+      setCertificate((current) =>
+        current?.redemption
+          ? {
+              ...current,
+              redemptionStatus: "rejected",
+              redemption: {
+                ...current.redemption,
+                status: "rejected",
+                requestedAt: String(data.requestedAt ?? current.redemption.requestedAt),
+                rejectionReason: "Cancelado pelo titular do certificado.",
+              },
+              canRedeem: true,
+            }
+          : current,
+      );
+      setSubmitted(false);
+      setConfirmingCancel(false);
+      setMessage("Solicitação cancelada. Você pode corrigir os dados e solicitar novamente.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível cancelar a solicitação.");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -240,6 +343,11 @@ export default function RedeemPage() {
                 <RedemptionStatus
                   redemption={certificate.redemption}
                   canRedeem={certificate.canRedeem}
+                  onCancel={() => void cancelRedemption()}
+                  cancelling={cancelling}
+                  confirmingCancel={confirmingCancel}
+                  onAskCancel={() => setConfirmingCancel(true)}
+                  onDismissCancel={() => setConfirmingCancel(false)}
                 />
               )}
             </>
@@ -278,6 +386,11 @@ export default function RedeemPage() {
                 <RedemptionStatus
                   redemption={certificate.redemption}
                   canRedeem={certificate.canRedeem}
+                  onCancel={() => void cancelRedemption()}
+                  cancelling={cancelling}
+                  confirmingCancel={confirmingCancel}
+                  onAskCancel={() => setConfirmingCancel(true)}
+                  onDismissCancel={() => setConfirmingCancel(false)}
                 />
               )}
               {certificate?.canRedeem && (
