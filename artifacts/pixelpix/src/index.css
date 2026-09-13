@@ -1738,24 +1738,6 @@ button:focus-visible {
   font-size: 13px;
 }
 
-.redeem-success {
-  display: grid;
-  gap: 12px;
-  margin-top: 22px;
-  padding: 18px;
-  border: 1px solid color-mix(in srgb, var(--pixelpix-brand) 30%, var(--pixelpix-border));
-  border-radius: 0;
-  color: var(--pixelpix-brand-hover);
-  background: color-mix(in srgb, var(--pixelpix-brand) 8%, var(--pixelpix-surface));
-}
-
-.redeem-success p {
-  margin: 0;
-  color: var(--pixelpix-text-primary);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
 .redeem-status {
   display: grid;
   gap: 10px;

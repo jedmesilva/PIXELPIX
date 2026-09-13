@@ -73,7 +73,7 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
                   Sua solicitação foi registrada.
                 </h1>
                 <p style="margin:14px 0 0;color:#aeb8b2;font-size:15px;line-height:1.6;">
-                  Recebemos o pedido de pagamento do prêmio do pixel #${input.cellId.toLocaleString("pt-BR")}. A administração irá conferir os dados antes de liberar o pagamento.
+                  Recebemos sua solicitação de resgate do prêmio do pixel #${input.cellId.toLocaleString("pt-BR")}. Você receberá um e-mail sobre o status da solicitação e poderá acompanhar o resgate pelo mesmo link.
                 </p>
               </td>
             </tr>
@@ -147,6 +147,7 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
     "PIXELPIX — Resgate solicitado",
     "",
     `Sua solicitação de resgate do pixel #${input.cellId.toLocaleString("pt-BR")} foi registrada.`,
+    "Você receberá um e-mail sobre o status da solicitação e poderá acompanhar o resgate pelo mesmo link.",
     "",
     `Valor do resgate: ${amount}`,
     `E-mail informado: ${input.email}`,

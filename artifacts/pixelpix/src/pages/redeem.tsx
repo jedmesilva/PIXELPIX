@@ -92,16 +92,15 @@ function RedemptionStatus({
         </div>
       </div>
       <p>
-        Solicitação registrada em {formatDate(redemption.requestedAt)}.
         {isCancelled
-          ? " O pedido foi interrompido e você pode solicitar novamente."
+          ? `Resgate solicitado em ${formatDate(redemption.requestedAt)}. O pedido foi interrompido e você pode solicitar novamente.`
           : isPaid
-          ? " O pagamento foi concluído."
-          : isRejected
-            ? " Você pode enviar uma nova solicitação com os dados corrigidos."
-            : redemption.status === "payment_pending"
-              ? " O pagamento já foi iniciado e não pode mais ser interrompido."
-            : " Você pode voltar a esta tela pelo link do e-mail para acompanhar a atualização."}
+            ? `Resgate solicitado em ${formatDate(redemption.requestedAt)}. O pagamento foi concluído.`
+            : isRejected
+              ? `Resgate solicitado em ${formatDate(redemption.requestedAt)}. Você pode enviar uma nova solicitação com os dados corrigidos.`
+              : redemption.status === "payment_pending"
+                ? `Resgate solicitado em ${formatDate(redemption.requestedAt)}. O pagamento já foi iniciado e não pode mais ser interrompido.`
+                : `Resgate solicitado em ${formatDate(redemption.requestedAt)}. Você receberá um e-mail sobre o status da solicitação, ou poderá voltar nesta página com as informações do certificado para acompanhar o resgate.`}
       </p>
       {canRedeem && isRejected && (
         <small>O formulário de solicitação está disponível novamente abaixo.</small>
@@ -332,25 +331,17 @@ export default function RedeemPage() {
                 : "Resgate seu prêmio"}
           </h1>
           {submitted ? (
-            <>
-              <div className="redeem-success">
-                <CheckCircle2 size={26} />
-                <p>
-                  Seu pedido foi enviado para análise. A administração conferirá o certificado e a chave Pix antes de realizar o pagamento.
-                </p>
-              </div>
-              {certificate?.redemption && (
-                <RedemptionStatus
-                  redemption={certificate.redemption}
-                  canRedeem={certificate.canRedeem}
-                  onCancel={() => void cancelRedemption()}
-                  cancelling={cancelling}
-                  confirmingCancel={confirmingCancel}
-                  onAskCancel={() => setConfirmingCancel(true)}
-                  onDismissCancel={() => setConfirmingCancel(false)}
-                />
-              )}
-            </>
+            certificate?.redemption ? (
+              <RedemptionStatus
+                redemption={certificate.redemption}
+                canRedeem={certificate.canRedeem}
+                onCancel={() => void cancelRedemption()}
+                cancelling={cancelling}
+                confirmingCancel={confirmingCancel}
+                onAskCancel={() => setConfirmingCancel(true)}
+                onDismissCancel={() => setConfirmingCancel(false)}
+              />
+            ) : null
           ) : (
             <>
               <p className="redeem-copy">
