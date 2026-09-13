@@ -134,7 +134,6 @@ async function sendCertificateEmail(input: {
   certificateCode: string;
   certificateToken: string;
   issuedAt: string;
-  prizeLabel?: string | null;
   emoji?: string | null;
   backgroundColor?: string | null;
   revealedAt?: string | null;
@@ -152,7 +151,6 @@ async function sendCertificateEmail(input: {
       certificateCode: input.certificateCode,
       certificateToken: input.certificateToken,
       prizeValueCents: input.prizeValueCents,
-      prizeLabel: input.prizeLabel,
       emoji: input.emoji,
       backgroundColor: input.backgroundColor,
       issuedAt: new Date(input.issuedAt),
@@ -225,7 +223,6 @@ export async function deliverCertificateForCell(cellId: number) {
     certificateCode: certificate.certificateCode,
     certificateToken: certificate.token,
     issuedAt: certificate.issuedAt.toISOString(),
-    prizeLabel: certificate.prizeLabel,
     emoji: certificate.emoji,
     backgroundColor: certificate.backgroundColor,
     revealedAt: certificate.revealedAt?.toISOString() ?? null,

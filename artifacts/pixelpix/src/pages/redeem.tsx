@@ -211,7 +211,7 @@ export default function RedeemPage() {
       const data = await readJson(response);
       setCertificate(data);
       if (Number(data.prizeValueCents) <= 0) {
-        setMessage("Este pixel foi revelado sem valor de resgate.");
+        setMessage("Este pixel não possui valor em Pix disponível para resgate.");
       } else if (!data.canRedeem) {
         setMessage("Este certificado já possui um resgate em processamento.");
       }

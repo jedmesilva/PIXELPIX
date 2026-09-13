@@ -49,14 +49,14 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
     <meta name="color-scheme" content="dark">
     <meta name="supported-color-schemes" content="dark">
   </head>
-  <body bgcolor="#0b0d10" style="margin:0;padding:0;background:#0b0d10;color:#e5e7eb;font-family:Arial,Helvetica,sans-serif;">
+  <body bgcolor="#0b0d10" style="margin:0;padding:0;background:#0b0d10 !important;background-color:#0b0d10 !important;color:#e5e7eb;font-family:Arial,Helvetica,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
       Sua solicitação de resgate do PIXELPIX foi registrada. Confira os dados e cancele se algo estiver errado.
     </div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#0b0d10" style="background:#0b0d10;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#0b0d10" style="background:#0b0d10 !important;background-color:#0b0d10 !important;">
       <tr>
-        <td align="center" style="padding:32px 16px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#14171b" style="max-width:560px;background:#14171b;border:1px solid #2b333c;border-top:4px solid #00b85c;border-radius:0;box-shadow:4px 4px 0 #0b5b36;overflow:hidden;">
+        <td align="center" bgcolor="#0b0d10" style="padding:32px 16px;background:#0b0d10 !important;background-color:#0b0d10 !important;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#14171b" style="max-width:560px;background:#14171b !important;background-color:#14171b !important;border:1px solid #2b333c;border-top:4px solid #00b85c;border-radius:0;box-shadow:4px 4px 0 #0b5b36;overflow:hidden;">
             <tr>
               <td style="padding:28px;border-bottom:1px solid #2b333c;">
                 <div style="font-size:19px;font-weight:900;letter-spacing:.04em;color:#e5e7eb;">
@@ -79,7 +79,7 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
             </tr>
             <tr>
               <td style="padding:18px 28px 0;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#171b20" style="border:1px solid #2b333c;border-radius:0;background:#171b20;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#171b20" style="border:1px solid #2b333c;border-radius:0;background:#171b20 !important;background-color:#171b20 !important;">
                   <tr>
                     <td style="padding:18px 20px;">
                       <p style="margin:0 0 13px;color:#00b85c;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;">Dados da solicitação</p>
@@ -108,7 +108,7 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
             </tr>
             <tr>
               <td style="padding:18px 28px 0;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#20262d" style="background:#20262d;border:1px solid #00b85c;border-radius:0;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#20262d" style="background:#20262d !important;background-color:#20262d !important;border:1px solid #00b85c;border-radius:0;">
                   <tr>
                     <td style="padding:16px 20px;color:#e5e7eb;font-size:13px;line-height:1.55;">
                       <strong style="color:#16d878;">Não reconhece este pedido ou informou algo errado?</strong><br>
@@ -129,7 +129,7 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
               </td>
             </tr>
             <tr>
-              <td bgcolor="#0f1316" style="padding:18px 28px;background:#0f1316;color:#8b93a1;font-size:11px;line-height:1.6;text-align:center;">
+              <td bgcolor="#0f1316" style="padding:18px 28px;background:#0f1316 !important;background-color:#0f1316 !important;color:#8b93a1;font-size:11px;line-height:1.6;text-align:center;">
                 Se os dados estiverem corretos, não é necessário fazer nada. O status poderá ser acompanhado pelo mesmo link.
               </td>
             </tr>
