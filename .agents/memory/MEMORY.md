@@ -4,3 +4,4 @@
 - [Supabase connection verification](supabase-connection.md) — Drizzle uses Supabase PostgreSQL and the API fails closed if the configured project or schema cannot be verified.
 - [PIXELPIX header behavior](pixelpix-header-behavior.md) — Use one sticky adaptive header; duplicate fixed and flow headers can visibly desynchronize during desktop scrolling.
 - [Prize secrecy](prize-secrecy.md) — Unrevealed winning cells must never persist or expose a prize marker; only confirmed paid cells may reveal their emoji.
+- [PIXELPIX brand assets](pixelpix-brand-assets.md) — Derive favicon and social assets from the app's six-block inline logo geometry, not an approximation.

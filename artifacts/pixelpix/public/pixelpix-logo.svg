@@ -1,0 +1,12 @@
+<svg width="430" height="200" viewBox="0 0 430 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>PIXELPIX</title>
+  <g fill="#00B85C">
+    <rect x="0" y="0" width="44.4" height="44.4" transform="translate(51.5 0)"/>
+    <rect x="0" y="0" width="44.4" height="44.4" transform="translate(0 51.9)"/>
+    <rect x="0" y="0" width="44.4" height="44.4" transform="translate(104.1 51.9)"/>
+    <rect x="0" y="0" width="44.4" height="44.4" transform="translate(0 103.7)"/>
+    <rect x="0" y="0" width="44.4" height="44.4" transform="translate(51.5 103.7)"/>
+    <rect x="0" y="0" width="44.4" height="44.4" transform="translate(0 155.6)"/>
+  </g>
+  <text x="178" y="116" fill="#F4F7F5" font-family="Inter, Arial, Helvetica, sans-serif" font-size="45" font-weight="700" letter-spacing="1">PIXELPIX</text>
+</svg>

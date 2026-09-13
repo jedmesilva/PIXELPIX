@@ -2,13 +2,13 @@
   <title>PIXELPIX — um milhão de pixels</title>
   <rect width="1200" height="630" fill="#0E1114"/>
   <rect x="48" y="48" width="1104" height="534" rx="28" fill="#171B20" stroke="#2B333C" stroke-width="2"/>
-  <g fill="#00B85C">
-    <rect x="112" y="119" width="44" height="44" rx="3"/>
-    <rect x="67" y="165" width="44" height="44" rx="3"/>
-    <rect x="157" y="165" width="44" height="44" rx="3"/>
-    <rect x="67" y="211" width="44" height="44" rx="3"/>
-    <rect x="112" y="211" width="44" height="44" rx="3"/>
-    <rect x="67" y="257" width="44" height="44" rx="3"/>
+  <g transform="translate(112 119) scale(.9)" fill="#00B85C">
+    <rect x="51.5" y="0" width="44.4" height="44.4"/>
+    <rect x="0" y="51.9" width="44.4" height="44.4"/>
+    <rect x="104.1" y="51.9" width="44.4" height="44.4"/>
+    <rect x="0" y="103.7" width="44.4" height="44.4"/>
+    <rect x="51.5" y="103.7" width="44.4" height="44.4"/>
+    <rect x="0" y="155.6" width="44.4" height="44.4"/>
   </g>
   <text x="245" y="205" fill="#F4F7F5" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="800" letter-spacing="3">PIXELPIX</text>
   <text x="112" y="398" fill="#F4F7F5" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="800">Um milhão de pixels.</text>

@@ -1,7 +1,6 @@
-<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <title>PIXELPIX Admin</title>
-  <rect width="180" height="180" rx="38" fill="#0E1114"/>
-  <g transform="translate(41 25) scale(.66)" fill="#00B85C">
+<svg width="149" height="200" viewBox="0 0 149 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>PIXELPIX</title>
+  <g fill="#00B85C">
     <rect x="51.5" y="0" width="44.4" height="44.4"/>
     <rect x="0" y="51.9" width="44.4" height="44.4"/>
     <rect x="104.1" y="51.9" width="44.4" height="44.4"/>
