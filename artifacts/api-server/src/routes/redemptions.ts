@@ -6,6 +6,7 @@ import {
   verifyCertificateToken,
 } from "../lib/certificates";
 import { buildRedemptionRequestEmail } from "../lib/redemption-request-email";
+import { getPublicAppUrl } from "../lib/public-app-url";
 import { sendResendEmail } from "../lib/resend";
 
 const router: IRouter = Router();
@@ -241,9 +242,7 @@ router.post("/redemptions", async (request: Request, response): Promise<void> =>
 
     let notificationSent = false;
     try {
-      const publicAppUrl =
-        process.env.PUBLIC_APP_URL?.trim() || "https://pixelpix.com.br";
-      const baseUrl = publicAppUrl.replace(/\/+$/, "");
+      const baseUrl = getPublicAppUrl();
       const manageUrl =
         `${baseUrl}/resgatar?code=${encodeURIComponent(String(certificate.certificate_code))}` +
         `&request=${encodeURIComponent(String(inserted.rows[0].id))}` +

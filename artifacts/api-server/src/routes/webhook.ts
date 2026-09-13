@@ -8,6 +8,7 @@ import { getEfiCharge } from "../lib/efi";
 import { ensureCertificateForCell } from "../lib/certificates";
 import { confirmEfiPayout } from "../lib/payouts";
 import { buildCertificateEmail } from "../lib/certificate-email";
+import { getPublicAppUrl } from "../lib/public-app-url";
 import { sendResendEmail } from "../lib/resend";
 
 const router: IRouter = Router();
@@ -139,9 +140,7 @@ async function sendCertificateEmail(input: {
   revealedAt?: string | null;
 }) {
   try {
-    const publicAppUrl =
-      process.env.PUBLIC_APP_URL?.trim() || "https://pixelpix.com.br";
-    const baseUrl = publicAppUrl.replace(/\/+$/, "");
+    const baseUrl = getPublicAppUrl();
     const redemptionUrl =
       input.prizeValueCents > 0
         ? `${baseUrl}/resgatar?code=${encodeURIComponent(input.certificateCode)}#token=${encodeURIComponent(input.certificateToken)}`
