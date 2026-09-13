@@ -8,6 +8,7 @@ import {
   isEfiWebhookRegistrationConfigured,
   registerEfiWebhook,
 } from "./lib/efi";
+import { assertResendConfiguration } from "./lib/resend";
 
 const rawPort = process.env["PORT"];
 
@@ -24,6 +25,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function start() {
+  assertResendConfiguration();
   const supabaseStatus = await verifySupabaseConnection(pool);
   logger.info(
     {

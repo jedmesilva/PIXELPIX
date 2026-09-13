@@ -97,10 +97,15 @@ workspace layout:
 Set `VITE_API_URL` in both Vercel projects to the Railway API origin
 (for example, `https://api.example.com`; a value ending in `/api` is also
 accepted). Railway provides `PORT`; configure `NODE_ENV=production`,
-`DATABASE_URL`, and `ADMIN_ACCESS_KEY` there. The full backend variable list is
-in `artifacts/api-server/.env.example`. `WEBHOOK_SECRET`, CAPTCHA, and
-certificate-delivery variables are optional and only needed for those
-integrations. Replit secrets are not copied automatically to Vercel or Railway.
+`DATABASE_URL`, `ADMIN_ACCESS_KEY`, a stable `SESSION_SECRET`, and the Railway
+secret `RESEND_API_KEY` there. Set `CERTIFICATE_FROM_EMAIL` to an address from
+a verified Resend domain; the `resend.dev` test sender is not suitable for
+production. The full backend variable list is in
+`artifacts/api-server/.env.example`. `WEBHOOK_SECRET`, CAPTCHA, and Efí
+variables are optional and only needed for those integrations. Certificate
+delivery requires the same stable `SESSION_SECRET` or
+`CERTIFICATE_TOKEN_SECRET` that was used to issue existing certificates.
+Replit secrets are not copied automatically to Vercel or Railway.
 Before the first deploy, apply the Drizzle schema to the target Supabase
 database with `pnpm --filter @workspace/db run push`; the Railway start command
 does not run schema changes automatically.

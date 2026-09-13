@@ -1,6 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { ReplitConnectors } from "@replit/connectors-sdk";
 import { pool } from "@workspace/db";
 import { releaseActiveReservationByCell } from "./cells";
 import { logger } from "../lib/logger";
@@ -9,6 +8,7 @@ import { getEfiCharge } from "../lib/efi";
 import { ensureCertificateForCell } from "../lib/certificates";
 import { confirmEfiPayout } from "../lib/payouts";
 import { buildCertificateEmail } from "../lib/certificate-email";
+import { sendResendEmail } from "../lib/resend";
 
 const router: IRouter = Router();
 const MAX_DIRECT_ALERTS_PER_HOUR = 100;
@@ -158,35 +158,18 @@ async function sendCertificateEmail(input: {
       visualizeUrl: `${baseUrl}/?pixel=${input.cellId}&from=certificate`,
       redemptionUrl,
     });
-    const connectors = new ReplitConnectors();
-    const result = await connectors.proxy("resend", "/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from:
-          process.env.CERTIFICATE_FROM_EMAIL?.trim() ||
-          "PIXELPIX <onboarding@resend.dev>",
-        to: [input.email],
-        subject: email.subject,
-        html: email.html,
-        text: email.text,
-        ...(process.env.CERTIFICATE_REPLY_TO?.trim()
-          ? { reply_to: process.env.CERTIFICATE_REPLY_TO.trim() }
-          : {}),
-      }),
+    await sendResendEmail({
+      from:
+        process.env.CERTIFICATE_FROM_EMAIL?.trim() ||
+        "PIXELPIX <onboarding@resend.dev>",
+      to: [input.email],
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+      ...(process.env.CERTIFICATE_REPLY_TO?.trim()
+        ? { reply_to: process.env.CERTIFICATE_REPLY_TO.trim() }
+        : {}),
     });
-    if (!result.ok) {
-      const providerMessage = await result.text().catch(() => "");
-      logger.warn(
-        {
-          cellId: input.cellId,
-          statusCode: result.status,
-          providerMessage: providerMessage.slice(0, 500),
-        },
-        "Resend rejected certificate delivery",
-      );
-      return false;
-    }
     return true;
   } catch (error) {
     logger.warn({ error, cellId: input.cellId }, "Resend certificate delivery failed");
