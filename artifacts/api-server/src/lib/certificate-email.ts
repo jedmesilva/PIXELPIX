@@ -95,7 +95,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
     ? `
       <tr>
         <td style="padding:0 0 18px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#20262d" style="background:#20262d;border:1px solid #00b85c;border-radius:14px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#20262d" style="background:#20262d;border:1px solid #00b85c;border-radius:0;">
             <tr>
               <td style="padding:18px 20px;">
                 <p style="margin:0 0 7px;color:#8b93a1;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;">Prêmio liberado</p>
@@ -110,7 +110,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
     : `
       <tr>
         <td style="padding:0 0 18px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#20262d" style="background:#20262d;border:1px solid #2b333c;border-radius:14px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#20262d" style="background:#20262d;border:1px solid #2b333c;border-radius:0;">
             <tr>
               <td style="padding:16px 20px;color:#aeb8b2;font-size:13px;line-height:1.5;">
                 Esta revelação não possui prêmio em dinheiro. Este certificado continua sendo a prova de que o pixel é seu.
@@ -125,7 +125,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
     ? `
       <tr>
         <td align="center" style="padding:0 0 10px;">
-          <a href="${safeRedemptionUrl}" style="display:inline-block;width:100%;padding:15px 20px;border-radius:10px;background:#00b85c;color:#07150d;font-size:15px;font-weight:900;text-align:center;text-decoration:none;">
+          <a href="${safeRedemptionUrl}" style="display:inline-block;width:100%;padding:15px 20px;border-radius:0;background:#00b85c;color:#07150d;font-size:15px;font-weight:900;text-align:center;text-decoration:none;">
             Resgatar prêmio
           </a>
         </td>
@@ -146,7 +146,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#0b0d10" style="background:#0b0d10;">
       <tr>
         <td align="center" style="padding:32px 16px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#14171b" style="max-width:560px;background:#14171b;border:1px solid #2b333c;border-radius:20px;overflow:hidden;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#14171b" style="max-width:560px;background:#14171b;border:1px solid #2b333c;border-top:4px solid #00b85c;border-radius:0;box-shadow:4px 4px 0 #0b5b36;overflow:hidden;">
             <tr>
               <td style="padding:28px 28px 22px;border-bottom:1px solid #2b333c;">
                 <div style="font-size:19px;font-weight:900;letter-spacing:.04em;color:#e5e7eb;">
@@ -169,10 +169,10 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
             </tr>
             <tr>
               <td style="padding:18px 28px 0;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#171b20" style="border:1px solid #2b333c;border-radius:16px;background:#171b20;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#171b20" style="border:1px solid #2b333c;border-radius:0;background:#171b20;">
                   <tr>
                     <td align="center" style="padding:26px 20px 18px;">
-                      <div style="display:inline-block;width:128px;height:128px;border-radius:18px;background:${backgroundColor};font-size:58px;line-height:128px;text-align:center;">
+                      <div style="display:inline-block;width:128px;height:128px;border-radius:0;background:${backgroundColor};font-size:58px;line-height:128px;text-align:center;">
                         ${escapeHtml(emoji)}
                       </div>
                     </td>
@@ -200,13 +200,13 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
                     <td style="padding:14px 0 7px;color:#00b85c;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">Código do certificado</td>
                   </tr>
                   <tr>
-                    <td style="padding:13px 14px;border:1px solid #00b85c;border-radius:10px;background:#20262d;color:#f4f7f5;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.03em;word-break:break-all;">${safeCode}</td>
+                    <td style="padding:13px 14px;border:1px solid #00b85c;border-radius:0;background:#20262d;color:#f4f7f5;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.03em;word-break:break-all;">${safeCode}</td>
                   </tr>
                   <tr>
                     <td style="padding:16px 0 7px;color:#00b85c;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">${tokenLabel}</td>
                   </tr>
                   <tr>
-                    <td style="padding:13px 14px;border:1px solid #34423a;border-radius:10px;background:#11161a;color:#e5e7eb;font-family:'Courier New',Courier,monospace;font-size:11px;line-height:1.5;word-break:break-all;">${safeToken}</td>
+                    <td style="padding:13px 14px;border:1px solid #34423a;border-radius:0;background:#11161a;color:#e5e7eb;font-family:'Courier New',Courier,monospace;font-size:11px;line-height:1.5;word-break:break-all;">${safeToken}</td>
                   </tr>
                   <tr>
                     <td style="padding:14px 0 0;color:#8b93a1;font-size:12px;">Revelado em <strong style="color:#e5e7eb;">${escapeHtml(issuedAt)}</strong></td>
@@ -220,7 +220,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
                   ${redemptionButton}
                   <tr>
                     <td align="center">
-                      <a href="${safeVisualizeUrl}" style="display:inline-block;width:100%;padding:14px 20px;border:1px solid #3b4b42;border-radius:10px;color:#dce8df;font-size:14px;font-weight:800;text-align:center;text-decoration:none;">
+                      <a href="${safeVisualizeUrl}" style="display:inline-block;width:100%;padding:14px 20px;border:1px solid #3b4b42;border-radius:0;color:#dce8df;font-size:14px;font-weight:800;text-align:center;text-decoration:none;">
                         Visualizar pixel
                       </a>
                     </td>

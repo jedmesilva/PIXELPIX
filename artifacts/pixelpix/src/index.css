@@ -1524,9 +1524,7 @@ button:focus-visible {
   height: 100%;
   overflow: auto;
   color: var(--pixelpix-text-primary);
-  background:
-    radial-gradient(circle at 80% 0%, rgba(0, 184, 92, 0.1), transparent 30%),
-    var(--pixelpix-page-bg);
+  background: var(--pixelpix-page-bg);
 }
 
 .redeem-shell {
@@ -1547,7 +1545,7 @@ button:focus-visible {
   gap: 7px;
   padding: 0 11px;
   border: 1px solid var(--pixelpix-border);
-  border-radius: 9px;
+  border-radius: 0;
   color: var(--pixelpix-text-muted);
   font-size: 13px;
   font-weight: 700;
@@ -1582,9 +1580,10 @@ button:focus-visible {
 .redeem-card {
   padding: clamp(24px, 5vw, 42px);
   border: 1px solid var(--pixelpix-border-strong);
-  border-radius: 24px;
+  border-top: 4px solid var(--pixelpix-brand);
+  border-radius: 0;
   background: var(--pixelpix-surface-raised);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, .24);
+  box-shadow: 5px 5px 0 rgba(0, 184, 92, .18);
 }
 
 .redeem-icon {
@@ -1594,7 +1593,7 @@ button:focus-visible {
   place-items: center;
   margin-bottom: 24px;
   border: 1px solid color-mix(in srgb, var(--pixelpix-brand) 30%, var(--pixelpix-border));
-  border-radius: 14px;
+  border-radius: 0;
   color: var(--pixelpix-brand);
   background: color-mix(in srgb, var(--pixelpix-brand) 10%, transparent);
 }
@@ -1628,7 +1627,7 @@ button:focus-visible {
   margin: 22px 0;
   padding: 12px 14px;
   border: 1px solid var(--pixelpix-border);
-  border-radius: 12px;
+  border-radius: 0;
   color: var(--pixelpix-text-muted);
   font-size: 12px;
   line-height: 1.45;
@@ -1652,7 +1651,7 @@ button:focus-visible {
   width: 100%;
   padding: 12px 13px;
   border: 1px solid var(--pixelpix-border-strong);
-  border-radius: 10px;
+  border-radius: 0;
   outline: none;
   color: var(--pixelpix-text-primary);
   background: var(--pixelpix-surface);
@@ -1675,7 +1674,7 @@ button:focus-visible {
   gap: 8px;
   padding: 0 18px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 0;
   color: var(--pixelpix-accent-foreground);
   background: var(--pixelpix-brand);
   font-size: 13px;
@@ -1701,8 +1700,9 @@ button:focus-visible {
   margin: 22px 0;
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--pixelpix-brand) 24%, var(--pixelpix-border));
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--pixelpix-brand) 6%, var(--pixelpix-surface));
+  border-radius: 0;
+  background: var(--pixelpix-surface);
+  box-shadow: 4px 4px 0 rgba(0, 184, 92, .12);
 }
 
 .redeem-certificate-summary div {
@@ -1732,7 +1732,7 @@ button:focus-visible {
   margin: 18px 0 0;
   padding: 11px 13px;
   border: 1px solid rgba(255, 172, 76, .3);
-  border-radius: 10px;
+  border-radius: 0;
   color: #ffc078;
   background: rgba(255, 172, 76, .08);
   font-size: 13px;
@@ -1744,7 +1744,7 @@ button:focus-visible {
   margin-top: 22px;
   padding: 18px;
   border: 1px solid color-mix(in srgb, var(--pixelpix-brand) 30%, var(--pixelpix-border));
-  border-radius: 14px;
+  border-radius: 0;
   color: var(--pixelpix-brand-hover);
   background: color-mix(in srgb, var(--pixelpix-brand) 8%, var(--pixelpix-surface));
 }
@@ -1762,8 +1762,9 @@ button:focus-visible {
   margin-top: 18px;
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--pixelpix-brand) 28%, var(--pixelpix-border));
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--pixelpix-brand) 7%, var(--pixelpix-surface));
+  border-radius: 0;
+  background: var(--pixelpix-surface);
+  box-shadow: 4px 4px 0 rgba(0, 184, 92, .12);
 }
 
 .redeem-status.is-rejected {
