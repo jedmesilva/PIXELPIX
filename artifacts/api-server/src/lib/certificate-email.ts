@@ -133,17 +133,17 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
   const html = `<!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta name="color-scheme" content="light">
-    <meta name="supported-color-schemes" content="light">
+    <meta name="color-scheme" content="dark">
+    <meta name="supported-color-schemes" content="dark">
   </head>
-  <body bgcolor="#0b0d10" style="margin:0;padding:0;background:#0b0d10 !important;background-color:#0b0d10 !important;color:#e5e7eb;font-family:Arial,Helvetica,sans-serif;">
+  <body class="email-body" bgcolor="#0b0d10" style="margin:0;padding:0;background:#0b0d10 !important;background-color:#0b0d10 !important;color:#e5e7eb;font-family:Arial,Helvetica,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
       Seu certificado PIXELPIX está pronto. O pixel #${input.cellId.toLocaleString("pt-BR")} agora é seu.
     </div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#0b0d10" style="background:#0b0d10 !important;background-color:#0b0d10 !important;">
+    <table class="email-outer" role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#0b0d10" style="background:#0b0d10 !important;background-color:#0b0d10 !important;">
       <tr>
-        <td align="center" bgcolor="#0b0d10" style="padding:32px 16px;background:#0b0d10 !important;background-color:#0b0d10 !important;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#14171b" style="max-width:560px;background:#14171b !important;background-color:#14171b !important;border:1px solid #2b333c;border-top:4px solid #00b85c;border-radius:0;box-shadow:4px 4px 0 #0b5b36;overflow:hidden;">
+        <td class="email-outer-cell" align="center" bgcolor="#0b0d10" style="padding:32px 16px;background:#0b0d10 !important;background-color:#0b0d10 !important;">
+          <table class="email-card" role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#14171b" style="max-width:560px;background:#14171b !important;background-color:#14171b !important;border:1px solid #2b333c;border-top:4px solid #00b85c;border-radius:0;box-shadow:4px 4px 0 #0b5b36;overflow:hidden;">
             <tr>
               <td style="padding:28px 28px 22px;border-bottom:1px solid #2b333c;">
                 <div style="font-size:19px;font-weight:900;letter-spacing:.04em;color:#e5e7eb;">
