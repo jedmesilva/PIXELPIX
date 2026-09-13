@@ -17,8 +17,8 @@ const EMAIL_COMPATIBILITY_STYLES = `
         color: #e5e7eb !important;
       }
       .email-card {
-        background: #101418 !important;
-        background-color: #101418 !important;
+        background: #000000 !important;
+        background-color: #000000 !important;
       }
       html[data-ogsc],
       html[data-ogsb],
@@ -40,8 +40,8 @@ const EMAIL_COMPATIBILITY_STYLES = `
       [data-ogsb].email-card,
       [data-ogsc] .email-card,
       [data-ogsb] .email-card {
-        background: #101418 !important;
-        background-color: #101418 !important;
+        background: #000000 !important;
+        background-color: #000000 !important;
       }
       table {
         border-collapse: collapse;
@@ -58,9 +58,15 @@ export function makeEmailClientSafe(html: string) {
   return html
     .replaceAll('content="light"', 'content="dark"')
     .replaceAll('bgcolor="#0b0d10"', 'bgcolor="#000000"')
+    .replaceAll('bgcolor="#14171b"', 'bgcolor="#000000"')
     .replaceAll("background:#0b0d10 !important", "background:#000000 !important")
     .replaceAll(
       "background-color:#0b0d10 !important",
+      "background-color:#000000 !important",
+    )
+    .replaceAll("background:#14171b !important", "background:#000000 !important")
+    .replaceAll(
+      "background-color:#14171b !important",
       "background-color:#000000 !important",
     )
     .replace(/<html(\s[^>]*)?>/i, (tag) =>
