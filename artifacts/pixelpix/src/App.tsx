@@ -102,6 +102,13 @@ function pixelSurfaceBackground(pixel: Pixel) {
   return pixel.backgroundColor ?? undefined;
 }
 
+function readPixelDeepLink() {
+  const raw = new URLSearchParams(window.location.search).get("pixel");
+  if (!raw || !/^\d+$/.test(raw)) return null;
+  const id = Number(raw);
+  return Number.isInteger(id) && id >= 0 && id < TOTAL_PIXELS ? id : null;
+}
+
 function getChunk(chunkId: number) {
   const cached = chunkCache.get(chunkId);
   if (cached) return cached;
@@ -1339,6 +1346,7 @@ function PixelGrid() {
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [scrollTopRow, setScrollTopRow] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [deepLinkPixelId] = useState(readPixelDeepLink);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [, setRevealVersion] = useState(0);
   const [chunkStates, setChunkStates] = useState<Map<number, ChunkStatus>>(
@@ -1350,6 +1358,7 @@ function PixelGrid() {
   const latestScrollTopRef = useRef(0);
   const compactHeaderThresholdRef = useRef<number | null>(null);
   const cellSizeRef = useRef(0);
+  const deepLinkOpenedRef = useRef(false);
   const [socialProfile, setSocialProfile] = useState<SocialProfile>(() => {
     try {
       const saved = window.localStorage.getItem(SOCIAL_PROFILE_STORAGE_KEY);
@@ -1461,6 +1470,24 @@ function PixelGrid() {
   }, [containerSize.width]);
 
   cellSizeRef.current = cellSize;
+
+  useEffect(() => {
+    if (
+      deepLinkPixelId === null ||
+      deepLinkOpenedRef.current ||
+      !cellSize ||
+      !containerRef.current
+    ) {
+      return;
+    }
+
+    containerRef.current.scrollTo({
+      top: Math.floor(deepLinkPixelId / columns) * cellSize,
+      behavior: "auto",
+    });
+    setSelectedId(deepLinkPixelId);
+    deepLinkOpenedRef.current = true;
+  }, [cellSize, columns, deepLinkPixelId]);
 
   const {
     viewportStartRow,

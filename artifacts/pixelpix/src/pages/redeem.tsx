@@ -24,6 +24,27 @@ function formatBRL(cents: number) {
   }).format(cents / 100);
 }
 
+function PixelPixLogo() {
+  return (
+    <div className="redeem-brand">
+      <svg
+        className="redeem-brand-logo"
+        viewBox="0 0 149 200"
+        fill="none"
+        aria-hidden="true"
+      >
+        <rect x="51.5" y="0" width="44.4" height="44.4" />
+        <rect x="0" y="51.9" width="44.4" height="44.4" />
+        <rect x="104.1" y="51.9" width="44.4" height="44.4" />
+        <rect x="0" y="103.7" width="44.4" height="44.4" />
+        <rect x="51.5" y="103.7" width="44.4" height="44.4" />
+        <rect x="0" y="155.6" width="44.4" height="44.4" />
+      </svg>
+      <span>PIXELPIX</span>
+    </div>
+  );
+}
+
 async function readJson(response: Response) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -68,7 +89,9 @@ export default function RedeemPage() {
       const response = await fetch(`${apiBaseUrl}/api/certificates/verify?${params}`);
       const data = await readJson(response);
       setCertificate(data);
-      if (!data.canRedeem) {
+      if (Number(data.prizeValueCents) <= 0) {
+        setMessage("Este pixel foi revelado sem valor de resgate.");
+      } else if (!data.canRedeem) {
         setMessage("Este certificado já possui um resgate em processamento.");
       }
     } catch (error) {
@@ -117,7 +140,7 @@ export default function RedeemPage() {
         <Link href="/" className="redeem-back">
           <ArrowLeft size={16} /> Voltar ao PIXELPIX
         </Link>
-        <div className="redeem-brand">PIXELPIX</div>
+        <PixelPixLogo />
         <section className="redeem-card">
           <div className="redeem-icon"><BadgeCheck size={25} /></div>
           <p className="redeem-kicker">Certificado de prêmio</p>

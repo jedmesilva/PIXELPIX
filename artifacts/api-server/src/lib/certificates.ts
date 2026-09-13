@@ -28,6 +28,10 @@ export type IssuedCertificate = {
   email: string;
   issuedAt: Date;
   status: string;
+  emoji: string | null;
+  backgroundColor: string | null;
+  revealedAt: Date | null;
+  prizeLabel: string | null;
 };
 
 function getTokenSecret() {
@@ -173,10 +177,15 @@ export async function ensureCertificateForCell(
   cellId: number,
 ): Promise<IssuedCertificate | null> {
   const existing = await client.query(
-    `SELECT id, cell_id, certificate_code, token_ciphertext, token_iv,
-            token_auth_tag, prize_value_cents, email, issued_at, status
-       FROM prize_certificates
-      WHERE cell_id = $1`,
+    `SELECT pc.id, pc.cell_id, pc.certificate_code, pc.token_ciphertext,
+            pc.token_iv, pc.token_auth_tag, pc.prize_value_cents, pc.email,
+            pc.issued_at, pc.status, c.emoji, c.background_color,
+            c.revealed_at, pp.label AS prize_label
+       FROM prize_certificates pc
+       INNER JOIN cells c ON c.id = pc.cell_id
+       LEFT JOIN winning_positions wp ON wp.cell_id = c.id
+       LEFT JOIN prize_pool pp ON pp.tier_id = wp.tier_id
+      WHERE pc.cell_id = $1`,
     [cellId],
   );
   if (existing.rows[0]) {
@@ -194,13 +203,22 @@ export async function ensureCertificateForCell(
       email: String(row.email),
       issuedAt: new Date(row.issued_at),
       status: String(row.status),
+      emoji: row.emoji ? String(row.emoji) : null,
+      backgroundColor: row.background_color
+        ? String(row.background_color)
+        : null,
+      revealedAt: row.revealed_at ? new Date(row.revealed_at) : null,
+      prizeLabel: row.prize_label ? String(row.prize_label) : null,
     };
   }
 
   const cellResult = await client.query(
-    `SELECT email, prize_value_cents, revealed_at
-       FROM cells
-      WHERE id = $1 AND status = 'paid'`,
+    `SELECT c.email, c.prize_value_cents, c.revealed_at, c.emoji,
+            c.background_color, pp.label AS prize_label
+       FROM cells c
+       LEFT JOIN winning_positions wp ON wp.cell_id = c.id
+       LEFT JOIN prize_pool pp ON pp.tier_id = wp.tier_id
+      WHERE c.id = $1 AND c.status = 'paid'`,
     [cellId],
   );
   const cell = cellResult.rows[0];
@@ -257,6 +275,12 @@ export async function ensureCertificateForCell(
       email: String(row.email),
       issuedAt,
       status: String(row.status),
+      emoji: cell.emoji ? String(cell.emoji) : null,
+      backgroundColor: cell.background_color
+        ? String(cell.background_color)
+        : null,
+      revealedAt: cell.revealed_at ? new Date(cell.revealed_at) : null,
+      prizeLabel: cell.prize_label ? String(cell.prize_label) : null,
     };
   }
   return ensureCertificateForCell(client, cellId);

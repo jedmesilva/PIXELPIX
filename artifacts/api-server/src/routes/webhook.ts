@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import { pool } from "@workspace/db";
 import { releaseActiveReservationByCell } from "./cells";
 import { logger } from "../lib/logger";
@@ -7,6 +8,7 @@ import { broadcastCellUpdate } from "../lib/cell-events";
 import { getEfiCharge } from "../lib/efi";
 import { ensureCertificateForCell } from "../lib/certificates";
 import { confirmEfiPayout } from "../lib/payouts";
+import { buildCertificateEmail } from "../lib/certificate-email";
 
 const router: IRouter = Router();
 const MAX_DIRECT_ALERTS_PER_HOUR = 100;
@@ -132,43 +134,62 @@ async function sendCertificateEmail(input: {
   certificateCode: string;
   certificateToken: string;
   issuedAt: string;
+  prizeLabel?: string | null;
+  emoji?: string | null;
+  backgroundColor?: string | null;
+  revealedAt?: string | null;
 }) {
-  const deliveryUrl = process.env.CERTIFICATE_DELIVERY_URL;
-  if (!deliveryUrl) {
-    logger.warn(
-      { cellId: input.cellId },
-      "Certificate delivery deferred; provider is not configured",
-    );
-    return false;
-  }
-
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (process.env.CERTIFICATE_DELIVERY_SECRET) {
-      headers.Authorization = `Bearer ${process.env.CERTIFICATE_DELIVERY_SECRET}`;
-    }
-    const redemptionUrl =
+    const publicAppUrl =
       process.env.PUBLIC_APP_URL?.trim() || "https://pixelpix.com.br";
-    const result = await fetch(deliveryUrl, {
+    const baseUrl = publicAppUrl.replace(/\/+$/, "");
+    const redemptionUrl =
+      input.prizeValueCents > 0
+        ? `${baseUrl}/resgatar?code=${encodeURIComponent(input.certificateCode)}#token=${encodeURIComponent(input.certificateToken)}`
+        : null;
+    const email = buildCertificateEmail({
+      cellId: input.cellId,
+      certificateCode: input.certificateCode,
+      prizeValueCents: input.prizeValueCents,
+      prizeLabel: input.prizeLabel,
+      emoji: input.emoji,
+      backgroundColor: input.backgroundColor,
+      issuedAt: new Date(input.issuedAt),
+      visualizeUrl: `${baseUrl}/?pixel=${input.cellId}&from=certificate`,
+      redemptionUrl,
+    });
+    const connectors = new ReplitConnectors();
+    const result = await connectors.proxy("resend", "/emails", {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...input,
-        redemptionUrl: `${redemptionUrl.replace(/\/+$/, "")}/resgatar?code=${encodeURIComponent(input.certificateCode)}#token=${encodeURIComponent(input.certificateToken)}`,
+        from:
+          process.env.CERTIFICATE_FROM_EMAIL?.trim() ||
+          "PIXELPIX <onboarding@resend.dev>",
+        to: [input.email],
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+        ...(process.env.CERTIFICATE_REPLY_TO?.trim()
+          ? { reply_to: process.env.CERTIFICATE_REPLY_TO.trim() }
+          : {}),
       }),
     });
     if (!result.ok) {
+      const providerMessage = await result.text().catch(() => "");
       logger.warn(
-        { cellId: input.cellId, statusCode: result.status },
-        "Certificate provider rejected delivery",
+        {
+          cellId: input.cellId,
+          statusCode: result.status,
+          providerMessage: providerMessage.slice(0, 500),
+        },
+        "Resend rejected certificate delivery",
       );
       return false;
     }
     return true;
   } catch (error) {
-    logger.warn({ error, cellId: input.cellId }, "Certificate delivery failed");
+    logger.warn({ error, cellId: input.cellId }, "Resend certificate delivery failed");
     return false;
   }
 }
@@ -220,6 +241,10 @@ export async function deliverCertificateForCell(cellId: number) {
     certificateCode: certificate.certificateCode,
     certificateToken: certificate.token,
     issuedAt: certificate.issuedAt.toISOString(),
+    prizeLabel: certificate.prizeLabel,
+    emoji: certificate.emoji,
+    backgroundColor: certificate.backgroundColor,
+    revealedAt: certificate.revealedAt?.toISOString() ?? null,
   });
   if (delivered) {
     await pool.query(

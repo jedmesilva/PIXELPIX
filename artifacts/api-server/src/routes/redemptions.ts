@@ -98,6 +98,7 @@ router.get("/certificates/verify", async (request, response): Promise<void> => {
   const canRedeem =
     certificate.status !== "revoked" &&
     certificate.cell_status === "paid" &&
+    Number(certificate.prize_value_cents) > 0 &&
     (!redemption || !blockedStatuses.has(String(redemption.status)));
 
   response.setHeader("Cache-Control", "no-store");
@@ -160,6 +161,7 @@ router.post("/redemptions", async (request: Request, response): Promise<void> =>
       !sameHash(hashCertificateToken(token), String(certificate?.token_hash ?? "")) ||
       String(certificate.email).toLowerCase() !== email ||
       String(certificate.cell_status) !== "paid" ||
+      Number(certificate.prize_value_cents) <= 0 ||
       String(certificate.status) === "revoked"
     ) {
       await client.query("ROLLBACK");
