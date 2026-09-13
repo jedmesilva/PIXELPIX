@@ -176,6 +176,9 @@ export async function ensureCertificateForCell(
   client: QueryClient,
   cellId: number,
 ): Promise<IssuedCertificate | null> {
+  // Every revealed cell is persisted as `paid`, including cells whose
+  // released prize value is zero. Certificate ownership must never depend on
+  // whether the cell also won money.
   const existing = await client.query(
     `SELECT pc.id, pc.cell_id, pc.certificate_code, pc.token_ciphertext,
             pc.token_iv, pc.token_auth_tag, pc.prize_value_cents, pc.email,

@@ -150,6 +150,7 @@ async function sendCertificateEmail(input: {
     const email = buildCertificateEmail({
       cellId: input.cellId,
       certificateCode: input.certificateCode,
+      certificateToken: input.certificateToken,
       prizeValueCents: input.prizeValueCents,
       prizeLabel: input.prizeLabel,
       emoji: input.emoji,
@@ -248,6 +249,8 @@ export async function deliverCertificateForCell(cellId: number) {
 }
 
 export async function processPendingCertificates() {
+  // `paid` is the canonical revealed state. A zero-value prize is still a
+  // valid certificate and must remain in this delivery queue.
   const pending = await pool.query(
     `SELECT id FROM cells
       WHERE status = 'paid'
