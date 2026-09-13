@@ -10,3 +10,5 @@ All user-facing PIXELPIX email templates must remain readable when Outlook or Ho
 **How to apply:** Route new certificate, redemption, and notification templates through the shared compatibility layer, keep the outer body/table and main card backgrounds explicitly black with `bgcolor` fallbacks, include `data-ogsc`/`data-ogsb` selectors for the outer canvas and card, and verify both HTML and plain-text alternatives.
 
 **Observed behavior:** Hotmail can preserve an explicit black outer canvas while rewriting a dark-gray main card into a light gray block. The main card therefore needs black `bgcolor` and inline fallback values, not only a CSS class rule.
+
+**Observed behavior:** The same rewrite affects nested PIXELPIX surfaces and dark pixel-color tiles. The email compatibility layer therefore flattens those email surfaces to black and keeps the green border/logo accents for deterministic rendering in Outlook/Hotmail.

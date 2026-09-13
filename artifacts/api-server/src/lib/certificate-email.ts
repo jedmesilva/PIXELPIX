@@ -169,7 +169,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#171b20" style="border:1px solid #2b333c;border-radius:0;background:#171b20 !important;background-color:#171b20 !important;">
                   <tr>
                     <td align="center" style="padding:26px 20px 18px;">
-                      <div style="display:inline-block;width:128px;height:128px;border-radius:0;background:${backgroundColor};font-size:58px;line-height:128px;text-align:center;">
+                      <div class="email-pixel-tile" style="display:inline-block;width:128px;height:128px;border-radius:0;background:${backgroundColor};font-size:58px;line-height:128px;text-align:center;">
                         ${escapeHtml(emoji)}
                       </div>
                     </td>

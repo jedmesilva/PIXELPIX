@@ -43,6 +43,12 @@ const EMAIL_COMPATIBILITY_STYLES = `
         background: #000000 !important;
         background-color: #000000 !important;
       }
+      [data-ogsc] .email-pixel-tile,
+      [data-ogsb] .email-pixel-tile {
+        background: #000000 !important;
+        background-color: #000000 !important;
+        border: 1px solid #00b85c !important;
+      }
       table {
         border-collapse: collapse;
         mso-table-lspace: 0pt;
@@ -67,6 +73,30 @@ export function makeEmailClientSafe(html: string) {
     .replaceAll("background:#14171b !important", "background:#000000 !important")
     .replaceAll(
       "background-color:#14171b !important",
+      "background-color:#000000 !important",
+    )
+    .replaceAll('bgcolor="#171b20"', 'bgcolor="#000000"')
+    .replaceAll('bgcolor="#20262d"', 'bgcolor="#000000"')
+    .replaceAll('bgcolor="#11161a"', 'bgcolor="#000000"')
+    .replaceAll('bgcolor="#0f1316"', 'bgcolor="#000000"')
+    .replaceAll("background:#171b20 !important", "background:#000000 !important")
+    .replaceAll(
+      "background-color:#171b20 !important",
+      "background-color:#000000 !important",
+    )
+    .replaceAll("background:#20262d !important", "background:#000000 !important")
+    .replaceAll(
+      "background-color:#20262d !important",
+      "background-color:#000000 !important",
+    )
+    .replaceAll("background:#11161a !important", "background:#000000 !important")
+    .replaceAll(
+      "background-color:#11161a !important",
+      "background-color:#000000 !important",
+    )
+    .replaceAll("background:#0f1316 !important", "background:#000000 !important")
+    .replaceAll(
+      "background-color:#0f1316 !important",
       "background-color:#000000 !important",
     )
     .replace(/<html(\s[^>]*)?>/i, (tag) =>
