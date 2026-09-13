@@ -1,4 +1,4 @@
-import { Activity, BookOpen, Boxes, LayoutDashboard, LogOut, Menu, ShieldCheck, Sparkles, TicketCheck, X } from 'lucide-react';
+import { Activity, BookOpen, Boxes, LayoutDashboard, LogOut, Menu, ShieldCheck, TicketCheck, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { adminRoutes } from '@/lib/routes';
@@ -10,6 +10,19 @@ const navigation = [
   { href: adminRoutes.manual, label: 'Manual', icon: BookOpen },
 ];
 
+function PixelPixMark() {
+  return (
+    <svg viewBox="0 0 149 200" fill="none" aria-hidden="true" className="size-5">
+      <rect x="51.5" y="0" width="44.4" height="44.4" fill="currentColor" />
+      <rect x="0" y="51.9" width="44.4" height="44.4" fill="currentColor" />
+      <rect x="104.1" y="51.9" width="44.4" height="44.4" fill="currentColor" />
+      <rect x="0" y="103.7" width="44.4" height="44.4" fill="currentColor" />
+      <rect x="51.5" y="103.7" width="44.4" height="44.4" fill="currentColor" />
+      <rect x="0" y="155.6" width="44.4" height="44.4" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -18,7 +31,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-[76px] items-center border-b border-sidebar-border px-6">
         <Link href={adminRoutes.overview} className="flex items-center gap-3" data-testid="link-admin-home">
           <span className="grid size-9 place-items-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
-            <Sparkles size={17} strokeWidth={2.5} />
+            <PixelPixMark />
           </span>
           <span className="font-mono-ui text-[15px] font-bold tracking-[-0.04em]">PIXELPIX</span>
         </Link>

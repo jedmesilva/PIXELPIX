@@ -1,3 +1,11 @@
 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+  <title>PIXELPIX Admin</title>
+  <rect width="180" height="180" rx="38" fill="#202A2F"/>
+  <g fill="#D9F77A">
+    <rect x="67" y="18" width="46" height="46" rx="3"/>
+    <rect x="20" y="66" width="46" height="46" rx="3"/>
+    <rect x="114" y="66" width="46" height="46" rx="3"/>
+    <rect x="20" y="114" width="46" height="46" rx="3"/>
+    <rect x="67" y="114" width="46" height="46" rx="3"/>
+  </g>
 </svg>

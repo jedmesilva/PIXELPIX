@@ -1,0 +1,19 @@
+{
+  "name": "PIXELPIX — um milhão de pixels",
+  "short_name": "PIXELPIX",
+  "description": "Descubra, revele e assine seu pedaço da internet.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0e1114",
+  "theme_color": "#0e1114",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

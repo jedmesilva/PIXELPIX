@@ -1,0 +1,19 @@
+{
+  "name": "PIXELPIX Admin",
+  "short_name": "PIXELPIX Admin",
+  "description": "Console interna de operações do PIXELPIX.",
+  "lang": "pt-BR",
+  "start_url": "/admin/",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#f4f2e9",
+  "theme_color": "#202a2f",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

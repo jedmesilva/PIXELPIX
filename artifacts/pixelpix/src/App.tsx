@@ -1104,7 +1104,7 @@ function PixelSheet({
                           <a
                             href={signatureUrl(displayedSignature)}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             aria-label={`Abrir @${displayedSignature.handle} no ${displayedSignature.network}`}
                           >
                             <SignatureIcon network={displayedSignature.network} size={17} />

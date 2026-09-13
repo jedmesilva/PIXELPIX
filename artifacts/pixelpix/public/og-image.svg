@@ -1,0 +1,17 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>PIXELPIX — um milhão de pixels</title>
+  <rect width="1200" height="630" fill="#0E1114"/>
+  <rect x="48" y="48" width="1104" height="534" rx="28" fill="#171B20" stroke="#2B333C" stroke-width="2"/>
+  <g fill="#00B85C">
+    <rect x="112" y="119" width="44" height="44" rx="3"/>
+    <rect x="67" y="165" width="44" height="44" rx="3"/>
+    <rect x="157" y="165" width="44" height="44" rx="3"/>
+    <rect x="67" y="211" width="44" height="44" rx="3"/>
+    <rect x="112" y="211" width="44" height="44" rx="3"/>
+    <rect x="67" y="257" width="44" height="44" rx="3"/>
+  </g>
+  <text x="245" y="205" fill="#F4F7F5" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="800" letter-spacing="3">PIXELPIX</text>
+  <text x="112" y="398" fill="#F4F7F5" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="800">Um milhão de pixels.</text>
+  <text x="112" y="458" fill="#00D36C" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">Uma revelação por vez.</text>
+  <text x="112" y="524" fill="#8B93A1" font-family="Arial, Helvetica, sans-serif" font-size="22">Descubra, revele e assine seu pedaço da internet.</text>
+</svg>
