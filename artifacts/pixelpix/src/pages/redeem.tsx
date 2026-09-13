@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BadgeCheck, CheckCircle2, Loader2, LockKeyhole } from "lucide-react";
+import { ArrowLeft, BadgeCheck, CheckCircle2, Clock3, Loader2, LockKeyhole, XCircle } from "lucide-react";
 import { Link } from "wouter";
 
 const apiBaseUrl = (import.meta.env.VITE_API_URL ?? "")
@@ -14,7 +14,21 @@ type CertificateVerification = {
   issuedAt: string;
   status: string;
   redemptionStatus: string | null;
+  redemption: {
+    id: number;
+    status: string;
+    requestedAt: string;
+  } | null;
   canRedeem: boolean;
+};
+
+const redemptionStatusLabels: Record<string, string> = {
+  pending: "Em análise",
+  approved: "Aprovado",
+  payment_pending: "Pagamento em processamento",
+  paid: "Pagamento realizado",
+  rejected: "Solicitação rejeitada",
+  failed: "Falha no pagamento",
 };
 
 function formatBRL(cents: number) {
@@ -22,6 +36,53 @@ function formatBRL(cents: number) {
     style: "currency",
     currency: "BRL",
   }).format(cents / 100);
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date(value));
+}
+
+function redemptionStatusLabel(status: string) {
+  return redemptionStatusLabels[status] ?? "Status atualizado";
+}
+
+function RedemptionStatus({
+  redemption,
+  canRedeem,
+}: {
+  redemption: NonNullable<CertificateVerification["redemption"]>;
+  canRedeem: boolean;
+}) {
+  const isRejected = redemption.status === "rejected" || redemption.status === "failed";
+  const isPaid = redemption.status === "paid";
+  const StatusIcon = isRejected ? XCircle : isPaid ? CheckCircle2 : Clock3;
+
+  return (
+    <div className={`redeem-status ${isRejected ? "is-rejected" : isPaid ? "is-paid" : ""}`}>
+      <div className="redeem-status-heading">
+        <StatusIcon size={20} aria-hidden="true" />
+        <div>
+          <span>Status do resgate</span>
+          <strong>{redemptionStatusLabel(redemption.status)}</strong>
+        </div>
+      </div>
+      <p>
+        Solicitação registrada em {formatDate(redemption.requestedAt)}.
+        {isPaid
+          ? " O pagamento foi concluído."
+          : isRejected
+            ? " Você pode enviar uma nova solicitação com os dados corrigidos."
+            : " Você pode voltar a esta tela pelo link do e-mail para acompanhar a atualização."}
+      </p>
+      {canRedeem && isRejected && (
+        <small>O formulário de solicitação está disponível novamente abaixo.</small>
+      )}
+    </div>
+  );
 }
 
 function PixelPixLogo() {
@@ -125,7 +186,21 @@ export default function RedeemPage() {
           pixKey: pixKey.trim(),
         }),
       });
-      await readJson(response);
+      const data = await readJson(response);
+      setCertificate((current) =>
+        current
+          ? {
+              ...current,
+              redemptionStatus: String(data.status),
+              redemption: {
+                id: Number(data.id),
+                status: String(data.status),
+                requestedAt: String(data.requestedAt),
+              },
+              canRedeem: false,
+            }
+          : current,
+      );
       setSubmitted(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível criar o resgate.");
@@ -146,18 +221,32 @@ export default function RedeemPage() {
         <section className="redeem-card">
           <div className="redeem-icon"><BadgeCheck size={25} /></div>
           <p className="redeem-kicker">Certificado de prêmio</p>
-          <h1>{submitted ? "Solicitação recebida" : "Resgate seu prêmio"}</h1>
+          <h1>
+            {submitted
+              ? "Solicitação recebida"
+              : certificate?.redemption
+                ? "Acompanhe seu resgate"
+                : "Resgate seu prêmio"}
+          </h1>
           {submitted ? (
-            <div className="redeem-success">
-              <CheckCircle2 size={26} />
-              <p>
-                Seu pedido foi enviado para análise. A administração conferirá o certificado e a chave Pix antes de realizar o pagamento.
-              </p>
-            </div>
+            <>
+              <div className="redeem-success">
+                <CheckCircle2 size={26} />
+                <p>
+                  Seu pedido foi enviado para análise. A administração conferirá o certificado e a chave Pix antes de realizar o pagamento.
+                </p>
+              </div>
+              {certificate?.redemption && (
+                <RedemptionStatus
+                  redemption={certificate.redemption}
+                  canRedeem={certificate.canRedeem}
+                />
+              )}
+            </>
           ) : (
             <>
               <p className="redeem-copy">
-                Valide o certificado recebido por e-mail e informe a chave Pix que deverá receber o valor liberado.
+                Valide o certificado recebido por e-mail e informe a chave Pix que deverá receber o valor liberado. Você poderá voltar pelo mesmo link para acompanhar o status.
               </p>
               <div className="redeem-security-note">
                 <LockKeyhole size={15} />
@@ -174,7 +263,7 @@ export default function RedeemPage() {
                 </label>
                 <button className="redeem-button redeem-button-secondary" type="button" onClick={() => void verify()} disabled={loading}>
                   {loading && <Loader2 className="redeem-spin" size={15} />}
-                  {loading ? "Validando…" : "Validar certificado"}
+                  {loading ? "Validando…" : certificate ? "Atualizar status" : "Validar certificado"}
                 </button>
               </div>
               {certificate && (
@@ -184,6 +273,12 @@ export default function RedeemPage() {
                   <div><span>Valor liberado</span><strong>{formatBRL(certificate.prizeValueCents)}</strong></div>
                   <div><span>E-mail cadastrado</span><strong>{certificate.email}</strong></div>
                 </div>
+              )}
+              {certificate?.redemption && (
+                <RedemptionStatus
+                  redemption={certificate.redemption}
+                  canRedeem={certificate.canRedeem}
+                />
               )}
               {certificate?.canRedeem && (
                 <form className="redeem-fields redeem-form-divider" onSubmit={submit}>

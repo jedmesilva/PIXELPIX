@@ -111,6 +111,13 @@ router.get("/certificates/verify", async (request, response): Promise<void> => {
     issuedAt: new Date(certificate.issued_at).toISOString(),
     status: String(certificate.status),
     redemptionStatus: redemption ? String(redemption.status) : null,
+    redemption: redemption
+      ? {
+          id: Number(redemption.id),
+          status: String(redemption.status),
+          requestedAt: new Date(redemption.requested_at).toISOString(),
+        }
+      : null,
     canRedeem,
   });
 });

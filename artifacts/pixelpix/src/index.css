@@ -1756,6 +1756,66 @@ button:focus-visible {
   line-height: 1.6;
 }
 
+.redeem-status {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--pixelpix-brand) 28%, var(--pixelpix-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--pixelpix-brand) 7%, var(--pixelpix-surface));
+}
+
+.redeem-status.is-rejected {
+  border-color: rgba(255, 172, 76, .35);
+  background: rgba(255, 172, 76, .08);
+}
+
+.redeem-status.is-paid {
+  border-color: color-mix(in srgb, var(--pixelpix-brand-hover) 42%, var(--pixelpix-border));
+}
+
+.redeem-status-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--pixelpix-brand-hover);
+}
+
+.redeem-status.is-rejected .redeem-status-heading {
+  color: #ffc078;
+}
+
+.redeem-status-heading div {
+  display: grid;
+  gap: 3px;
+}
+
+.redeem-status-heading span {
+  color: var(--pixelpix-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.redeem-status-heading strong {
+  color: var(--pixelpix-text-primary);
+  font-size: 14px;
+}
+
+.redeem-status p {
+  margin: 0;
+  color: var(--pixelpix-text-primary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.redeem-status small {
+  color: #ffc078;
+  font-size: 12px;
+}
+
 .redeem-spin { animation: prototype-spin 900ms linear infinite; }
 
 @media (max-width: 520px) {
