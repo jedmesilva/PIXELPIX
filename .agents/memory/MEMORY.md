@@ -1,5 +1,6 @@
 - [PIXELPIX source of truth](pixelpix-source-of-truth.md) — Treat the uploaded prototype as the visual and interaction baseline; do not reinterpret its design without explicit approval.
 - [Public redemption language](public-redemption-language.md) — Public status and email copy must describe outcomes and follow-up without exposing internal administration or review processes.
+- [Email client compatibility](email-client-compatibility.md) — PIXELPIX emails need a light, high-contrast fallback because Outlook/Hotmail may rewrite dark-mode backgrounds.
 - [PIXELPIX grid performance](pixelpix-grid-performance.md) — Paint stable available cells locally and fetch only occupied cells in large prefetched chunks.
 - [Prize value semantics](prize-value-semantics.md) — Planned value is nominal tier value; distributed value is dynamically released at discovery time.
 - [Supabase connection verification](supabase-connection.md) — Drizzle uses Supabase PostgreSQL and the API fails closed if the configured project or schema cannot be verified.

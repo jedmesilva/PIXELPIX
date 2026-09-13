@@ -1,3 +1,5 @@
+import { makeEmailClientSafe } from "./email-compatibility";
+
 type CertificateEmailInput = {
   cellId: number;
   certificateCode: string;
@@ -131,8 +133,8 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
   const html = `<!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta name="color-scheme" content="dark">
-    <meta name="supported-color-schemes" content="dark">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
   </head>
   <body bgcolor="#0b0d10" style="margin:0;padding:0;background:#0b0d10 !important;background-color:#0b0d10 !important;color:#e5e7eb;font-family:Arial,Helvetica,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
@@ -237,6 +239,8 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
   </body>
 </html>`;
 
+  const safeHtml = makeEmailClientSafe(html);
+
   const text = [
     "PIXELPIX — Certificado de revelação",
     "",
@@ -257,7 +261,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
   ].join("\n");
 
   return {
-    html,
+    html: safeHtml,
     text,
     subject: `Seu certificado PIXELPIX · pixel #${input.cellId} revelado`,
   };

@@ -1,4 +1,5 @@
 import { logoMark } from "./certificate-email";
+import { makeEmailClientSafe } from "./email-compatibility";
 
 type RedemptionRequestEmailInput = {
   redemptionId: number;
@@ -46,8 +47,8 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
   const html = `<!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta name="color-scheme" content="dark">
-    <meta name="supported-color-schemes" content="dark">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
   </head>
   <body bgcolor="#0b0d10" style="margin:0;padding:0;background:#0b0d10 !important;background-color:#0b0d10 !important;color:#e5e7eb;font-family:Arial,Helvetica,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
@@ -143,6 +144,8 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
   </body>
 </html>`;
 
+  const safeHtml = makeEmailClientSafe(html);
+
   const text = [
     "PIXELPIX — Resgate solicitado",
     "",
@@ -163,7 +166,7 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
   ].join("\n");
 
   return {
-    html,
+    html: safeHtml,
     text,
     subject: `PIXELPIX · Resgate solicitado — pixel #${input.cellId}`,
   };
