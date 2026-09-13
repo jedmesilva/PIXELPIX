@@ -1535,22 +1535,37 @@ button:focus-visible {
   padding: 28px 0 64px;
 }
 
-.redeem-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--pixelpix-text-muted);
-  font-size: 13px;
-  text-decoration: none;
+.redeem-navigation {
+  display: flex;
+  margin-bottom: 28px;
 }
 
-.redeem-back:hover { color: var(--pixelpix-text-primary); }
+.redeem-back {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--pixelpix-border);
+  border-radius: 9px;
+  color: var(--pixelpix-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  background: color-mix(in srgb, var(--pixelpix-surface) 82%, transparent);
+}
+
+.redeem-back:hover {
+  border-color: var(--pixelpix-border-strong);
+  color: var(--pixelpix-text-primary);
+  background: var(--pixelpix-surface-strong);
+}
 
 .redeem-brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin: 56px 0 22px;
+  margin: 0 0 26px;
   color: var(--pixelpix-text-primary);
   font-size: 16px;
   font-weight: 800;
@@ -1745,7 +1760,6 @@ button:focus-visible {
 
 @media (max-width: 520px) {
   .redeem-shell { width: min(100% - 24px, 640px); }
-  .redeem-brand { margin-top: 38px; }
   .redeem-certificate-summary { grid-template-columns: 1fr; }
 }
 

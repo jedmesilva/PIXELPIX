@@ -137,9 +137,11 @@ export default function RedeemPage() {
   return (
     <main className="redeem-page">
       <div className="redeem-shell">
-        <Link href="/" className="redeem-back">
-          <ArrowLeft size={16} /> Voltar ao PIXELPIX
-        </Link>
+        <nav className="redeem-navigation" aria-label="Navegação da tela de resgate">
+          <Link href="/" className="redeem-back">
+            <ArrowLeft size={16} aria-hidden="true" /> Voltar ao início
+          </Link>
+        </nav>
         <PixelPixLogo />
         <section className="redeem-card">
           <div className="redeem-icon"><BadgeCheck size={25} /></div>
