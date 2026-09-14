@@ -231,7 +231,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
             </tr>
           </table>
           <p style="max-width:560px;margin:18px auto 0;color:#5f6c65;font-size:11px;line-height:1.5;text-align:center;">
-            Descubra, revele e assine seu pedaço da internet.
+            PIXELPIX — Revele um pixel
           </p>
         </td>
       </tr>
