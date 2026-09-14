@@ -9,6 +9,6 @@ The uploaded PIXELPIX prototype is the source of truth for the product's visual 
 
 **How to apply:** When changing PIXELPIX, make functional or accessibility improvements in place. Do not introduce a new visual direction, editorial layout, light theme, or alternate metaphor unless the user explicitly asks for a redesign.
 
-**Brand language:** Use “PIXELPIX — Revele um pixel” as the approved short slogan, alongside “Escolha um pixel, revele o resultado e descubra se ele vale um prêmio.” Do not invent alternate slogans.
+**Brand language:** Use only “PIXELPIX — Revele um pixel” as the approved short slogan in product, SEO, social, and email copy. Do not add alternate taglines or explanatory slogans.
 
-**Why:** The user explicitly rejected both the previous “uma revelação por vez” wording and the “assine seu pedaço da internet” language, then selected copy that connects directly to the reveal action and conditional prize outcome.
+**Why:** The user explicitly rejected multiple invented-sounding secondary phrases and wants the concise approved slogan used without reinterpretation.
