@@ -12,3 +12,5 @@ All user-facing PIXELPIX email templates must remain readable when Outlook or Ho
 **Observed behavior:** Hotmail can preserve an explicit black outer canvas while rewriting a dark-gray main card into a light gray block. The main card therefore needs black `bgcolor` and inline fallback values, not only a CSS class rule.
 
 **Observed behavior:** The same rewrite affects nested PIXELPIX surfaces and dark pixel-color tiles. The email compatibility layer therefore flattens those email surfaces to black and keeps the green border/logo accents for deterministic rendering in Outlook/Hotmail.
+
+**Observed behavior:** Full-width anchor buttons can overflow to the right when horizontal padding is added under email-client box-model quirks. Use block links with `width:auto`, `max-width:100%`, and `box-sizing:border-box` inside the padded content column.

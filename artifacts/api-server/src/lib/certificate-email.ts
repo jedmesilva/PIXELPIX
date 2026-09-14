@@ -122,7 +122,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
     ? `
       <tr>
         <td align="center" style="padding:0 0 10px;">
-          <a href="${safeRedemptionUrl}" style="display:inline-block;width:100%;padding:15px 20px;border-radius:0;background:#00b85c;color:#07150d;font-size:15px;font-weight:900;text-align:center;text-decoration:none;">
+          <a class="email-button" href="${safeRedemptionUrl}" style="display:block;width:auto;max-width:100%;box-sizing:border-box;padding:15px 20px;border-radius:0;background:#00b85c;color:#07150d;font-size:15px;font-weight:900;text-align:center;text-decoration:none;">
             Resgatar prêmio
           </a>
         </td>
@@ -216,7 +216,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
                   ${redemptionButton}
                   <tr>
                     <td align="center">
-                      <a href="${safeVisualizeUrl}" style="display:inline-block;width:100%;padding:14px 20px;border:1px solid #3b4b42;border-radius:0;color:#dce8df;font-size:14px;font-weight:800;text-align:center;text-decoration:none;">
+                      <a class="email-button" href="${safeVisualizeUrl}" style="display:block;width:auto;max-width:100%;box-sizing:border-box;padding:14px 20px;border:1px solid #3b4b42;border-radius:0;color:#dce8df;font-size:14px;font-weight:800;text-align:center;text-decoration:none;">
                         Visualizar pixel
                       </a>
                     </td>
