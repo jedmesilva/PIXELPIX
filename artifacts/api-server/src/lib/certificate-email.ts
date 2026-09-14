@@ -160,7 +160,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
                   O pixel #${input.cellId.toLocaleString("pt-BR")} é seu.
                 </h1>
                 <p style="margin:14px 0 0;color:#aeb8b2;font-size:15px;line-height:1.6;">
-                  A revelação foi confirmada. Este e-mail é a prova de titularidade do pixel que você revelou.
+                  A revelação foi confirmada. Este certificado comprova a titularidade do pixel que você revelou.
                 </p>
               </td>
             </tr>
@@ -226,7 +226,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
             </tr>
             <tr>
               <td bgcolor="#0f1316" style="padding:18px 28px;background:#0f1316 !important;background-color:#0f1316 !important;color:#8b93a1;font-size:11px;line-height:1.6;text-align:center;">
-                Guarde este e-mail. O código e o token são pessoais e comprovam a titularidade do seu pixel.
+                Guarde este e-mail para consultar os dados do certificado. O certificado comprova a titularidade do seu pixel.
               </td>
             </tr>
           </table>
@@ -245,6 +245,7 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
     "PIXELPIX — Certificado de revelação",
     "",
     `O pixel #${input.cellId.toLocaleString("pt-BR")} é seu.`,
+    "A revelação foi confirmada. Este certificado comprova a titularidade do pixel que você revelou.",
     `Item do pixel: ${emoji}`,
     ...(hasPrize
       ? [`Prêmio liberado: ${prizeValue}`]
