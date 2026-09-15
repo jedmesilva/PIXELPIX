@@ -132,6 +132,7 @@ async function sendCertificateEmail(input: {
   email: string;
   cellId: number;
   prizeValueCents: number;
+  remainingPrizeValueCents?: number;
   certificateCode: string;
   certificateToken: string;
   issuedAt: string;
@@ -150,10 +151,12 @@ async function sendCertificateEmail(input: {
       certificateCode: input.certificateCode,
       certificateToken: input.certificateToken,
       prizeValueCents: input.prizeValueCents,
+      remainingPrizeValueCents: input.remainingPrizeValueCents,
       emoji: input.emoji,
       backgroundColor: input.backgroundColor,
       issuedAt: new Date(input.issuedAt),
       visualizeUrl: `${baseUrl}/?pixel=${input.cellId}&from=certificate`,
+      revealUrl: baseUrl,
       redemptionUrl,
     });
     await sendResendEmail({
@@ -219,6 +222,14 @@ export async function deliverCertificateForCell(cellId: number) {
     email: String(claimed.rows[0].email),
     cellId,
     prizeValueCents: Number(claimed.rows[0].prize_value_cents ?? 0),
+    remainingPrizeValueCents: Number(
+      (
+        await pool.query(
+          `SELECT COALESCE(SUM(remaining_value_cents), 0) AS remaining_prize_cents
+             FROM prize_pool`,
+        )
+      ).rows[0]?.remaining_prize_cents ?? 0,
+    ),
     certificateCode: certificate.certificateCode,
     certificateToken: certificate.token,
     issuedAt: certificate.issuedAt.toISOString(),

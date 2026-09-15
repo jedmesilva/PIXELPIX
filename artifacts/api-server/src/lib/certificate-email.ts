@@ -5,10 +5,12 @@ type CertificateEmailInput = {
   certificateCode: string;
   certificateToken: string;
   prizeValueCents: number;
+  remainingPrizeValueCents?: number;
   emoji?: string | null;
   backgroundColor?: string | null;
   issuedAt: Date;
   visualizeUrl: string;
+  revealUrl: string;
   redemptionUrl: string | null;
 };
 
@@ -71,198 +73,196 @@ export function logoMark() {
   `;
 }
 
+function pixelSummary(input: {
+  cellId: number;
+  emoji: string;
+  backgroundColor: string;
+}) {
+  return `
+    <tr>
+      <td style="padding:0 28px 28px 28px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1e2126;">
+          <tr>
+            <td style="width:76px;padding:16px 0 16px 16px;">
+              <div class="email-pixel-tile" style="width:60px;height:60px;background-color:${input.backgroundColor};border:1px solid #2ee66b;text-align:center;line-height:60px;font-size:28px;">
+                ${escapeHtml(input.emoji)}
+              </div>
+            </td>
+            <td style="padding:16px;vertical-align:middle;">
+              <div style="font-size:20px;font-weight:800;color:#f4f4f4;">Pixel #${input.cellId.toLocaleString("pt-BR")}</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  `;
+}
+
 export function buildCertificateEmail(input: CertificateEmailInput) {
   const hasPrize = input.prizeValueCents > 0;
   const prizeValue = formatBRL(input.prizeValueCents);
   const issuedAt = formatDate(input.issuedAt);
   const emoji = input.emoji || "·";
   const backgroundColor = /^#[0-9a-f]{6}$/i.test(input.backgroundColor ?? "")
-    ? input.backgroundColor
-    : "#20262d";
-  const tokenLabel = hasPrize
-    ? "Token privado de resgate"
-    : "Token privado do certificado";
+    ? input.backgroundColor!
+    : "#15181d";
   const safeCode = escapeHtml(input.certificateCode);
   const safeToken = escapeHtml(input.certificateToken);
   const safeVisualizeUrl = escapeHtml(input.visualizeUrl);
+  const safeRevealUrl = escapeHtml(input.revealUrl);
   const safeRedemptionUrl = input.redemptionUrl
     ? escapeHtml(input.redemptionUrl)
     : null;
-
+  const remainingPrizeCopy =
+    input.remainingPrizeValueCents && input.remainingPrizeValueCents > 0
+      ? ` ${formatBRL(input.remainingPrizeValueCents)} em Pix ainda estão escondidos por aí.`
+      : "";
   const prizeSection = hasPrize
     ? `
       <tr>
-        <td style="padding:0 0 18px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#20262d" style="background:#20262d !important;background-color:#20262d !important;border:1px solid #00b85c;border-radius:0;">
-            <tr>
-              <td style="padding:18px 20px;">
-                <p style="margin:0 0 7px;color:#8b93a1;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;">Prêmio liberado</p>
-                <div style="color:#16d878;font-size:28px;line-height:1.1;font-weight:900;">${prizeValue}</div>
-              </td>
-            </tr>
+        <td style="padding:0 28px 28px 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0f1f16;border:1px solid #2ee66b;">
+            <tr><td style="padding:20px 20px 4px 20px;">
+              <div style="font-size:11px;font-weight:700;color:#2ee66b;letter-spacing:1px;text-transform:uppercase;">Prêmio deste pixel</div>
+            </td></tr>
+            <tr><td style="padding:2px 20px 18px 20px;">
+              <div style="font-size:34px;font-weight:800;color:#f4f4f4;letter-spacing:-0.5px;">${prizeValue}</div>
+            </td></tr>
+            ${
+              safeRedemptionUrl
+                ? `<tr><td style="padding:0 20px 20px 20px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="background-color:#2ee66b;">
+                      <a href="${safeRedemptionUrl}" style="display:block;padding:14px;font-size:14px;font-weight:800;color:#0b0d10;text-decoration:none;letter-spacing:0.3px;">RESGATAR PRÊMIO</a>
+                    </td></tr></table>
+                  </td></tr>`
+                : ""
+            }
           </table>
         </td>
       </tr>
     `
     : `
       <tr>
-        <td style="padding:0 0 18px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#20262d" style="background:#20262d !important;background-color:#20262d !important;border:1px solid #2b333c;border-radius:0;">
-            <tr>
-              <td style="padding:16px 20px;color:#aeb8b2;font-size:13px;line-height:1.5;">
-                Este pixel não possui valor em Pix disponível para resgate. O certificado continua comprovando a titularidade do pixel.
-              </td>
-            </tr>
+        <td style="padding:0 28px 28px 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#15181d;border:1px solid #2a2f37;">
+            <tr><td style="padding:20px 20px 14px 20px;">
+              <div style="font-size:14px;font-weight:600;color:#9aa1ab;line-height:1.6;">Nenhum Pix neste pixel. Continue revelando.${remainingPrizeCopy}</div>
+            </td></tr>
+            <tr><td style="padding:0 20px 20px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="background-color:#2ee66b;">
+                <a href="${safeRevealUrl}" style="display:block;padding:14px;font-size:14px;font-weight:800;color:#0b0d10;text-decoration:none;letter-spacing:0.3px;">REVELAR OUTRO PIXEL</a>
+              </td></tr></table>
+            </td></tr>
           </table>
         </td>
       </tr>
     `;
+  const footerCopy = hasPrize
+    ? "O código e o token do certificado devem ser guardados com segurança — são os dados necessários para solicitar o resgate do prêmio."
+    : "O código e o token do certificado devem ser guardados com segurança — são os dados que comprovam a titularidade deste pixel.";
+  const preheader = hasPrize
+    ? `O pixel #${input.cellId.toLocaleString("pt-BR")} foi revelado e tem um prêmio disponível para resgate.`
+    : `O certificado do pixel #${input.cellId.toLocaleString("pt-BR")} está pronto.`;
 
-  const redemptionButton = safeRedemptionUrl
-    ? `
-      <tr>
-        <td align="center" style="padding:0 0 10px;">
-          <a class="email-button" href="${safeRedemptionUrl}" style="display:block;width:auto;max-width:100%;box-sizing:border-box;padding:15px 20px;border-radius:0;background:#00b85c;color:#07150d;font-size:15px;font-weight:900;text-align:center;text-decoration:none;">
-            Resgatar prêmio
-          </a>
-        </td>
-      </tr>
-    `
-    : "";
-
-  const html = `<!doctype html>
+  const html = `<!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta name="color-scheme" content="dark">
-    <meta name="supported-color-schemes" content="dark">
-  </head>
-  <body class="email-body" bgcolor="#0b0d10" style="margin:0;padding:0;background:#0b0d10 !important;background-color:#0b0d10 !important;color:#e5e7eb;font-family:Arial,Helvetica,sans-serif;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-      Seu certificado PIXELPIX está pronto. O pixel #${input.cellId.toLocaleString("pt-BR")} agora é seu.
-    </div>
-    <table class="email-outer" role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#0b0d10" style="background:#0b0d10 !important;background-color:#0b0d10 !important;">
-      <tr>
-        <td class="email-outer-cell" align="center" bgcolor="#0b0d10" style="padding:32px 16px;background:#0b0d10 !important;background-color:#0b0d10 !important;">
-          <table class="email-card" role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#14171b" style="max-width:560px;background:#14171b !important;background-color:#14171b !important;border:1px solid #2b333c;border-top:4px solid #00b85c;border-radius:0;box-shadow:4px 4px 0 #0b5b36;overflow:hidden;">
-            <tr>
-              <td style="padding:28px 28px 22px;border-bottom:1px solid #2b333c;">
-                <div style="font-size:19px;font-weight:900;letter-spacing:.04em;color:#e5e7eb;">
-                  ${logoMark()}<span style="vertical-align:middle;">PIXELPIX</span>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:30px 28px 10px;">
-                <p style="margin:0 0 8px;color:#00d36c;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;">
-                  Certificado de revelação
-                </p>
-                <h1 style="margin:0;color:#f4f7f5;font-size:30px;line-height:1.1;">
-                  O pixel #${input.cellId.toLocaleString("pt-BR")} é seu.
-                </h1>
-                <p style="margin:14px 0 0;color:#aeb8b2;font-size:15px;line-height:1.6;">
-                  A revelação foi confirmada. Este certificado comprova a titularidade do pixel que você revelou.
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:18px 28px 0;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#171b20" style="border:1px solid #2b333c;border-radius:0;background:#171b20 !important;background-color:#171b20 !important;">
-                  <tr>
-                    <td align="center" style="padding:26px 20px 18px;">
-                      <div class="email-pixel-tile" style="display:inline-block;width:128px;height:128px;border-radius:0;background:${backgroundColor};font-size:58px;line-height:128px;text-align:center;">
-                        ${escapeHtml(emoji)}
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td align="center" style="padding:0 20px 25px;">
-                      <div style="color:#e5e7eb;font-size:18px;font-weight:900;">Item do pixel</div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:18px 28px 0;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                  ${prizeSection}
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 28px 24px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                  <tr>
-                    <td style="padding:14px 0 7px;color:#00b85c;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">Código do certificado</td>
-                  </tr>
-                  <tr>
-            <td style="padding:13px 14px;border:1px solid #00b85c;border-radius:0;background:#20262d !important;background-color:#20262d !important;color:#f4f7f5;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.03em;word-break:break-all;">${safeCode}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:16px 0 7px;color:#00b85c;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">${tokenLabel}</td>
-                  </tr>
-                  <tr>
-            <td style="padding:13px 14px;border:1px solid #34423a;border-radius:0;background:#11161a !important;background-color:#11161a !important;color:#e5e7eb;font-family:'Courier New',Courier,monospace;font-size:11px;line-height:1.5;word-break:break-all;">${safeToken}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:14px 0 0;color:#8b93a1;font-size:12px;">Revelado em <strong style="color:#e5e7eb;">${escapeHtml(issuedAt)}</strong></td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 28px 28px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                  ${redemptionButton}
-                  <tr>
-                    <td align="center">
-                      <a class="email-button" href="${safeVisualizeUrl}" style="display:block;width:auto;max-width:100%;box-sizing:border-box;padding:14px 20px;border:1px solid #3b4b42;border-radius:0;color:#dce8df;font-size:14px;font-weight:800;text-align:center;text-decoration:none;">
-                        Visualizar pixel
-                      </a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td bgcolor="#0f1316" style="padding:18px 28px;background:#0f1316 !important;background-color:#0f1316 !important;color:#8b93a1;font-size:11px;line-height:1.6;text-align:center;">
-                Guarde este e-mail para consultar os dados do certificado. O certificado comprova a titularidade do seu pixel.
-              </td>
-            </tr>
+<head>
+  <meta charset="UTF-8">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
+</head>
+<body class="email-body" bgcolor="#000000" style="margin:0;padding:0;background-color:#000000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#000000;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background-color:#0b0d10;border:1px solid #1e2126;">
+        <tr><td style="padding:24px 28px;border-bottom:1px solid #1e2126;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td style="vertical-align:middle;">
+              <div style="font-size:16px;font-weight:800;color:#f4f4f4;letter-spacing:0.5px;">
+                ${logoMark()}<span style="vertical-align:middle;">PIXELPIX</span>
+              </div>
+            </td>
+          </tr></table>
+        </td></tr>
+        <tr><td style="padding:32px 28px 4px 28px;">
+          <div style="font-size:12px;font-weight:700;color:#2ee66b;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Certificado</div>
+          <div style="font-size:38px;font-weight:800;color:#f4f4f4;line-height:1.15;letter-spacing:-0.5px;">Pixel <span style="color:#2ee66b;">#${input.cellId.toLocaleString("pt-BR")}</span></div>
+        </td></tr>
+        <tr><td style="padding:10px 28px 24px 28px;">
+          <div style="font-size:14px;font-weight:600;color:#9aa1ab;line-height:1.5;">Este certificado é a prova de titularidade de que você revelou o pixel #${input.cellId.toLocaleString("pt-BR")} em ${escapeHtml(issuedAt)}.</div>
+        </td></tr>
+        ${pixelSummary({
+          cellId: input.cellId,
+          emoji,
+          backgroundColor,
+        })}
+        ${prizeSection}
+        <tr><td style="padding:0 28px;"><hr style="border:none;border-top:1px solid #1e2126;margin:0;"></td></tr>
+        <tr><td style="padding:24px 28px 4px 28px;">
+          <div style="font-size:11px;font-weight:700;color:#f4f4f4;letter-spacing:1px;text-transform:uppercase;">Registro do certificado</div>
+        </td></tr>
+        <tr><td style="padding:16px 28px 0 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1e2126;">
+            <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+              <div style="font-size:10px;color:#5c6470;margin-bottom:4px;">Revelado em</div>
+              <div style="font-size:13px;color:#f4f4f4;font-weight:600;">${escapeHtml(issuedAt)}</div>
+            </td></tr>
+            <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+              <div style="font-size:10px;color:#5c6470;margin-bottom:4px;">Código do certificado</div>
+              <div style="font-size:13px;color:#2ee66b;font-family:'SF Mono',Consolas,monospace;word-break:break-all;">${safeCode}</div>
+            </td></tr>
+            <tr><td style="padding:14px 16px;">
+              <div style="font-size:10px;color:#5c6470;margin-bottom:4px;">Token privado do certificado</div>
+              <div style="font-size:11px;color:#6b7280;font-family:'SF Mono',Consolas,monospace;word-break:break-all;">${safeToken}</div>
+            </td></tr>
           </table>
-          <p style="max-width:560px;margin:18px auto 0;color:#5f6c65;font-size:11px;line-height:1.5;text-align:center;">
-            PIXELPIX — Revele um pixel
-          </p>
-        </td>
-      </tr>
-    </table>
-  </body>
+        </td></tr>
+        <tr><td style="padding:28px 28px 0 28px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="border:1px solid #2ee66b;">
+            <a href="${safeVisualizeUrl}" style="display:block;padding:14px;font-size:14px;font-weight:800;color:#2ee66b;text-decoration:none;letter-spacing:0.3px;">VER PIXEL</a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="padding:24px 28px;">
+          <div style="font-size:11px;color:#4a4f57;text-align:center;line-height:1.6;">${footerCopy}</div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
 </html>`;
 
-  const safeHtml = makeEmailClientSafe(html);
-
   const text = [
-    "PIXELPIX — Certificado de revelação",
+    "PIXELPIX — Certificado",
     "",
-    `O pixel #${input.cellId.toLocaleString("pt-BR")} é seu.`,
-    "A revelação foi confirmada. Este certificado comprova a titularidade do pixel que você revelou.",
+    `Pixel #${input.cellId.toLocaleString("pt-BR")}`,
+    `Este certificado é a prova de titularidade de que você revelou o pixel #${input.cellId.toLocaleString("pt-BR")} em ${issuedAt}.`,
     `Item do pixel: ${emoji}`,
+    "",
     ...(hasPrize
-      ? [`Prêmio liberado: ${prizeValue}`]
-      : ["Este pixel não possui valor em Pix disponível para resgate."]),
+      ? [
+          `Prêmio deste pixel: ${prizeValue}`,
+          ...(input.redemptionUrl
+            ? [`Resgatar prêmio: ${input.redemptionUrl}`]
+            : []),
+        ]
+      : [
+          `Nenhum Pix neste pixel. Continue revelando.${remainingPrizeCopy}`,
+          `Revelar outro pixel: ${input.revealUrl}`,
+        ]),
     "",
-    `Código do certificado: ${input.certificateCode}`,
-    `Token privado: ${input.certificateToken}`,
+    "Registro do certificado",
     `Revelado em: ${issuedAt}`,
+    `Código do certificado: ${input.certificateCode}`,
+    `Token privado do certificado: ${input.certificateToken}`,
     "",
-    `Visualizar pixel: ${input.visualizeUrl}`,
-    ...(input.redemptionUrl
-      ? [`Resgatar prêmio: ${input.redemptionUrl}`]
-      : ["Não há resgate em dinheiro para esta revelação."]),
+    `Ver pixel: ${input.visualizeUrl}`,
+    "",
+    footerCopy,
   ].join("\n");
 
   return {
-    html: safeHtml,
+    html: makeEmailClientSafe(html),
     text,
     subject: `Seu certificado PIXELPIX · pixel #${input.cellId} revelado`,
   };

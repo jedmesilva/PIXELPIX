@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>PIXELPIX — Versão D</title>
+</head>
+<body style="margin:0;padding:0;background-color:#000000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#000000;padding:32px 12px;">
+<tr><td align="center">
+<table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background-color:#0b0d10;border:1px solid #1e2126;">
+
+  <!-- Header -->
+  <tr><td style="padding:24px 28px;border-bottom:1px solid #1e2126;">
+    <table role="presentation" width="100%"><tr>
+      <td style="vertical-align:middle;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="width:32px;">
+            <table role="presentation" cellpadding="0" cellspacing="2"><tr>
+              <td style="width:9px;height:9px;background-color:#2ee66b;"></td>
+              <td style="width:9px;height:9px;background-color:#0b0d10;"></td>
+            </tr>
+            <tr>
+              <td style="width:9px;height:9px;background-color:#0b0d10;"></td>
+              <td style="width:9px;height:9px;background-color:#2ee66b;"></td>
+            </tr></table>
+          </td>
+          <td style="font-size:16px;font-weight:800;color:#f4f4f4;letter-spacing:0.5px;padding-left:10px;">PIXELPIX</td>
+        </tr></table>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Big headline, site-style -->
+  <tr><td style="padding:32px 28px 4px 28px;">
+    <div style="font-size:12px;font-weight:700;color:#2ee66b;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Certificado</div>
+    <div style="font-size:38px;font-weight:800;color:#f4f4f4;line-height:1.15;letter-spacing:-0.5px;">Pixel <span style="color:#2ee66b;">#999.902</span></div>
+  </td></tr>
+
+  <tr><td style="padding:10px 28px 24px 28px;">
+    <div style="font-size:14px;font-weight:600;color:#9aa1ab;line-height:1.5;">Este certificado é a prova de titularidade de que você revelou o pixel #999.902 em 13 de setembro de 2026 às 20:15.</div>
+  </td></tr>
+
+  <!-- Stat box with pixel inside -->
+  <tr><td style="padding:0 28px 28px 28px;">
+    <table role="presentation" width="100%" style="border:1px solid #1e2126;">
+      <tr>
+        <td style="width:76px;padding:16px 0 16px 16px;">
+          <div style="width:60px;height:60px;background-color:#15181d;border:1px solid #2ee66b;text-align:center;vertical-align:middle;line-height:60px;font-size:28px;">⚡</div>
+        </td>
+        <td style="padding:16px;vertical-align:middle;">
+          <div style="font-size:20px;font-weight:800;color:#f4f4f4;">Pixel #999.902</div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- Prize section -->
+  <tr><td style="padding:0 28px 28px 28px;">
+    <table role="presentation" width="100%" style="background-color:#0f1f16;border:1px solid #2ee66b;">
+      <tr><td style="padding:20px 20px 4px 20px;">
+        <div style="font-size:11px;font-weight:700;color:#2ee66b;letter-spacing:1px;text-transform:uppercase;">Prêmio deste pixel</div>
+      </td></tr>
+      <tr><td style="padding:2px 20px 18px 20px;">
+        <div style="font-size:34px;font-weight:800;color:#f4f4f4;letter-spacing:-0.5px;">R$ 50,00</div>
+      </td></tr>
+      <tr><td style="padding:0 20px 20px 20px;">
+        <table role="presentation" width="100%"><tr><td align="center" style="background-color:#2ee66b;">
+          <a href="#" style="display:block;padding:14px;font-size:14px;font-weight:800;color:#0b0d10;text-decoration:none;letter-spacing:0.3px;">RESGATAR PRÊMIO</a>
+        </td></tr></table>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- Divider -->
+  <tr><td style="padding:0 28px;"><hr style="border:none;border-top:1px solid #1e2126;margin:0;"></td></tr>
+
+  <!-- Registry -->
+  <tr><td style="padding:24px 28px 4px 28px;">
+    <div style="font-size:11px;font-weight:700;color:#f4f4f4;letter-spacing:1px;text-transform:uppercase;">Registro do certificado</div>
+  </td></tr>
+
+  <tr><td style="padding:16px 28px 0 28px;">
+    <table role="presentation" width="100%" style="border:1px solid #1e2126;">
+      <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+        <div style="font-size:10px;color:#5c6470;margin-bottom:4px;">Revelado em</div>
+        <div style="font-size:13px;color:#f4f4f4;font-weight:600;">13 de setembro de 2026 às 20:14</div>
+      </td></tr>
+      <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+        <div style="font-size:10px;color:#5c6470;margin-bottom:4px;">Código do certificado</div>
+        <div style="font-size:13px;color:#2ee66b;font-family:'SF Mono',Consolas,monospace;">PPX-2026-999902-4A52A7F8</div>
+      </td></tr>
+      <tr><td style="padding:14px 16px;">
+        <div style="font-size:10px;color:#5c6470;margin-bottom:4px;">Token privado do certificado</div>
+        <div style="font-size:11px;color:#6b7280;font-family:'SF Mono',Consolas,monospace;word-break:break-all;">eyJ...token-de-demonstração...</div>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- CTA secundário, outline -->
+  <tr><td style="padding:28px 28px 0 28px;">
+    <table role="presentation" width="100%"><tr><td align="center" style="border:1px solid #2ee66b;">
+      <a href="#" style="display:block;padding:14px;font-size:14px;font-weight:800;color:#2ee66b;text-decoration:none;letter-spacing:0.3px;">VER PIXEL</a>
+    </td></tr></table>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="padding:24px 28px;margin-top:24px;">
+    <div style="font-size:11px;color:#4a4f57;text-align:center;line-height:1.6;">O código e o token do certificado devem ser guardados com segurança — são os dados necessários para solicitar o resgate do prêmio.</div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
