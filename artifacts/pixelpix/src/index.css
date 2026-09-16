@@ -1943,6 +1943,137 @@ button:focus-visible {
   }
 }
 
+/* Keep every modal surface fluid instead of shrinking its inner content to
+   the desktop reference width. */
+.prototype-sheet:not(.is-checkout),
+.prototype-sheet:not(.is-checkout) * {
+  box-sizing: border-box;
+}
+
+.prototype-sheet.is-checkout,
+.prototype-sheet.is-checkout * {
+  box-sizing: border-box;
+}
+
+.prototype-sheet.is-checkout {
+  width: min(100%, 680px);
+}
+
+.prototype-sheet.is-checkout .prototype-checkout-content,
+.prototype-sheet.is-checkout .prototype-checkout-layout,
+.prototype-sheet.is-checkout .prototype-certificate-banner {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 700px) {
+  .prototype-sheet:not(.is-checkout) {
+    width: min(920px, calc(100vw - 40px));
+    max-width: 920px;
+    max-height: calc(100dvh - 40px);
+  }
+
+  .prototype-sheet:not(.is-checkout) .prototype-detail-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(20px, 3vw, 36px);
+    padding: clamp(24px, 3vw, 40px);
+  }
+
+  .prototype-sheet:not(.is-checkout) .prototype-detail-actions,
+  .prototype-sheet:not(.is-checkout) .prototype-prize-box,
+  .prototype-sheet:not(.is-checkout) .prototype-no-prize-box {
+    width: 100%;
+  }
+}
+
+@media (max-width: 699px) {
+  .prototype-overlay:not(.is-checkout-overlay) {
+    align-items: center;
+    padding: 8px;
+  }
+
+  .prototype-sheet:not(.is-checkout) {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 16px);
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+
+  .prototype-sheet:not(.is-checkout) .prototype-sheet-header {
+    padding: clamp(18px, 5vw, 28px) clamp(16px, 5vw, 28px) 0;
+  }
+
+  .prototype-sheet:not(.is-checkout) .prototype-detail-layout {
+    width: 100%;
+    gap: clamp(20px, 5vw, 30px);
+    padding: clamp(18px, 5vw, 28px);
+  }
+
+  .prototype-sheet:not(.is-checkout) .prototype-pixel-hero {
+    width: 100%;
+    height: clamp(240px, 58vw, 380px);
+    min-height: 0;
+  }
+
+  .prototype-sheet:not(.is-checkout) .prototype-detail-actions,
+  .prototype-sheet:not(.is-checkout) .prototype-prize-box,
+  .prototype-sheet:not(.is-checkout) .prototype-no-prize-box,
+  .prototype-sheet:not(.is-checkout) .prototype-detail-meta,
+  .prototype-sheet:not(.is-checkout) .prototype-share-button {
+    width: 100%;
+  }
+
+  .prototype-sheet:not(.is-checkout) .prototype-prize-box,
+  .prototype-sheet:not(.is-checkout) .prototype-no-prize-box {
+    padding: clamp(16px, 4vw, 22px);
+  }
+
+  .prototype-sheet:not(.is-checkout) .prototype-prize-value {
+    font-size: clamp(28px, 8vw, 40px);
+  }
+
+  .prototype-sheet.is-checkout {
+    width: 100%;
+    max-width: none;
+    padding-right: clamp(16px, 5vw, 24px);
+    padding-left: clamp(16px, 5vw, 24px);
+  }
+
+  .prototype-sheet.is-checkout .prototype-sheet-header {
+    margin-right: calc(-1 * clamp(16px, 5vw, 24px));
+    margin-left: calc(-1 * clamp(16px, 5vw, 24px));
+    padding-right: clamp(16px, 5vw, 24px);
+    padding-left: clamp(16px, 5vw, 24px);
+  }
+}
+
+@media (max-width: 699px) {
+  .prototype-share-dialog {
+    padding: 8px;
+  }
+
+  .prototype-share-dialog-card {
+    width: 100%;
+    max-height: calc(100dvh - 16px);
+    padding: clamp(18px, 5vw, 24px);
+  }
+
+  .prototype-share-preview {
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .prototype-share-dialog-actions,
+  .prototype-share-network-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .prototype-share-action,
+  .prototype-share-network-button {
+    min-width: 0;
+  }
+}
+
 .redeem-page {
   width: 100%;
   height: 100%;
