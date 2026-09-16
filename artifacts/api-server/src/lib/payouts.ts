@@ -1,4 +1,5 @@
 import { pool } from "@workspace/db";
+import { notifyRedemptionStatusChange } from "./redemption-notifications";
 
 export async function confirmEfiPayout(input: {
   providerTransactionId?: string | null;
@@ -50,7 +51,14 @@ export async function confirmEfiPayout(input: {
     );
     await client.query(
       `UPDATE prize_redemption_requests
-          SET status = 'paid', processed_at = NOW(), processed_by = 'efi-webhook'
+          SET status = 'paid',
+              processed_at = NOW(),
+              processed_by = 'efi-webhook',
+              status_email_pending = true,
+              status_email_sent_at = NULL,
+              status_email_attempts = 0,
+              status_email_last_attempt_at = NULL,
+              status_email_last_error = NULL
         WHERE id = $1 AND status = 'payment_pending'`,
       [payout.redemption_request_id],
     );
@@ -80,6 +88,10 @@ export async function confirmEfiPayout(input: {
       ],
     );
     await client.query("COMMIT");
+    void notifyRedemptionStatusChange(
+      Number(payout.redemption_request_id),
+      "paid",
+    );
     return true;
   } catch (error) {
     await client.query("ROLLBACK");

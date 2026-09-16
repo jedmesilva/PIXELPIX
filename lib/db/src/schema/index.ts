@@ -290,6 +290,13 @@ export const prizeRedemptionRequests = pgTable(
     approvedAmountCents: integer("approved_amount_cents"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     reviewedBy: text("reviewed_by"),
+    statusEmailPending: boolean("status_email_pending").notNull().default(false),
+    statusEmailSentAt: timestamp("status_email_sent_at", { withTimezone: true }),
+    statusEmailAttempts: integer("status_email_attempts").notNull().default(0),
+    statusEmailLastAttemptAt: timestamp("status_email_last_attempt_at", {
+      withTimezone: true,
+    }),
+    statusEmailLastError: text("status_email_last_error"),
   },
   (table) => ({
     cellId: index("idx_prize_redemptions_cell_id").on(table.cellId),

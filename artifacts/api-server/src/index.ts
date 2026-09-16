@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureCellRecords, expireReservations } from "./routes/cells";
 import { processPendingCertificates } from "./routes/webhook";
+import { processPendingRedemptionStatusEmails } from "./lib/redemption-notifications";
 import { pool, verifySupabaseConnection } from "@workspace/db";
 import {
   isEfiConfigured,
@@ -43,6 +44,7 @@ async function start() {
   `);
   await expireReservations();
   await processPendingCertificates();
+  await processPendingRedemptionStatusEmails();
   if (isEfiConfigured() && isEfiWebhookRegistrationConfigured()) {
     try {
       await registerEfiWebhook();
@@ -57,6 +59,9 @@ async function start() {
     );
     void processPendingCertificates().catch((error) =>
       logger.error({ error }, "Certificate retry job failed"),
+    );
+    void processPendingRedemptionStatusEmails().catch((error) =>
+      logger.error({ error }, "Redemption status email retry job failed"),
     );
   }, 30_000);
   app.listen(port, (err) => {

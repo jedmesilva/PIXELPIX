@@ -8,6 +8,7 @@ import {
 import { buildRedemptionRequestEmail } from "../lib/redemption-request-email";
 import { getPublicAppUrl } from "../lib/public-app-url";
 import { sendResendEmail } from "../lib/resend";
+import { notifyRedemptionStatusChange } from "../lib/redemption-notifications";
 
 const router: IRouter = Router();
 
@@ -356,7 +357,12 @@ router.post("/redemptions/:id/cancel", async (request: Request, response): Promi
               processed_by = 'certificate-holder',
               rejection_reason = $2,
               reviewed_at = NOW(),
-              reviewed_by = 'certificate-holder'
+              reviewed_by = 'certificate-holder',
+              status_email_pending = true,
+              status_email_sent_at = NULL,
+              status_email_attempts = 0,
+              status_email_last_attempt_at = NULL,
+              status_email_last_error = NULL
         WHERE id = $1
         RETURNING id, status, requested_at`,
       [redemptionId, reason],
@@ -368,6 +374,7 @@ router.post("/redemptions/:id/cancel", async (request: Request, response): Promi
       [redemptionId, String(redemption.status), reason],
     );
     await client.query("COMMIT");
+    void notifyRedemptionStatusChange(redemptionId, "rejected");
 
     response.json({
       id: Number(updated.rows[0].id),

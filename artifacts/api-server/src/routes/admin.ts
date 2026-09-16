@@ -24,6 +24,7 @@ import {
   verifyCertificateToken,
 } from "../lib/certificates";
 import { sendPixTransfer } from "../lib/efi";
+import { notifyRedemptionStatusChange } from "../lib/redemption-notifications";
 import {
   generatePrizeBatch,
   addPrizeTier,
@@ -394,7 +395,12 @@ router.patch("/redemptions/:id", async (request, response): Promise<void> => {
              ELSE approved_amount_cents
            END,
            reviewed_at = NOW(),
-           reviewed_by = $2
+            reviewed_by = $2,
+            status_email_pending = true,
+            status_email_sent_at = NULL,
+            status_email_attempts = 0,
+            status_email_last_attempt_at = NULL,
+            status_email_last_error = NULL
        WHERE id = $4
        RETURNING *`,
       [
@@ -417,6 +423,7 @@ router.patch("/redemptions/:id", async (request, response): Promise<void> => {
       ],
     );
     await client.query("COMMIT");
+    void notifyRedemptionStatusChange(params.data.id, body.data.status);
     const enriched = await pool.query(
       `SELECT r.*, c.status AS cell_status, p.status AS payment_status
               , payout.status AS payout_status
@@ -505,7 +512,12 @@ router.post("/redemptions/:id/payout", async (request, response): Promise<void> 
       `UPDATE prize_redemption_requests
           SET status = 'payment_pending',
               processed_at = NOW(),
-              processed_by = 'admin-access-key'
+              processed_by = 'admin-access-key',
+              status_email_pending = true,
+              status_email_sent_at = NULL,
+              status_email_attempts = 0,
+              status_email_last_attempt_at = NULL,
+              status_email_last_error = NULL
         WHERE id = $1`,
       [params.data.id],
     );
@@ -524,6 +536,7 @@ router.post("/redemptions/:id/payout", async (request, response): Promise<void> 
     throw error;
   }
   client.release();
+  void notifyRedemptionStatusChange(params.data.id, "payment_pending");
 
   try {
     const provider = await sendPixTransfer({
@@ -563,10 +576,16 @@ router.post("/redemptions/:id/payout", async (request, response): Promise<void> 
     );
     await pool.query(
       `UPDATE prize_redemption_requests
-          SET status = 'failed'
+          SET status = 'failed',
+              status_email_pending = true,
+              status_email_sent_at = NULL,
+              status_email_attempts = 0,
+              status_email_last_attempt_at = NULL,
+              status_email_last_error = NULL
         WHERE id = $1 AND status = 'payment_pending'`,
       [params.data.id],
     );
+    void notifyRedemptionStatusChange(params.data.id, "failed");
     request.log.error({ error, redemptionId: params.data.id }, "Prize payout failed");
     response.status(502).json({ error: "A Efí não confirmou o envio do Pix." });
   }
@@ -632,7 +651,14 @@ router.post(
       );
       await client.query(
         `UPDATE prize_redemption_requests
-            SET status = 'paid', processed_at = NOW(), processed_by = 'admin-access-key'
+             SET status = 'paid',
+                 processed_at = NOW(),
+                 processed_by = 'admin-access-key',
+                 status_email_pending = true,
+                 status_email_sent_at = NULL,
+                 status_email_attempts = 0,
+                 status_email_last_attempt_at = NULL,
+                 status_email_last_error = NULL
           WHERE id = $1`,
         [params.data.id],
       );
@@ -656,6 +682,7 @@ router.post(
         [params.data.id],
       );
       await client.query("COMMIT");
+      void notifyRedemptionStatusChange(params.data.id, "paid");
       response.json({ ok: true, status: "paid", amountCents: amount });
     } catch (error) {
       await client.query("ROLLBACK");

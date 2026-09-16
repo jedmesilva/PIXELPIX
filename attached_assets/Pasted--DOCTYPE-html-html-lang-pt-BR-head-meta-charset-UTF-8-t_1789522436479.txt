@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>PIXELPIX — Pagamento realizado</title>
+</head>
+<body style="margin:0;padding:0;background-color:#000000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#000000;padding:32px 12px;">
+<tr><td align="center">
+<table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background-color:#0b0d10;border:1px solid #1e2126;">
+
+  <!-- Header -->
+  <tr><td style="padding:24px 28px;border-bottom:1px solid #1e2126;">
+    <table role="presentation" width="100%"><tr>
+      <td style="vertical-align:middle;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="width:32px;">
+            <table role="presentation" cellpadding="0" cellspacing="2"><tr>
+              <td style="width:9px;height:9px;background-color:#2ee66b;"></td>
+              <td style="width:9px;height:9px;background-color:#0b0d10;"></td>
+            </tr>
+            <tr>
+              <td style="width:9px;height:9px;background-color:#0b0d10;"></td>
+              <td style="width:9px;height:9px;background-color:#2ee66b;"></td>
+            </tr></table>
+          </td>
+          <td style="font-size:16px;font-weight:800;color:#f4f4f4;letter-spacing:0.5px;padding-left:10px;">PIXELPIX</td>
+        </tr></table>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Headline -->
+  <tr><td style="padding:32px 28px 4px 28px;">
+    <div style="font-size:12px;font-weight:700;color:#2ee66b;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Pagamento realizado</div>
+    <div style="font-size:32px;font-weight:800;color:#f4f4f4;line-height:1.2;letter-spacing:-0.5px;">Seu Pix caiu na conta.</div>
+  </td></tr>
+
+  <tr><td style="padding:10px 28px 28px 28px;">
+    <div style="font-size:14px;font-weight:600;color:#9aa1ab;line-height:1.5;">O pagamento do resgate do pixel #28 foi concluído. O valor já está disponível na chave Pix informada.</div>
+  </td></tr>
+
+  <!-- Dados do pagamento -->
+  <tr><td style="padding:0 28px 4px 28px;">
+    <div style="font-size:11px;font-weight:700;color:#2ee66b;letter-spacing:1px;text-transform:uppercase;">Dados do pagamento</div>
+  </td></tr>
+
+  <tr><td style="padding:16px 28px 0 28px;">
+    <table role="presentation" width="100%" style="border:1px solid #1e2126;">
+      <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+        <table role="presentation" width="100%"><tr>
+          <td style="font-size:13px;color:#9aa1ab;">Valor pago</td>
+          <td align="right" style="font-size:15px;color:#2ee66b;font-weight:800;">R$ 1,20</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+        <table role="presentation" width="100%"><tr>
+          <td style="font-size:13px;color:#9aa1ab;">Chave Pix</td>
+          <td align="right" style="font-size:13px;color:#f4f4f4;font-weight:700;">jedme_silva@hotmail.com</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+        <table role="presentation" width="100%"><tr>
+          <td style="font-size:13px;color:#9aa1ab;">Pago em</td>
+          <td align="right" style="font-size:13px;color:#f4f4f4;font-weight:700;">13 de setembro de 2026 às 20:02</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:14px 16px;">
+        <table role="presentation" width="100%"><tr>
+          <td style="font-size:13px;color:#9aa1ab;">Certificado</td>
+          <td align="right" style="font-size:13px;color:#f4f4f4;font-weight:700;font-family:'SF Mono',Consolas,monospace;">PPX-2026-000028-668ACAAA</td>
+        </tr></table>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- CTA principal -->
+  <tr><td style="padding:28px 28px 0 28px;">
+    <table role="presentation" width="100%"><tr><td align="center" style="background-color:#2ee66b;">
+      <a href="#" style="display:block;padding:14px;font-size:14px;font-weight:800;color:#0b0d10;text-decoration:none;letter-spacing:0.3px;">REVELAR OUTRO PIXEL</a>
+    </td></tr></table>
+  </td></tr>
+
+  <!-- CTA secundário -->
+  <tr><td style="padding:12px 28px 0 28px;">
+    <table role="presentation" width="100%"><tr><td align="center" style="border:1px solid #2ee66b;">
+      <a href="#" style="display:block;padding:13px;font-size:14px;font-weight:800;color:#2ee66b;text-decoration:none;letter-spacing:0.3px;">COMPARTILHAR</a>
+    </td></tr></table>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="padding:20px 28px 28px 28px;">
+    <div style="font-size:11px;color:#4a4f57;text-align:center;line-height:1.6;">Guarde este e-mail como comprovante do pagamento.</div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
