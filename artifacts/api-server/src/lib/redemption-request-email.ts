@@ -1,4 +1,5 @@
 import { makeEmailClientSafe } from "./email-compatibility";
+import { pixelpixEmailLogoMark } from "./pixelpix-email-logo";
 
 type RedemptionRequestEmailInput = {
   redemptionId: number;
@@ -63,16 +64,7 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
                 <td style="vertical-align:middle;">
                   <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                    <td style="width:32px;">
-                      <table role="presentation" cellpadding="0" cellspacing="2"><tr>
-                        <td width="9" height="9" bgcolor="#2ee66b" style="width:9px;height:9px;background-color:#2ee66b;"></td>
-                        <td width="9" height="9" bgcolor="#0b0d10" style="width:9px;height:9px;background-color:#0b0d10;"></td>
-                      </tr>
-                      <tr>
-                        <td width="9" height="9" bgcolor="#0b0d10" style="width:9px;height:9px;background-color:#0b0d10;"></td>
-                        <td width="9" height="9" bgcolor="#2ee66b" style="width:9px;height:9px;background-color:#2ee66b;"></td>
-                      </tr></table>
-                    </td>
+                    <td style="width:54px;">${pixelpixEmailLogoMark()}</td>
                     <td style="font-size:16px;font-weight:800;color:#f4f4f4;letter-spacing:0.5px;padding-left:10px;">PIXELPIX</td>
                   </tr></table>
                 </td>

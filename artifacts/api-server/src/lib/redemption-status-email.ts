@@ -1,4 +1,5 @@
 import { makeEmailClientSafe } from "./email-compatibility";
+import { pixelpixEmailLogoMark } from "./pixelpix-email-logo";
 
 export type RedemptionNotificationStatus =
   | "approved"
@@ -103,24 +104,6 @@ function copyForStatus(status: RedemptionNotificationKind) {
   }
 }
 
-function logoMark() {
-  return `
-    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-      <td style="width:32px;">
-        <table role="presentation" cellpadding="0" cellspacing="2"><tr>
-          <td width="9" height="9" bgcolor="#2ee66b" style="width:9px;height:9px;background-color:#2ee66b;"></td>
-          <td width="9" height="9" bgcolor="#0b0d10" style="width:9px;height:9px;background-color:#0b0d10;"></td>
-        </tr>
-        <tr>
-          <td width="9" height="9" bgcolor="#0b0d10" style="width:9px;height:9px;background-color:#0b0d10;"></td>
-          <td width="9" height="9" bgcolor="#2ee66b" style="width:9px;height:9px;background-color:#2ee66b;"></td>
-        </tr></table>
-      </td>
-      <td style="font-size:16px;font-weight:800;color:#f4f4f4;letter-spacing:0.5px;padding-left:10px;">PIXELPIX</td>
-    </tr></table>
-  `;
-}
-
 function buildCancelledOrRejectedEmail(
   input: RedemptionStatusEmailInput,
   kind: "cancelled" | "rejected",
@@ -184,7 +167,7 @@ function buildCancelledOrRejectedEmail(
     <tr><td align="center" bgcolor="#000000">
       <table class="email-card" role="presentation" width="520" cellpadding="0" cellspacing="0" bgcolor="#0b0d10" style="max-width:520px;width:100%;background-color:#0b0d10;border:1px solid #1e2126;">
         <tr><td style="padding:24px 28px;border-bottom:1px solid #1e2126;">
-          ${logoMark()}
+          ${pixelpixEmailLogoMark()}<span style="font-size:16px;font-weight:800;color:#f4f4f4;letter-spacing:0.5px;padding-left:10px;">PIXELPIX</span>
         </td></tr>
         <tr><td style="padding:32px 28px 4px 28px;">
           <div style="font-size:12px;font-weight:700;color:${isCancelled ? "#9aa1ab" : "#ff6b5c"};letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">${copy.label}</div>
@@ -285,7 +268,7 @@ export function buildRedemptionStatusEmail(input: RedemptionStatusEmailInput) {
     <tr><td align="center" bgcolor="#000000">
       <table class="email-card" role="presentation" width="520" cellpadding="0" cellspacing="0" bgcolor="#0b0d10" style="max-width:520px;width:100%;background-color:#0b0d10;border:1px solid #1e2126;">
         <tr><td style="padding:24px 28px;border-bottom:1px solid #1e2126;">
-          ${logoMark()}
+          ${pixelpixEmailLogoMark()}<span style="font-size:16px;font-weight:800;color:#f4f4f4;letter-spacing:0.5px;padding-left:10px;">PIXELPIX</span>
         </td></tr>
         <tr><td style="padding:32px 28px 4px 28px;">
           <div style="font-size:12px;font-weight:700;color:#2ee66b;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">${copy.label}</div>
