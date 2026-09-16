@@ -13,6 +13,9 @@ import {
   Check,
   Clock3,
   Copy,
+  Download,
+  ExternalLink,
+  Link2,
   Loader2,
   Lock,
   Mail,
@@ -413,6 +416,157 @@ function formatRevealedDate(date: Date | null) {
   return `${datePart} às ${timePart}`;
 }
 
+function drawShareCardLogo(context: CanvasRenderingContext2D) {
+  const block = 22;
+  const gap = 5;
+  const originX = 64;
+  const originY = 62;
+  const blocks = [
+    [1, 0],
+    [0, 1],
+    [2, 1],
+    [0, 2],
+    [1, 2],
+    [0, 3],
+  ];
+
+  context.fillStyle = "#2ee66b";
+  for (const [column, row] of blocks) {
+    context.fillRect(
+      originX + column * (block + gap),
+      originY + row * (block + gap),
+      block,
+      block,
+    );
+  }
+  context.fillStyle = "#f4f4f4";
+  context.font = "800 34px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+  context.fillText("PIXELPIX", originX + 3 * (block + gap) + 18, originY + 58);
+}
+
+function drawShareCardCenteredText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  y: number,
+  font: string,
+  color: string,
+) {
+  context.fillStyle = color;
+  context.font = font;
+  context.textAlign = "center";
+  context.fillText(text, 540, y);
+  context.textAlign = "left";
+}
+
+function createShareCardBlob(
+  pixel: Pixel,
+  remainingPrizeCents?: number,
+): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1080;
+  const context = canvas.getContext("2d");
+  if (!context) return Promise.reject(new Error("Não foi possível criar a imagem."));
+
+  context.fillStyle = "#0b0d10";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  drawShareCardLogo(context);
+
+  const hasPrize = pixel.prizeValueCents > 0;
+  const pixelNumber = `Pixel #${pixel.id.toLocaleString("pt-BR")}`;
+  const pixelBackground = pixel.backgroundColor ?? "#15181d";
+
+  if (hasPrize) {
+    drawShareCardCenteredText(
+      context,
+      "ENCONTREI UM PIX",
+      360,
+      "700 24px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+      "#9aa1ab",
+    );
+    drawShareCardCenteredText(
+      context,
+      formatBRL(pixel.prizeValueCents / 100),
+      500,
+      "800 104px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+      "#f4f4f4",
+    );
+  } else {
+    drawShareCardCenteredText(
+      context,
+      "REVELEI UM PIXEL",
+      315,
+      "700 24px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+      "#9aa1ab",
+    );
+  }
+
+  const tileSize = hasPrize ? 120 : 330;
+  const tileX = 540 - tileSize / 2;
+  const tileY = hasPrize ? 570 : 385;
+  context.fillStyle = pixelBackground;
+  context.fillRect(tileX, tileY, tileSize, tileSize);
+  context.strokeStyle = "#2ee66b";
+  context.lineWidth = 3;
+  context.strokeRect(tileX, tileY, tileSize, tileSize);
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.font = `${hasPrize ? 58 : 150}px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+  context.fillText(pixel.emoji ?? "·", 540, tileY + tileSize / 2);
+  context.textBaseline = "alphabetic";
+  context.textAlign = "left";
+
+  const rowY = hasPrize ? 735 : 755;
+  context.fillStyle = "#15181d";
+  context.fillRect(150, rowY, 780, 92);
+  context.strokeStyle = "#232a33";
+  context.lineWidth = 1;
+  context.strokeRect(150, rowY, 780, 92);
+  context.fillStyle = "#f4f4f4";
+  context.font = "800 28px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+  context.fillText(pixelNumber, 180, rowY + 40);
+  context.fillStyle = "#9aa1ab";
+  context.font = "500 20px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+  context.fillText(
+    hasPrize
+      ? "Um prêmio encontrado no PIXELPIX."
+      : "Ainda existem Pix escondidos na grade.",
+    180,
+    rowY + 70,
+  );
+
+  context.strokeStyle = "#1e2126";
+  context.beginPath();
+  context.moveTo(150, 930);
+  context.lineTo(930, 930);
+  context.stroke();
+  const footerValue =
+    remainingPrizeCents && remainingPrizeCents > 0
+      ? `${formatBRL(remainingPrizeCents / 100)} em Pix escondidos.`
+      : "R$ 1 milhão em Pix escondidos.";
+  drawShareCardCenteredText(
+    context,
+    footerValue,
+    975,
+    "800 28px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "#f4f4f4",
+  );
+  drawShareCardCenteredText(
+    context,
+    "pixelpix.com.br",
+    1015,
+    "700 22px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "#2ee66b",
+  );
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("A imagem não pôde ser gerada."))),
+      "image/png",
+    );
+  });
+}
+
 function PixelSheet({
   pixel,
   onClose,
@@ -459,6 +613,11 @@ function PixelSheet({
   const [checkoutMode, setCheckoutMode] = useState<"efi" | "local">("local");
   const [checkoutQrDataUrl, setCheckoutQrDataUrl] = useState("");
   const [shareFeedback, setShareFeedback] = useState("");
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareImageUrl, setShareImageUrl] = useState("");
+  const [shareImageBlob, setShareImageBlob] = useState<Blob | null>(null);
+  const [shareImageLoading, setShareImageLoading] = useState(false);
+  const [shareError, setShareError] = useState("");
   const [checkoutAmountCents, setCheckoutAmountCents] = useState(
     STARTING_PIXEL_PRICE * 100,
   );
@@ -481,38 +640,129 @@ function PixelSheet({
     }
   }, [checkoutReference]);
 
-  const sharePixel = useCallback(async () => {
+  const getShareUrl = useCallback(() => {
     const shareUrl = new URL(window.location.href);
     shareUrl.searchParams.set("pixel", String(pixel.id));
-    const shareData = {
-      title: `PIXELPIX · Pixel #${pixel.id.toLocaleString("pt-BR")}`,
-      text: pixel.revealed
-        ? `Eu revelei o pixel #${pixel.id.toLocaleString("pt-BR")} no PIXELPIX.`
-        : `Veja o pixel #${pixel.id.toLocaleString("pt-BR")} no PIXELPIX.`,
-      url: shareUrl.toString(),
+    shareUrl.searchParams.delete("from");
+    return shareUrl.toString();
+  }, [pixel.id]);
+
+  const shareText = pixel.prizeValueCents > 0
+    ? `Encontrei um Pix de ${formatBRL(pixel.prizeValueCents / 100)} no pixel #${pixel.id.toLocaleString("pt-BR")} do PIXELPIX.`
+    : `Revelei o pixel #${pixel.id.toLocaleString("pt-BR")} no PIXELPIX.`;
+
+  const openShareDialog = useCallback(async () => {
+    setShareDialogOpen(true);
+    setShareImageLoading(true);
+    setShareImageBlob(null);
+    setShareImageUrl("");
+    setShareError("");
+    try {
+      const blob = await createShareCardBlob(pixel, remainingPrizeCents);
+      setShareImageBlob(blob);
+      setShareImageUrl(URL.createObjectURL(blob));
+    } catch (error) {
+      setShareError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível preparar a imagem.",
+      );
+    } finally {
+      setShareImageLoading(false);
+    }
+  }, [pixel, remainingPrizeCents]);
+
+  const shareImageWithDevice = useCallback(async () => {
+    if (!shareImageBlob) return;
+    const file = new File([shareImageBlob], `pixelpix-${pixel.id}.png`, {
+      type: "image/png",
+    });
+    const browserNavigator = navigator as Navigator & {
+      share?: (data: {
+        title: string;
+        text: string;
+        url: string;
+        files?: File[];
+      }) => Promise<void>;
+      canShare?: (data: { files?: File[] }) => boolean;
     };
 
+    if (!browserNavigator.share) {
+      setShareError(
+        "Este navegador não oferece o seletor nativo. Baixe a imagem ou compartilhe o link.",
+      );
+      return;
+    }
+    if (browserNavigator.canShare && !browserNavigator.canShare({ files: [file] })) {
+      setShareError(
+        "Este navegador não aceita imagem neste seletor. Baixe a imagem ou compartilhe o link.",
+      );
+      return;
+    }
+
     try {
-      const browserNavigator = navigator as Navigator & {
-        share?: (data: {
-          title: string;
-          text: string;
-          url: string;
-        }) => Promise<void>;
-      };
-      if (browserNavigator.share) {
-        await browserNavigator.share(shareData);
-        setShareFeedback("Compartilhado");
-      } else {
-        await navigator.clipboard?.writeText(shareUrl.toString());
-        setShareFeedback("Link copiado");
-      }
+      await browserNavigator.share({
+        title: `PIXELPIX · Pixel #${pixel.id.toLocaleString("pt-BR")}`,
+        text: shareText,
+        url: getShareUrl(),
+        files: [file],
+      });
+      setShareDialogOpen(false);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      setShareFeedback("Não foi possível compartilhar");
+      setShareError("Não foi possível abrir o seletor de compartilhamento.");
     }
-    window.setTimeout(() => setShareFeedback(""), 2_000);
-  }, [pixel.id, pixel.revealed]);
+  }, [getShareUrl, pixel.id, shareImageBlob, shareText]);
+
+  const downloadShareImage = useCallback(() => {
+    if (!shareImageUrl) return;
+    const link = document.createElement("a");
+    link.href = shareImageUrl;
+    link.download = `pixelpix-${pixel.id}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setShareFeedback("Imagem baixada");
+  }, [pixel.id, shareImageUrl]);
+
+  const copyShareLink = useCallback(async () => {
+    try {
+      await navigator.clipboard?.writeText(getShareUrl());
+      setShareFeedback("Link copiado");
+    } catch {
+      setShareError("Não foi possível copiar o link.");
+    }
+  }, [getShareUrl]);
+
+  const openNetworkShare = useCallback(
+    (network: "whatsapp" | "x" | "facebook") => {
+      const url = getShareUrl();
+      const encodedUrl = encodeURIComponent(url);
+      const encodedText = encodeURIComponent(shareText);
+      const networkUrl =
+        network === "whatsapp"
+          ? `https://wa.me/?text=${encodeURIComponent(`${shareText} ${url}`)}`
+          : network === "x"
+            ? `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`
+            : `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+      window.open(networkUrl, "_blank", "noopener,noreferrer");
+    },
+    [getShareUrl, shareText],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (shareImageUrl) URL.revokeObjectURL(shareImageUrl);
+    };
+  }, [shareImageUrl]);
+
+  useEffect(() => {
+    setShareDialogOpen(false);
+    setShareImageBlob(null);
+    setShareImageUrl("");
+    setShareImageLoading(false);
+    setShareError("");
+  }, [pixel.id]);
 
   useEffect(() => {
     setCheckoutOpen(false);
@@ -1126,7 +1376,7 @@ function PixelSheet({
                       <button
                         className="prototype-share-button"
                         type="button"
-                        onClick={() => void sharePixel()}
+                        onClick={() => void openShareDialog()}
                       >
                         <Share2 size={15} aria-hidden="true" />
                         {shareFeedback || "COMPARTILHAR"}
@@ -1255,6 +1505,161 @@ function PixelSheet({
           </>
         )}
 
+        {shareDialogOpen && (
+          <ShareCardDialog
+            pixel={pixel}
+            imageUrl={shareImageUrl}
+            isLoading={shareImageLoading}
+            error={shareError}
+            onClose={() => setShareDialogOpen(false)}
+            onNativeShare={() => void shareImageWithDevice()}
+            onDownload={downloadShareImage}
+            onCopyLink={() => void copyShareLink()}
+            onNetworkShare={openNetworkShare}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ShareCardDialog({
+  pixel,
+  imageUrl,
+  isLoading,
+  error,
+  onClose,
+  onNativeShare,
+  onDownload,
+  onCopyLink,
+  onNetworkShare,
+}: {
+  pixel: Pixel;
+  imageUrl: string;
+  isLoading: boolean;
+  error: string;
+  onClose: () => void;
+  onNativeShare: () => void;
+  onDownload: () => void;
+  onCopyLink: () => void;
+  onNetworkShare: (network: "whatsapp" | "x" | "facebook") => void;
+}) {
+  return (
+    <div
+      className="prototype-share-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="prototype-share-title"
+      onClick={onClose}
+    >
+      <div
+        className="prototype-share-dialog-card"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="prototype-share-dialog-header">
+          <div>
+            <div className="prototype-eyebrow">COMPARTILHAR</div>
+            <h2 id="prototype-share-title">
+              Pixel #{pixel.id.toLocaleString("pt-BR")}
+            </h2>
+          </div>
+          <button
+            className="prototype-close-button"
+            type="button"
+            onClick={onClose}
+          >
+            Fechar
+          </button>
+        </div>
+
+        <div className="prototype-share-preview">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={`Arte de compartilhamento do pixel ${pixel.id}`}
+            />
+          ) : isLoading ? (
+            <div className="prototype-share-loading" role="status">
+              <Loader2 size={22} className="prototype-spinner" />
+              Gerando sua arte…
+            </div>
+          ) : (
+            <div className="prototype-share-loading" role="alert">
+              Não foi possível gerar a arte.
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="prototype-share-error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <div className="prototype-share-dialog-actions">
+          <button
+            className="prototype-share-action prototype-share-action-primary"
+            type="button"
+            onClick={onNativeShare}
+            disabled={!imageUrl || isLoading}
+          >
+            <Share2 size={16} aria-hidden="true" />
+            Compartilhar imagem
+          </button>
+          <button
+            className="prototype-share-action"
+            type="button"
+            onClick={onDownload}
+            disabled={!imageUrl || isLoading}
+          >
+            <Download size={16} aria-hidden="true" />
+            Baixar imagem
+          </button>
+          <button
+            className="prototype-share-action"
+            type="button"
+            onClick={onCopyLink}
+          >
+            <Link2 size={16} aria-hidden="true" />
+            Copiar link
+          </button>
+        </div>
+
+        <div className="prototype-share-network-section">
+          <div className="prototype-detail-label">Compartilhar link em</div>
+          <div className="prototype-share-network-actions">
+            <button
+              className="prototype-share-network-button"
+              type="button"
+              onClick={() => onNetworkShare("whatsapp")}
+            >
+              WhatsApp
+              <ExternalLink size={13} aria-hidden="true" />
+            </button>
+            <button
+              className="prototype-share-network-button"
+              type="button"
+              onClick={() => onNetworkShare("x")}
+            >
+              X
+              <ExternalLink size={13} aria-hidden="true" />
+            </button>
+            <button
+              className="prototype-share-network-button"
+              type="button"
+              onClick={() => onNetworkShare("facebook")}
+            >
+              Facebook
+              <ExternalLink size={13} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <p className="prototype-share-dialog-note">
+          No celular, “Compartilhar imagem” abre os aplicativos instalados que
+          aceitam a arte, como WhatsApp e Instagram. No computador, baixe a
+          imagem para publicar onde quiser.
+        </p>
       </div>
     </div>
   );

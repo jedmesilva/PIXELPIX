@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>PIXELPIX — Share Card (Troféu)</title>
+<style>
+  html,body{height:100%;margin:0;padding:0;background-color:#3a3a3a;}
+  .stage{
+    width:100%;height:100%;
+    display:flex;align-items:center;justify-content:center;
+    box-sizing:border-box;
+    padding:24px;
+  }
+  .frame{
+    width:min(90vw,90vh);
+    aspect-ratio:1/1;
+    container-type:inline-size;
+    container-name:card;
+  }
+  .canvas{
+    width:100%;height:100%;
+    background-color:#0b0d10;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    position:relative;
+    box-sizing:border-box;
+    padding:5.93cqw;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+  .logo-row{display:flex;align-items:center;}
+  .logo-grid{display:grid;grid-template-columns:1.85cqw 1.85cqw;grid-template-rows:1.85cqw 1.85cqw;gap:0.37cqw;}
+  .logo-grid div{width:1.85cqw;height:1.85cqw;}
+  .logo-grid .g1{background:#2ee66b;}
+  .logo-grid .g2{background:#0b0d10;}
+  .logo-grid .g3{background:#0b0d10;}
+  .logo-grid .g4{background:#2ee66b;}
+  .logo-text{font-size:2.96cqw;font-weight:800;color:#f4f4f4;letter-spacing:0.09cqw;margin-left:1.85cqw;}
+  .rarity-tag{font-size:1.85cqw;font-weight:700;color:#2ee66b;background-color:#0f1f16;border:0.14cqw solid #2ee66b;padding:0.9cqw 1.6cqw;letter-spacing:0.09cqw;}
+
+  .center{display:flex;flex-direction:column;align-items:center;text-align:center;}
+  .prize-label{font-size:2.22cqw;font-weight:700;color:#9aa1ab;letter-spacing:0.28cqw;text-transform:uppercase;margin-bottom:1.48cqw;}
+  .prize-value{font-size:14cqw;font-weight:800;color:#f4f4f4;letter-spacing:-0.3cqw;line-height:1;margin-bottom:2.96cqw;}
+  .prize-value .cifrao{font-size:6.5cqw;color:#2ee66b;vertical-align:top;margin-right:0.5cqw;}
+
+  .pixel-row{display:flex;align-items:center;gap:1.85cqw;background-color:#15181d;border:0.09cqw solid #232a33;padding:1.85cqw 2.59cqw;}
+  .pixel-box{width:8.15cqw;height:8.15cqw;background-color:#0b0d10;border:0.19cqw solid #2ee66b;display:flex;align-items:center;justify-content:center;font-size:3.7cqw;flex-shrink:0;}
+  .pixel-id{font-size:2.59cqw;font-weight:800;color:#f4f4f4;text-align:left;}
+  .pixel-sub{font-size:1.67cqw;color:#5c6470;text-align:left;margin-top:0.28cqw;}
+
+  .footer{display:flex;flex-direction:column;align-items:center;text-align:center;border-top:0.09cqw solid #1e2126;padding-top:3.7cqw;}
+  .footer-cta{font-size:3.15cqw;font-weight:800;color:#f4f4f4;margin-bottom:0.93cqw;}
+  .footer-sub{font-size:1.85cqw;color:#9aa1ab;margin-bottom:1.85cqw;}
+  .footer-url{font-size:2.04cqw;color:#2ee66b;font-weight:700;letter-spacing:0.09cqw;}
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="frame">
+<div class="canvas">
+
+  <div class="logo-row">
+    <div class="logo-grid">
+      <div class="g1"></div><div class="g2"></div>
+      <div class="g3"></div><div class="g4"></div>
+    </div>
+    <div class="logo-text">PIXELPIX</div>
+  </div>
+
+  <div class="center">
+    <div class="prize-label">Encontrei um Pix</div>
+    <div class="prize-value"><span class="cifrao">R$</span>50,00</div>
+
+    <div class="pixel-row">
+      <div class="pixel-box">⚡</div>
+      <div>
+        <div class="pixel-id">Pixel #999.902</div>
+        <div class="pixel-sub">PPX-2026-999902-4A52A7F8</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-cta">R$ 1 milhão escondidos.</div>
+    <div class="footer-sub">Encontre um Pix agora revelando o pixel certo.</div>
+    <div class="footer-url">pixelpix.com.br</div>
+  </div>
+
+</div>
+</div>
+</div>
+</body>
+</html>
