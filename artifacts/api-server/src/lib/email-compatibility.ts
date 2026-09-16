@@ -71,6 +71,8 @@ export function makeEmailClientSafe(html: string) {
     .replaceAll("background-color:#0f1f16", "background-color:#000000")
     .replaceAll("background:#15181d", "background:#000000")
     .replaceAll("background-color:#15181d", "background-color:#000000")
+    .replaceAll("background:#1a1210", "background:#000000")
+    .replaceAll("background-color:#1a1210", "background-color:#000000")
     .replaceAll("background:#0b0d10 !important", "background:#000000 !important")
     .replaceAll(
       "background-color:#0b0d10 !important",

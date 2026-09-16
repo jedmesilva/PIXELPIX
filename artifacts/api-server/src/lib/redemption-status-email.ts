@@ -126,7 +126,7 @@ function buildCancelledOrRejectedEmail(
           <div style="font-size:13px;color:#9aa1ab;line-height:1.5;">Nenhum valor foi transferido. O prêmio deste pixel continua disponível e você pode solicitar o resgate novamente quando quiser.</div>
         </td></tr>
       </table>`
-    : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #4a2a26;background-color:#1a1210;">
+    : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#000000" style="border:1px solid #4a2a26;background-color:#000000;">
         <tr><td style="padding:16px 18px;">
           <div style="font-size:11px;font-weight:700;color:#ff6b5c;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Motivo da recusa</div>
           <div style="font-size:13px;color:#c9beba;line-height:1.5;">${safeReason}</div>
