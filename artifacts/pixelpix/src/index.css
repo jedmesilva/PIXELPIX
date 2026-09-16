@@ -1532,8 +1532,8 @@ button:focus-visible {
 }
 
 .prototype-sheet:not(.is-checkout) {
-  width: min(640px, calc(100vw - 48px));
-  max-width: 640px;
+  width: min(780px, calc(100vw - 48px));
+  max-width: 780px;
   max-height: calc(100dvh - 48px);
   padding: 0 0 24px;
   border: 1px solid #1e2126;
@@ -1569,7 +1569,7 @@ button:focus-visible {
 
 .prototype-sheet:not(.is-checkout) .prototype-detail-layout {
   display: grid;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(260px, 0.95fr) minmax(300px, 1.05fr);
   align-items: start;
   gap: 24px;
   padding: 24px;
@@ -1926,7 +1926,7 @@ button:focus-visible {
 
   .prototype-sheet:not(.is-checkout) {
     width: 100%;
-    max-width: 640px;
+    max-width: 780px;
     max-height: calc(100dvh - 32px);
   }
 
