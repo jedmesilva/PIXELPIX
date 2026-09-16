@@ -173,7 +173,13 @@ async function sendCertificateEmail(input: {
     });
     return true;
   } catch (error) {
-    logger.warn({ error, cellId: input.cellId }, "Resend certificate delivery failed");
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        cellId: input.cellId,
+      },
+      "Resend certificate delivery failed",
+    );
     return false;
   }
 }

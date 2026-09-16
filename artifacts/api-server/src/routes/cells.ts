@@ -806,7 +806,7 @@ router.post("/checkout/local/:paymentId/confirm", async (request, response) => {
     [request.params.paymentId],
   );
   const cellId = payment.rows[0]?.cell_id;
-  if (!cellId) {
+  if (cellId === undefined || cellId === null) {
     response.status(404).json({ error: "Cobrança pendente não encontrada" });
     return;
   }
