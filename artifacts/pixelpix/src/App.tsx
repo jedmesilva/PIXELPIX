@@ -17,6 +17,7 @@ import {
   Lock,
   Mail,
   QrCode as QrCodeIcon,
+  Share2,
 } from "lucide-react";
 import { FiInstagram } from "react-icons/fi";
 import { RiTwitterXFill } from "react-icons/ri";
@@ -395,6 +396,7 @@ function PixelSheet({
   canReserve = true,
   socialProfile,
   onSaveSocialProfile,
+  remainingPrizeCents,
 }: {
   pixel: Pixel;
   onClose: () => void;
@@ -411,6 +413,7 @@ function PixelSheet({
     cellId: number,
     token: string,
   ) => Promise<void>;
+  remainingPrizeCents?: number;
 }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [emailPromptOpen, setEmailPromptOpen] = useState(false);
@@ -430,6 +433,7 @@ function PixelSheet({
   const [checkoutPaymentId, setCheckoutPaymentId] = useState("");
   const [checkoutMode, setCheckoutMode] = useState<"efi" | "local">("local");
   const [checkoutQrDataUrl, setCheckoutQrDataUrl] = useState("");
+  const [shareFeedback, setShareFeedback] = useState("");
   const [checkoutAmountCents, setCheckoutAmountCents] = useState(
     STARTING_PIXEL_PRICE * 100,
   );
@@ -452,6 +456,39 @@ function PixelSheet({
     }
   }, [checkoutReference]);
 
+  const sharePixel = useCallback(async () => {
+    const shareUrl = new URL(window.location.href);
+    shareUrl.searchParams.set("pixel", String(pixel.id));
+    const shareData = {
+      title: `PIXELPIX · Pixel #${pixel.id.toLocaleString("pt-BR")}`,
+      text: pixel.revealed
+        ? `Eu revelei o pixel #${pixel.id.toLocaleString("pt-BR")} no PIXELPIX.`
+        : `Veja o pixel #${pixel.id.toLocaleString("pt-BR")} no PIXELPIX.`,
+      url: shareUrl.toString(),
+    };
+
+    try {
+      const browserNavigator = navigator as Navigator & {
+        share?: (data: {
+          title: string;
+          text: string;
+          url: string;
+        }) => Promise<void>;
+      };
+      if (browserNavigator.share) {
+        await browserNavigator.share(shareData);
+        setShareFeedback("Compartilhado");
+      } else {
+        await navigator.clipboard?.writeText(shareUrl.toString());
+        setShareFeedback("Link copiado");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setShareFeedback("Não foi possível compartilhar");
+    }
+    window.setTimeout(() => setShareFeedback(""), 2_000);
+  }, [pixel.id, pixel.revealed]);
+
   useEffect(() => {
     setCheckoutOpen(false);
     setEmailPromptOpen(false);
@@ -469,6 +506,7 @@ function PixelSheet({
     setCheckoutPaymentId("");
     setCheckoutMode("local");
     setCheckoutQrDataUrl("");
+    setShareFeedback("");
     setCheckoutAmountCents(STARTING_PIXEL_PRICE * 100);
     setSecondsRemaining(300);
   }, [pixel.id]);
@@ -994,19 +1032,113 @@ function PixelSheet({
 
             <div className="prototype-detail-layout">
               <div
-                className="prototype-pixel-hero"
+                className={`prototype-pixel-hero ${pixel.revealed ? "is-revealed" : ""}`}
                 style={{ background: pixelSurfaceBackground(pixel) }}
               >
                 {pixel.revealed ? (
                   <span className="prototype-hero-emoji">{pixel.emoji}</span>
                 ) : (
-                  <Lock size={28} color="rgba(255,255,255,.55)" />
+                  <Lock size={30} color="rgba(255,255,255,.55)" />
                 )}
               </div>
 
               <div className="prototype-detail-actions">
-                {!pixel.revealed && isReserved && (
-                  <div className="prototype-reserved-message" role="status">
+                {pixel.revealed ? (
+                  <>
+                    {pixel.prizeValueCents > 0 ? (
+                      <div className="prototype-prize-box">
+                        <div className="prototype-detail-label">Prêmio deste pixel</div>
+                        <div className="prototype-prize-value">
+                          {formatBRL(pixel.prizeValueCents / 100)}
+                        </div>
+                        <button
+                          className="prototype-reveal-button"
+                          type="button"
+                          onClick={() => {
+                            window.location.href = "/resgatar";
+                          }}
+                        >
+                          RESGATAR PRÊMIO
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="prototype-no-prize-box">
+                        <div className="prototype-no-prize-text">
+                          Nenhum Pix neste pixel. Continue revelando.
+                          {remainingPrizeCents && remainingPrizeCents > 0
+                            ? ` ${formatBRL(remainingPrizeCents / 100)} em Pix ainda estão escondidos por aí.`
+                            : ""}
+                        </div>
+                        <button
+                          className="prototype-reveal-button"
+                          type="button"
+                          onClick={() => {
+                            window.location.href = "/";
+                          }}
+                        >
+                          REVELAR OUTRO PIXEL
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="prototype-detail-meta">
+                      <div className="prototype-detail-meta-row">
+                        <span className="prototype-detail-label">Revelado em</span>
+                        <strong>{formatRevealedDate(pixel.revealedAt)}</strong>
+                      </div>
+                      <div className="prototype-detail-meta-row">
+                        <span className="prototype-detail-label">Código do certificado</span>
+                        <strong className="prototype-certificate-code">
+                          Disponível no e-mail enviado
+                        </strong>
+                      </div>
+                    </div>
+
+                    <button
+                      className="prototype-share-button"
+                      type="button"
+                      onClick={() => void sharePixel()}
+                    >
+                      <Share2 size={15} aria-hidden="true" />
+                      {shareFeedback || "COMPARTILHAR"}
+                    </button>
+
+                    {hasSignature && (
+                      <div className="prototype-social-section">
+                        <div className="prototype-social-title">Assinado por</div>
+                        <div className="prototype-social-links">
+                          <a
+                            href={signatureUrl(displayedSignature)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Abrir @${displayedSignature.handle} no ${displayedSignature.network}`}
+                          >
+                            <SignatureIcon network={displayedSignature.network} size={17} />
+                            <span>@{displayedSignature.handle}</span>
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    {reservationToken &&
+                      pixel.revealedBy === CURRENT_USER_NICKNAME &&
+                      !hasSignature &&
+                      !signatureSubmitted && (
+                        <button
+                          className="prototype-edit-social-button"
+                          onClick={() => {
+                            setSocialForm(EMPTY_SOCIAL_PROFILE);
+                            setSocialError("");
+                            setEditingSocials(false);
+                          }}
+                        >
+                          Assinar esse pixel publicamente
+                        </button>
+                      )}
+                  </>
+                ) : isReserved ? (
+                  <div className="prototype-state-box prototype-reserved-message" role="status">
+                    <div className="prototype-detail-label">Status do pixel</div>
                     <strong>
                       {isOwnedReservation
                         ? "Sua reserva está ativa"
@@ -1028,14 +1160,15 @@ function PixelSheet({
                         disabled={secondsRemaining <= 0}
                         onClick={resumeReservation}
                       >
-                        Retomar pagamento
+                        RETOMAR PAGAMENTO
                       </button>
                     )}
                   </div>
-                )}
-
-                {!pixel.revealed && !isReserved && (
-                  <>
+                ) : (
+                  <div className="prototype-state-box prototype-available-box">
+                    <div className="prototype-detail-label">Pixel disponível</div>
+                    <strong>Este pixel ainda não foi revelado.</strong>
+                    <span>Revele agora para descobrir o que ele guarda.</span>
                     {!canReserve && (
                       <div className="prototype-reservation-error" role="status">
                         Não foi possível carregar os dados desta área. Tente
@@ -1083,52 +1216,8 @@ function PixelSheet({
                         }
                       }}
                     >
-                      {isSubmittingReveal ? "Reservando…" : "Revelar pixel"}
+                      {isSubmittingReveal ? "RESERVANDO…" : "REVELAR PIXEL"}
                     </button>
-                  </>
-                )}
-
-                {pixel.revealed && (
-                  <div className="prototype-revealed-content">
-                    <div className="prototype-revealed-by">
-                      <span>Revelado em</span>
-                      <span>{formatRevealedDate(pixel.revealedAt)}</span>
-                    </div>
-
-                    {hasSignature && (
-                      <div className="prototype-social-section">
-                        <div className="prototype-social-title">
-                          Assinado por
-                        </div>
-                        <div className="prototype-social-links">
-                          <a
-                            href={signatureUrl(displayedSignature)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={`Abrir @${displayedSignature.handle} no ${displayedSignature.network}`}
-                          >
-                            <SignatureIcon network={displayedSignature.network} size={17} />
-                            <span>@{displayedSignature.handle}</span>
-                          </a>
-                        </div>
-                      </div>
-                    )}
-
-                    {reservationToken &&
-                      pixel.revealedBy === CURRENT_USER_NICKNAME &&
-                      !hasSignature &&
-                      !signatureSubmitted && (
-                      <button
-                        className="prototype-edit-social-button"
-                        onClick={() => {
-                           setSocialForm(EMPTY_SOCIAL_PROFILE);
-                          setSocialError("");
-                           setEditingSocials(false);
-                        }}
-                      >
-                         Assinar esse pixel publicamente
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -1978,6 +2067,7 @@ function PixelGrid() {
           }
           socialProfile={socialProfile}
           onSaveSocialProfile={handleSaveSocialProfile}
+          remainingPrizeCents={publicStats?.remainingPrizeCents}
         />
       )}
 

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>PIXELPIX — Modal do Pixel</title>
+<style>
+  *{box-sizing:border-box;}
+  body{
+    margin:0;padding:24px;min-height:100vh;
+    background-color:#050505;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .modal{
+    width:100%;max-width:640px;
+    background-color:#0e1013;
+    border:1px solid #1e2126;
+    border-top:2px solid #2ee66b;
+    position:relative;
+  }
+  .close{position:absolute;top:22px;right:24px;font-size:13px;color:#2ee66b;font-weight:600;cursor:pointer;}
+
+  .head{padding:24px 24px 0 24px;}
+  .label{font-size:11px;font-weight:700;color:#6a7280;letter-spacing:1.5px;text-transform:uppercase;}
+  .title{font-size:32px;font-weight:800;color:#f4f4f4;margin-top:6px;letter-spacing:-0.5px;}
+
+  .body-row{
+    display:flex;flex-wrap:wrap;gap:24px;
+    padding:24px;
+  }
+  .pixel-box{
+    width:220px;height:220px;flex-shrink:0;
+    background-color:#1b1f25;border:1px solid #2ee66b;
+    display:flex;align-items:center;justify-content:center;
+    font-size:88px;
+  }
+  .info-col{flex:1;min-width:220px;display:flex;flex-direction:column;gap:16px;}
+
+  .revealed-at{font-size:13px;color:#9aa1ab;}
+  .revealed-at b{color:#f4f4f4;font-weight:700;}
+
+  .prize-box{
+    border:1px solid #2ee66b;background-color:#0f1f16;
+    padding:16px 18px;
+  }
+  .prize-label{font-size:10px;font-weight:700;color:#2ee66b;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
+  .prize-value{font-size:28px;font-weight:800;color:#f4f4f4;letter-spacing:-0.5px;margin-bottom:14px;}
+  .btn-primary{
+    display:block;width:100%;text-align:center;
+    background-color:#2ee66b;color:#0b0d10;
+    font-size:13px;font-weight:800;letter-spacing:0.3px;
+    padding:12px;text-decoration:none;border:none;cursor:pointer;
+  }
+  .btn-outline{
+    display:block;width:100%;text-align:center;
+    background-color:transparent;color:#2ee66b;
+    border:1px solid #2ee66b;
+    font-size:13px;font-weight:800;letter-spacing:0.3px;
+    padding:11px;text-decoration:none;cursor:pointer;
+  }
+
+  .foot{padding:0 24px 24px 24px;}
+
+  @media (max-width:480px){
+    .pixel-box{width:100%;height:220px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="modal">
+  <div class="close">Fechar</div>
+
+  <div class="head">
+    <div class="label">Pixel</div>
+    <div class="title">#999.902</div>
+  </div>
+
+  <div class="body-row">
+    <div class="pixel-box">⚡</div>
+
+    <div class="info-col">
+      <div class="prize-box">
+        <div class="prize-label">Prêmio deste pixel</div>
+        <div class="prize-value">R$ 50,00</div>
+        <a href="#" class="btn-primary">RESGATAR PRÊMIO</a>
+      </div>
+
+      <div>
+        <div style="font-size:10px;color:#6a7280;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">Revelado em</div>
+        <div class="revealed-at" style="margin-bottom:12px;"><b>13/09/2026 às 20:15</b></div>
+
+        <div style="font-size:10px;color:#6a7280;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;">Código do certificado</div>
+        <div style="font-size:13px;color:#2ee66b;font-family:'SF Mono',Consolas,monospace;">PPX-2026-999902-4A52A7F8</div>
+      </div>
+
+      <a href="#" class="btn-outline">COMPARTILHAR</a>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
