@@ -9,7 +9,7 @@ import { ensureCertificateForCell } from "../lib/certificates";
 import { confirmEfiPayout } from "../lib/payouts";
 import { buildCertificateEmail } from "../lib/certificate-email";
 import { getPublicAppUrl } from "../lib/public-app-url";
-import { sendResendEmail } from "../lib/resend";
+import { getResendFromEmail, sendResendEmail } from "../lib/resend";
 
 const router: IRouter = Router();
 const MAX_DIRECT_ALERTS_PER_HOUR = 100;
@@ -160,9 +160,7 @@ async function sendCertificateEmail(input: {
       redemptionUrl,
     });
     await sendResendEmail({
-      from:
-        process.env.CERTIFICATE_FROM_EMAIL?.trim() ||
-        "PIXELPIX <onboarding@resend.dev>",
+      from: getResendFromEmail(),
       to: [input.email],
       subject: email.subject,
       html: email.html,

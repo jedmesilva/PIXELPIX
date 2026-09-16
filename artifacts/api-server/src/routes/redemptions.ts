@@ -7,7 +7,7 @@ import {
 } from "../lib/certificates";
 import { buildRedemptionRequestEmail } from "../lib/redemption-request-email";
 import { getPublicAppUrl } from "../lib/public-app-url";
-import { sendResendEmail } from "../lib/resend";
+import { getResendFromEmail, sendResendEmail } from "../lib/resend";
 import { notifyRedemptionStatusChange } from "../lib/redemption-notifications";
 
 const router: IRouter = Router();
@@ -259,9 +259,7 @@ router.post("/redemptions", async (request: Request, response): Promise<void> =>
         manageUrl,
       });
       await sendResendEmail({
-        from:
-          process.env.CERTIFICATE_FROM_EMAIL?.trim() ||
-          "PIXELPIX <onboarding@resend.dev>",
+        from: getResendFromEmail(),
         to: [email],
         subject: notification.subject,
         html: notification.html,

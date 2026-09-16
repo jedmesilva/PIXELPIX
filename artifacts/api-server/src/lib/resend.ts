@@ -11,8 +11,13 @@ export type ResendEmailPayload = {
   reply_to?: string;
 };
 
-function certificateFromEmail() {
-  return process.env.CERTIFICATE_FROM_EMAIL?.trim() || "PIXELPIX <onboarding@resend.dev>";
+const DEVELOPMENT_FROM_EMAIL = "PIXELPIX <onboarding@resend.dev>";
+
+export function getResendFromEmail() {
+  if (process.env.NODE_ENV !== "production") {
+    return DEVELOPMENT_FROM_EMAIL;
+  }
+  return process.env.CERTIFICATE_FROM_EMAIL?.trim() || DEVELOPMENT_FROM_EMAIL;
 }
 
 export function assertResendConfiguration() {
@@ -41,9 +46,13 @@ async function responseError(response: Response) {
 
 export async function sendResendEmail(payload: ResendEmailPayload) {
   const body = JSON.stringify(payload);
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-
-  if (apiKey) {
+  if (process.env.NODE_ENV === "production") {
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey) {
+      throw new Error(
+        "RESEND_API_KEY must be configured in production for certificate email delivery.",
+      );
+    }
     const response = await fetch(RESEND_API_URL, {
       method: "POST",
       headers: {
@@ -59,9 +68,8 @@ export async function sendResendEmail(payload: ResendEmailPayload) {
     return;
   }
 
-  // The Replit connector remains useful for local development. Railway must
-  // use RESEND_API_KEY because Replit connector identity is not available
-  // inside an external deployment.
+  // Development uses Replit's managed connector, even when a production
+  // RESEND_API_KEY is present in the shared environment.
   const connectors = new ReplitConnectors();
   const response = await connectors.proxy("resend", "/emails", {
     method: "POST",

@@ -1,7 +1,7 @@
 import { pool } from "@workspace/db";
 import { logger } from "./logger";
 import { getPublicAppUrl } from "./public-app-url";
-import { sendResendEmail } from "./resend";
+import { getResendFromEmail, sendResendEmail } from "./resend";
 import {
   buildRedemptionStatusEmail,
   type RedemptionNotificationKind,
@@ -84,9 +84,7 @@ export async function notifyRedemptionStatusChange(
       shareUrl: `${publicUrl}/?pixel=${Number(current.cell_id)}&from=redemption`,
     });
     await sendResendEmail({
-      from:
-        process.env.CERTIFICATE_FROM_EMAIL?.trim() ||
-        "PIXELPIX <onboarding@resend.dev>",
+      from: getResendFromEmail(),
       to: [String(current.email)],
       subject: email.subject,
       html: email.html,
