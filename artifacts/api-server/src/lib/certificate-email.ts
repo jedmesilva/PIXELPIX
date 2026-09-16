@@ -139,9 +139,9 @@ export function buildCertificateEmail(input: CertificateEmailInput) {
 </head>
 <body class="email-body" bgcolor="#000000" style="margin:0;padding:0;background-color:#000000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#000000;padding:32px 12px;">
-    <tr><td align="center">
-      <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background-color:#0b0d10;border:1px solid #1e2126;">
+  <table class="email-outer" role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#000000" style="background-color:#000000;padding:32px 12px;">
+    <tr><td align="center" bgcolor="#000000">
+      <table class="email-card" role="presentation" width="520" cellpadding="0" cellspacing="0" bgcolor="#000000" style="max-width:520px;width:100%;background-color:#000000;border:1px solid #1e2126;">
         <tr><td style="padding:24px 28px;border-bottom:1px solid #1e2126;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
             <td style="vertical-align:middle;">
