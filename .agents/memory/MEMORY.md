@@ -9,3 +9,4 @@
 - [PIXELPIX brand assets](pixelpix-brand-assets.md) — Derive favicon and social assets from the app's six-block inline logo geometry, not an approximation.
 - [Certificate token key stability](certificate-token-key-stability.md) — Existing encrypted certificate tokens can become undecryptable after secret rotation; do not auto-rotate unsent rows.
 - [Public application URL](public-app-url.md) — Certificate and redemption emails must use an explicit deployment URL, never a silent fallback domain.
+- [Share ownership](pixelpix-share-ownership.md) — Show pixel sharing only after the current browser reveals it or a certificate email link opens it.

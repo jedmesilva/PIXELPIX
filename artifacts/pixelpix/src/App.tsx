@@ -45,6 +45,7 @@ const STARTING_PIXEL_PRICE = 1;
 const RECEIPT_EMAIL_STORAGE_KEY = "pixelpix-receipt-email";
 const SOCIAL_PROFILE_STORAGE_KEY = "pixelpix-social-profile";
 const RESERVATION_STORAGE_PREFIX = "pixelpix-reservation:";
+const OWN_REVEALED_PIXEL_STORAGE_PREFIX = "pixelpix-own-revealed:";
 const CURRENT_USER_NICKNAME = "você";
 
 type Pixel = {
@@ -237,6 +238,30 @@ function clearStoredReservation(cellId: number) {
   } catch {
     // Ignore storage failures; the reservation will expire on the server.
   }
+}
+
+function ownRevealedPixelStorageKey(cellId: number) {
+  return `${OWN_REVEALED_PIXEL_STORAGE_PREFIX}${cellId}`;
+}
+
+function hasStoredOwnReveal(cellId: number) {
+  try {
+    return window.localStorage.getItem(ownRevealedPixelStorageKey(cellId)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function storeOwnReveal(cellId: number) {
+  try {
+    window.localStorage.setItem(ownRevealedPixelStorageKey(cellId), "1");
+  } catch {
+    // The current reveal remains visible even when browser storage is unavailable.
+  }
+}
+
+function isCertificateVisualizationLink() {
+  return new URLSearchParams(window.location.search).get("from") === "certificate";
 }
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -603,6 +628,9 @@ function PixelSheet({
 
   const displayedSignature = pixel.socialProfile;
   const hasSignature = Boolean(displayedSignature.handle);
+  const canSharePixel =
+    pixel.revealed &&
+    (isCertificateVisualizationLink() || hasStoredOwnReveal(pixel.id));
 
   const openCheckout = useCallback(
     async (token: string, email: string) => {
@@ -1094,14 +1122,16 @@ function PixelSheet({
                       </div>
                     </div>
 
-                    <button
-                      className="prototype-share-button"
-                      type="button"
-                      onClick={() => void sharePixel()}
-                    >
-                      <Share2 size={15} aria-hidden="true" />
-                      {shareFeedback || "COMPARTILHAR"}
-                    </button>
+                    {canSharePixel && (
+                      <button
+                        className="prototype-share-button"
+                        type="button"
+                        onClick={() => void sharePixel()}
+                      >
+                        <Share2 size={15} aria-hidden="true" />
+                        {shareFeedback || "COMPARTILHAR"}
+                      </button>
+                    )}
 
                     {hasSignature && (
                       <div className="prototype-social-section">
@@ -1919,6 +1949,7 @@ function PixelGrid() {
 
   const handleReveal = useCallback(async (receipt: ReceiptPayload) => {
       clearStoredReservation(receipt.pixelId);
+      storeOwnReveal(receipt.pixelId);
       revealPixelInCache(
         receipt.pixelId,
         receipt.emoji,
