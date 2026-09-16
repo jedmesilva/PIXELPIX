@@ -4,6 +4,7 @@ import { getPublicAppUrl } from "./public-app-url";
 import { sendResendEmail } from "./resend";
 import {
   buildRedemptionStatusEmail,
+  type RedemptionNotificationKind,
   type RedemptionNotificationStatus,
 } from "./redemption-status-email";
 
@@ -26,7 +27,8 @@ export async function notifyRedemptionStatusChange(
   const result = await pool.query(
     `SELECT id, cell_id, certificate_code, email, pix_key,
             COALESCE(approved_amount_cents, requested_amount_cents) AS amount_cents,
-            status, COALESCE(processed_at, reviewed_at, NOW()) AS updated_at
+            status, processed_by, rejection_reason,
+            COALESCE(processed_at, reviewed_at, NOW()) AS updated_at
        FROM prize_redemption_requests
       WHERE id = $1`,
     [redemptionId],
@@ -59,6 +61,12 @@ export async function notifyRedemptionStatusChange(
 
   try {
     const publicUrl = getPublicAppUrl();
+    const notificationKind: RedemptionNotificationKind =
+      String(current.status) === "rejected"
+        ? String(current.processed_by) === "certificate-holder"
+          ? "cancelled"
+          : "rejected"
+        : (String(current.status) as RedemptionNotificationStatus);
     const email = buildRedemptionStatusEmail({
       redemptionId,
       cellId: Number(current.cell_id),
@@ -67,6 +75,10 @@ export async function notifyRedemptionStatusChange(
       pixKey: String(current.pix_key),
       amountCents: Number(current.amount_cents),
       status: String(current.status) as RedemptionNotificationStatus,
+      notificationKind,
+      rejectionReason: current.rejection_reason
+        ? String(current.rejection_reason)
+        : null,
       updatedAt: new Date(current.updated_at),
       publicUrl,
       shareUrl: `${publicUrl}/?pixel=${Number(current.cell_id)}&from=redemption`,
