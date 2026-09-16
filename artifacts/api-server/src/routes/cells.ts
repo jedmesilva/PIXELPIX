@@ -389,8 +389,10 @@ router.get("/cells/:id", async (request, response) => {
     `SELECT c.id, c.status, c.emoji, c.background_color, c.reserved_at,
             c.reservation_token, c.revealed_by,
             c.revealed_at, c.prize_value_cents,
+            pc.certificate_code,
             s.platform, s.handle, pp.label AS prize_label
        FROM cells c
+       LEFT JOIN prize_certificates pc ON pc.cell_id = c.id
        LEFT JOIN cell_signatures s
          ON s.cell_id = c.id AND s.moderation_status = 'approved'
        LEFT JOIN winning_positions wp ON wp.cell_id = c.id
@@ -447,6 +449,9 @@ router.get("/cells/:id", async (request, response) => {
     revealedAt: cell.revealed_at,
     prizeValueCents: Number(cell.prize_value_cents ?? 0),
     prizeLabel: cell.prize_label ?? null,
+    // The certificate code is public identification data. The private
+    // certificate token is never returned by the public cell endpoint.
+    certificateCode: cell.certificate_code ?? null,
     revealedBy: cell.revealed_by,
     signature: cell.handle
       ? { platform: cell.platform, handle: cell.handle }

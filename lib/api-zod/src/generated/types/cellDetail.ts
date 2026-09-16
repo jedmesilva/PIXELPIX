@@ -25,6 +25,8 @@ export interface CellDetail {
   /** @nullable */
   prizeLabel?: string | null;
   /** @nullable */
+  certificateCode?: string | null;
+  /** @nullable */
   revealedBy?: string | null;
   signature?: PublicSignature | null;
 }

@@ -62,6 +62,7 @@ type Pixel = {
   reservationOwned: boolean;
   prizeValueCents: number;
   prizeLabel: string | null;
+  certificateCode: string | null;
   socialProfile: SocialProfile;
   status: "available" | "reserved" | "paid";
 };
@@ -95,6 +96,7 @@ function emptyPixel(id: number): Pixel {
     reservationOwned: false,
     prizeValueCents: 0,
     prizeLabel: null,
+    certificateCode: null,
     socialProfile: EMPTY_SOCIAL_PROFILE,
     status: "available",
   };
@@ -140,6 +142,7 @@ function revealPixelInCache(
   socialProfile: SocialProfile,
   prizeValueCents: number,
   prizeLabel: string | null,
+  certificateCode: string | null,
   revealedAt: Date | null,
 ) {
   const pixel = getPixel(id);
@@ -151,6 +154,7 @@ function revealPixelInCache(
   pixel.reservedUntil = null;
   pixel.prizeValueCents = prizeValueCents;
   pixel.prizeLabel = prizeLabel;
+  pixel.certificateCode = certificateCode;
   pixel.socialProfile = socialProfile;
   pixel.status = "paid";
   pixel.reservationOwned = false;
@@ -192,6 +196,7 @@ function applyCellStatus(
     pixel.revealedAt = null;
     pixel.prizeValueCents = 0;
     pixel.prizeLabel = null;
+    pixel.certificateCode = null;
     pixel.socialProfile = EMPTY_SOCIAL_PROFILE;
   }
 }
@@ -373,6 +378,7 @@ type ReceiptPayload = {
   revealedBy: string | null;
   prizeValueCents: number;
   prizeLabel: string | null;
+  certificateCode: string | null;
   socialProfile: SocialProfile;
 };
 
@@ -881,6 +887,8 @@ function PixelSheet({
   const canSharePixel =
     pixel.revealed &&
     (isCertificateVisualizationLink() || hasStoredOwnReveal(pixel.id));
+  const canRedeemPrize =
+    canSharePixel && pixel.prizeValueCents > 0 && Boolean(pixel.certificateCode);
 
   const openCheckout = useCallback(
     async (token: string, email: string) => {
@@ -991,6 +999,7 @@ function PixelSheet({
         revealedBy: string | null;
         prizeValueCents?: number;
         prizeLabel?: string | null;
+        certificateCode?: string | null;
       }>(`/api/cells/${cellId}`);
       const receipt: ReceiptPayload = {
         pixelId: cellId,
@@ -1003,6 +1012,7 @@ function PixelSheet({
         revealedBy: detail.revealedBy,
         prizeValueCents: Number(detail.prizeValueCents ?? 0),
         prizeLabel: detail.prizeLabel ?? null,
+        certificateCode: detail.certificateCode ?? null,
         socialProfile: EMPTY_SOCIAL_PROFILE,
       };
       await onReveal(receipt);
@@ -1329,15 +1339,20 @@ function PixelSheet({
                         <div className="prototype-prize-value">
                           {formatBRL(pixel.prizeValueCents / 100)}
                         </div>
-                        <button
-                          className="prototype-reveal-button"
-                          type="button"
-                          onClick={() => {
-                            window.location.href = "/resgatar";
-                          }}
-                        >
-                          RESGATAR PRÊMIO
-                        </button>
+                        {canRedeemPrize && (
+                          <button
+                            className="prototype-reveal-button"
+                            type="button"
+                            onClick={() => {
+                              const params = new URLSearchParams({
+                                code: pixel.certificateCode ?? "",
+                              });
+                              window.location.href = `/resgatar?${params.toString()}`;
+                            }}
+                          >
+                            RESGATAR PRÊMIO
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="prototype-no-prize-box">
@@ -1367,7 +1382,7 @@ function PixelSheet({
                       <div className="prototype-detail-meta-row">
                         <span className="prototype-detail-label">Código do certificado</span>
                         <strong className="prototype-certificate-code">
-                          Disponível no e-mail enviado
+                          {pixel.certificateCode ?? "Aguardando emissão"}
                         </strong>
                       </div>
                     </div>
@@ -2285,6 +2300,7 @@ function PixelGrid() {
       revealedAt?: string | null;
       prizeValueCents?: number;
       prizeLabel?: string | null;
+      certificateCode?: string | null;
       signature?: { platform: SignatureNetwork; handle: string } | null;
     }>(
       `/api/cells/${selectedId}`,
@@ -2304,6 +2320,7 @@ function PixelGrid() {
           pixel.revealedBy = detail.revealedBy ?? null;
           pixel.prizeValueCents = Number(detail.prizeValueCents ?? 0);
           pixel.prizeLabel = detail.prizeLabel ?? null;
+          pixel.certificateCode = detail.certificateCode ?? null;
           pixel.revealedAt = detail.revealedAt
             ? new Date(detail.revealedAt)
             : null;
@@ -2363,6 +2380,7 @@ function PixelGrid() {
         receipt.socialProfile,
         receipt.prizeValueCents,
         receipt.prizeLabel,
+        receipt.certificateCode,
         receipt.revealedAt ? new Date(receipt.revealedAt) : null,
       );
       setRevealVersion((version) => version + 1);

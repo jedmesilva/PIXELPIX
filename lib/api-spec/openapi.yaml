@@ -718,6 +718,7 @@ components:
         reservationOwned: { type: boolean }
         prizeValueCents: { type: integer, minimum: 0 }
         prizeLabel: { type: ["string", "null"] }
+        certificateCode: { type: ["string", "null"] }
         revealedBy: { type: ["string", "null"] }
         signature:
           oneOf:

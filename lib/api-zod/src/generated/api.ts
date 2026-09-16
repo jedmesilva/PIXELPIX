@@ -91,6 +91,7 @@ export const GetCellResponse = zod.object({
   "reservationOwned": zod.boolean(),
   "prizeValueCents": zod.int().min(getCellResponsePrizeValueCentsMin).optional(),
   "prizeLabel": zod.string().nullish(),
+  "certificateCode": zod.string().nullish(),
   "revealedBy": zod.string().nullish(),
   "signature": zod.union([zod.object({
   "platform": zod.enum(['instagram', 'x']),
