@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>PIXELPIX — Resgate solicitado</title>
+</head>
+<body style="margin:0;padding:0;background-color:#000000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#000000;padding:32px 12px;">
+<tr><td align="center">
+<table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background-color:#0b0d10;border:1px solid #1e2126;">
+
+  <!-- Header -->
+  <tr><td style="padding:24px 28px;border-bottom:1px solid #1e2126;">
+    <table role="presentation" width="100%"><tr>
+      <td style="vertical-align:middle;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="width:32px;">
+            <table role="presentation" cellpadding="0" cellspacing="2"><tr>
+              <td style="width:9px;height:9px;background-color:#2ee66b;"></td>
+              <td style="width:9px;height:9px;background-color:#0b0d10;"></td>
+            </tr>
+            <tr>
+              <td style="width:9px;height:9px;background-color:#0b0d10;"></td>
+              <td style="width:9px;height:9px;background-color:#2ee66b;"></td>
+            </tr></table>
+          </td>
+          <td style="font-size:16px;font-weight:800;color:#f4f4f4;letter-spacing:0.5px;padding-left:10px;">PIXELPIX</td>
+        </tr></table>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Headline -->
+  <tr><td style="padding:32px 28px 4px 28px;">
+    <div style="font-size:12px;font-weight:700;color:#2ee66b;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Resgate solicitado</div>
+    <div style="font-size:32px;font-weight:800;color:#f4f4f4;line-height:1.2;letter-spacing:-0.5px;">Sua solicitação de resgate foi recebida.</div>
+  </td></tr>
+
+  <tr><td style="padding:10px 28px 28px 28px;">
+    <div style="font-size:14px;font-weight:600;color:#9aa1ab;line-height:1.5;">Recebemos a sua solicitação de resgate do prêmio de R$ 1,20 do pixel #28, pelo certificado PPX-2026-000028-668ACAAA.</div>
+  </td></tr>
+
+  <!-- Dados da solicitação -->
+  <tr><td style="padding:0 28px 4px 28px;">
+    <div style="font-size:11px;font-weight:700;color:#2ee66b;letter-spacing:1px;text-transform:uppercase;">Dados da solicitação</div>
+  </td></tr>
+
+  <tr><td style="padding:16px 28px 0 28px;">
+    <table role="presentation" width="100%" style="border:1px solid #1e2126;">
+      <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+        <table role="presentation" width="100%"><tr>
+          <td style="font-size:13px;color:#9aa1ab;">Valor do resgate</td>
+          <td align="right" style="font-size:15px;color:#2ee66b;font-weight:800;">R$ 1,20</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+        <table role="presentation" width="100%"><tr>
+          <td style="font-size:13px;color:#9aa1ab;">E-mail informado</td>
+          <td align="right" style="font-size:13px;color:#f4f4f4;font-weight:700;">jedme_silva@hotmail.com</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+        <table role="presentation" width="100%"><tr>
+          <td style="font-size:13px;color:#9aa1ab;">Chave Pix informada</td>
+          <td align="right" style="font-size:13px;color:#f4f4f4;font-weight:700;">jedme_silva@hotmail.com</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:14px 16px;">
+        <table role="presentation" width="100%"><tr>
+          <td style="font-size:13px;color:#9aa1ab;">Solicitado em</td>
+          <td align="right" style="font-size:13px;color:#f4f4f4;font-weight:700;">13 de setembro de 2026 às 19:40</td>
+        </tr></table>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- CTA principal -->
+  <tr><td style="padding:24px 28px 0 28px;">
+    <table role="presentation" width="100%"><tr><td align="center" style="background-color:#2ee66b;">
+      <a href="#" style="display:block;padding:14px;font-size:14px;font-weight:800;color:#0b0d10;text-decoration:none;letter-spacing:0.3px;">ACOMPANHAR SOLICITAÇÃO</a>
+    </td></tr></table>
+  </td></tr>
+
+  <tr><td style="padding:12px 28px 0 28px;">
+    <div style="font-size:12px;color:#5c6470;text-align:center;line-height:1.5;">Você receberá um e-mail assim que o status do resgate for atualizado.</div>
+  </td></tr>
+
+  <!-- Status e cancelamento -->
+  <tr><td style="padding:20px 28px 28px 28px;">
+    <div style="font-size:13px;color:#9aa1ab;text-align:center;line-height:1.6;margin-bottom:12px;">
+      Não reconhece este pedido ou informou algo errado? <a href="#" style="color:#2ee66b;text-decoration:underline;font-weight:700;">Cancelar solicitação</a>
+    </div>
+    <div style="font-size:11px;color:#4a4f57;text-align:center;line-height:1.6;">
+      Se você reconhece o resgate, não é necessário realizar nenhuma ação.
+    </div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -1,4 +1,3 @@
-import { logoMark } from "./certificate-email";
 import { makeEmailClientSafe } from "./email-compatibility";
 
 type RedemptionRequestEmailInput = {
@@ -47,97 +46,100 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
   const html = `<!doctype html>
 <html lang="pt-BR">
   <head>
+    <meta charset="UTF-8">
+    <title>PIXELPIX — Resgate solicitado</title>
     <meta name="color-scheme" content="dark">
     <meta name="supported-color-schemes" content="dark">
   </head>
-  <body class="email-body" bgcolor="#0b0d10" style="margin:0;padding:0;background:#0b0d10 !important;background-color:#0b0d10 !important;color:#e5e7eb;font-family:Arial,Helvetica,sans-serif;">
+  <body class="email-body" bgcolor="#000000" style="margin:0;padding:0;background-color:#000000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
-      Sua solicitação de resgate do PIXELPIX foi registrada. Confira os dados e cancele se algo estiver errado.
+      Sua solicitação de resgate foi recebida. Confira os dados e acompanhe o status pelo link seguro.
     </div>
-    <table class="email-outer" role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#0b0d10" style="background:#0b0d10 !important;background-color:#0b0d10 !important;">
+    <table class="email-outer" role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#000000" style="background-color:#000000;padding:32px 12px;">
       <tr>
-        <td class="email-outer-cell" align="center" bgcolor="#0b0d10" style="padding:32px 16px;background:#0b0d10 !important;background-color:#0b0d10 !important;">
-          <table class="email-card" role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#14171b" style="max-width:560px;background:#14171b !important;background-color:#14171b !important;border:1px solid #2b333c;border-top:4px solid #00b85c;border-radius:0;box-shadow:4px 4px 0 #0b5b36;overflow:hidden;">
-            <tr>
-              <td style="padding:28px;border-bottom:1px solid #2b333c;">
-                <div style="font-size:19px;font-weight:900;letter-spacing:.04em;color:#e5e7eb;">
-                  ${logoMark()}<span style="vertical-align:middle;">PIXELPIX</span>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:30px 28px 10px;">
-                <p style="margin:0 0 8px;color:#00d36c;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;">
-                  Resgate solicitado
-                </p>
-                <h1 style="margin:0;color:#f4f7f5;font-size:29px;line-height:1.1;">
-                  Sua solicitação foi registrada.
-                </h1>
-                <p style="margin:14px 0 0;color:#aeb8b2;font-size:15px;line-height:1.6;">
-                  Recebemos sua solicitação de resgate do prêmio do pixel #${input.cellId.toLocaleString("pt-BR")}. Você receberá um e-mail sobre o status da solicitação e poderá acompanhar o resgate pelo mesmo link.
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:18px 28px 0;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#171b20" style="border:1px solid #2b333c;border-radius:0;background:#171b20 !important;background-color:#171b20 !important;">
-                  <tr>
-                    <td style="padding:18px 20px;">
-                      <p style="margin:0 0 13px;color:#00b85c;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;">Dados da solicitação</p>
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                        <tr>
-                          <td style="padding:8px 0;border-bottom:1px solid #2b333c;color:#8b93a1;font-size:12px;">Valor do resgate</td>
-                          <td align="right" style="padding:8px 0;border-bottom:1px solid #2b333c;color:#16d878;font-size:16px;font-weight:900;">${amount}</td>
-                        </tr>
-                        <tr>
-                          <td style="padding:8px 0;border-bottom:1px solid #2b333c;color:#8b93a1;font-size:12px;">E-mail informado</td>
-                          <td align="right" style="padding:8px 0;border-bottom:1px solid #2b333c;color:#e5e7eb;font-size:12px;font-weight:700;word-break:break-word;">${safeEmail}</td>
-                        </tr>
-                        <tr>
-                          <td style="padding:8px 0;border-bottom:1px solid #2b333c;color:#8b93a1;font-size:12px;">Chave Pix informada</td>
-                          <td align="right" style="padding:8px 0;border-bottom:1px solid #2b333c;color:#e5e7eb;font-size:12px;font-weight:700;word-break:break-word;">${safePixKey}</td>
-                        </tr>
-                        <tr>
-                          <td style="padding:8px 0;color:#8b93a1;font-size:12px;">Solicitado em</td>
-                          <td align="right" style="padding:8px 0;color:#e5e7eb;font-size:12px;font-weight:700;">${requestedAt}</td>
-                        </tr>
-                      </table>
+        <td align="center" bgcolor="#000000">
+          <table class="email-card" role="presentation" width="520" cellpadding="0" cellspacing="0" bgcolor="#0b0d10" style="max-width:520px;width:100%;background-color:#0b0d10;border:1px solid #1e2126;">
+            <tr><td style="padding:24px 28px;border-bottom:1px solid #1e2126;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                <td style="vertical-align:middle;">
+                  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                    <td style="width:32px;">
+                      <table role="presentation" cellpadding="0" cellspacing="2"><tr>
+                        <td width="9" height="9" bgcolor="#2ee66b" style="width:9px;height:9px;background-color:#2ee66b;"></td>
+                        <td width="9" height="9" bgcolor="#0b0d10" style="width:9px;height:9px;background-color:#0b0d10;"></td>
+                      </tr>
+                      <tr>
+                        <td width="9" height="9" bgcolor="#0b0d10" style="width:9px;height:9px;background-color:#0b0d10;"></td>
+                        <td width="9" height="9" bgcolor="#2ee66b" style="width:9px;height:9px;background-color:#2ee66b;"></td>
+                      </tr></table>
                     </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:18px 28px 0;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#20262d" style="background:#20262d !important;background-color:#20262d !important;border:1px solid #00b85c;border-radius:0;">
-                  <tr>
-                    <td style="padding:16px 20px;color:#e5e7eb;font-size:13px;line-height:1.55;">
-                      <strong style="color:#16d878;">Não reconhece este pedido ou informou algo errado?</strong><br>
-                      Acesse a tela segura do certificado para conferir os dados e cancelar a solicitação enquanto ela ainda não entrou em pagamento.
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:18px 28px 28px;">
-                <a href="${safeManageUrl}" style="display:inline-block;width:100%;padding:15px 20px;border-radius:0;background:#00b85c;color:#07150d;font-size:15px;font-weight:900;text-align:center;text-decoration:none;">
-                  Conferir ou cancelar resgate
-                </a>
-                <p style="margin:14px 0 0;color:#8b93a1;font-size:11px;line-height:1.5;text-align:center;">
-                  Solicitação #${input.redemptionId} · certificado ${safeCode}
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td bgcolor="#0f1316" style="padding:18px 28px;background:#0f1316 !important;background-color:#0f1316 !important;color:#8b93a1;font-size:11px;line-height:1.6;text-align:center;">
-                Se os dados estiverem corretos, não é necessário fazer nada. O status poderá ser acompanhado pelo mesmo link.
-              </td>
-            </tr>
+                    <td style="font-size:16px;font-weight:800;color:#f4f4f4;letter-spacing:0.5px;padding-left:10px;">PIXELPIX</td>
+                  </tr></table>
+                </td>
+              </tr></table>
+            </td></tr>
+
+            <tr><td style="padding:32px 28px 4px 28px;">
+              <div style="font-size:12px;font-weight:700;color:#2ee66b;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Resgate solicitado</div>
+              <div style="font-size:32px;font-weight:800;color:#f4f4f4;line-height:1.2;letter-spacing:-0.5px;">Sua solicitação de resgate foi recebida.</div>
+            </td></tr>
+
+            <tr><td style="padding:10px 28px 28px 28px;">
+              <div style="font-size:14px;font-weight:600;color:#9aa1ab;line-height:1.5;">Recebemos a sua solicitação de resgate do prêmio de ${amount} do pixel #${input.cellId.toLocaleString("pt-BR")}, pelo certificado ${safeCode}.</div>
+            </td></tr>
+
+            <tr><td style="padding:0 28px 4px 28px;">
+              <div style="font-size:11px;font-weight:700;color:#2ee66b;letter-spacing:1px;text-transform:uppercase;">Dados da solicitação</div>
+            </td></tr>
+
+            <tr><td style="padding:16px 28px 0 28px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1e2126;">
+                <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                    <td style="font-size:13px;color:#9aa1ab;">Valor do resgate</td>
+                    <td align="right" style="font-size:15px;color:#2ee66b;font-weight:800;">${amount}</td>
+                  </tr></table>
+                </td></tr>
+                <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                    <td style="font-size:13px;color:#9aa1ab;">E-mail informado</td>
+                    <td align="right" style="font-size:13px;color:#f4f4f4;font-weight:700;word-break:break-word;overflow-wrap:anywhere;">${safeEmail}</td>
+                  </tr></table>
+                </td></tr>
+                <tr><td style="padding:14px 16px;border-bottom:1px solid #1e2126;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                    <td style="font-size:13px;color:#9aa1ab;">Chave Pix informada</td>
+                    <td align="right" style="font-size:13px;color:#f4f4f4;font-weight:700;word-break:break-word;overflow-wrap:anywhere;">${safePixKey}</td>
+                  </tr></table>
+                </td></tr>
+                <tr><td style="padding:14px 16px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                    <td style="font-size:13px;color:#9aa1ab;">Solicitado em</td>
+                    <td align="right" style="font-size:13px;color:#f4f4f4;font-weight:700;word-break:break-word;">${requestedAt}</td>
+                  </tr></table>
+                </td></tr>
+              </table>
+            </td></tr>
+
+            <tr><td style="padding:24px 28px 0 28px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="#2ee66b" style="background-color:#2ee66b;">
+                <a href="${safeManageUrl}" style="display:block;width:auto;max-width:100%;box-sizing:border-box;padding:14px;font-size:14px;font-weight:800;color:#0b0d10;text-decoration:none;letter-spacing:0.3px;">ACOMPANHAR SOLICITAÇÃO</a>
+              </td></tr></table>
+            </td></tr>
+
+            <tr><td style="padding:12px 28px 0 28px;">
+              <div style="font-size:12px;color:#5c6470;text-align:center;line-height:1.5;">Você receberá um e-mail assim que o status do resgate for atualizado.</div>
+            </td></tr>
+
+            <tr><td style="padding:20px 28px 28px 28px;">
+              <div style="font-size:13px;color:#9aa1ab;text-align:center;line-height:1.6;margin-bottom:12px;">
+                Não reconhece este pedido ou informou algo errado? <a href="${safeManageUrl}" style="color:#2ee66b;text-decoration:underline;font-weight:700;">Cancelar solicitação</a>
+              </div>
+              <div style="font-size:11px;color:#4a4f57;text-align:center;line-height:1.6;">
+                Se você reconhece o resgate, não é necessário realizar nenhuma ação.
+              </div>
+            </td></tr>
           </table>
-          <p style="max-width:560px;margin:18px auto 0;color:#5f6c65;font-size:11px;line-height:1.5;text-align:center;">
-            PIXELPIX — Revele um pixel
-          </p>
         </td>
       </tr>
     </table>
@@ -149,25 +151,27 @@ export function buildRedemptionRequestEmail(input: RedemptionRequestEmailInput) 
   const text = [
     "PIXELPIX — Resgate solicitado",
     "",
-    `Sua solicitação de resgate do pixel #${input.cellId.toLocaleString("pt-BR")} foi registrada.`,
-    "Você receberá um e-mail sobre o status da solicitação e poderá acompanhar o resgate pelo mesmo link.",
+    "Sua solicitação de resgate foi recebida.",
+    `Recebemos a sua solicitação de resgate do prêmio de ${amount} do pixel #${input.cellId.toLocaleString("pt-BR")}, pelo certificado ${input.certificateCode}.`,
     "",
+    "Dados da solicitação",
     `Valor do resgate: ${amount}`,
     `E-mail informado: ${input.email}`,
     `Chave Pix informada: ${input.pixKey}`,
     `Solicitado em: ${requestedAt}`,
-    `Solicitação: #${input.redemptionId}`,
-    `Certificado: ${input.certificateCode}`,
     "",
-    "Se os dados estiverem errados ou você não reconhecer o pedido, acesse o link abaixo para conferir e cancelar a solicitação:",
-    input.manageUrl,
+    `Acompanhar solicitação: ${input.manageUrl}`,
     "",
-    "Se os dados estiverem corretos, não é necessário fazer nada. O status poderá ser acompanhado pelo mesmo link.",
+    "Você receberá um e-mail assim que o status do resgate for atualizado.",
+    "",
+    "Não reconhece este pedido ou informou algo errado? Acesse o link acima para conferir e cancelar a solicitação.",
+    "",
+    "Se você reconhece o resgate, não é necessário realizar nenhuma ação.",
   ].join("\n");
 
   return {
     html: safeHtml,
     text,
-    subject: `PIXELPIX · Resgate solicitado — pixel #${input.cellId}`,
+    subject: "PIXELPIX — Resgate solicitado",
   };
 }
